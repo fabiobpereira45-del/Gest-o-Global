@@ -1,0 +1,126 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* IBAD Brand Colors - Deep Violet & Gold */
+  --maroon: #4c1d95;
+  --maroon-light: #6d28d9;
+  --maroon-dark: #2e1065;
+  --gold: #7c3aed;
+  --gold-light: #8b5cf6;
+  --gold-dark: #5b21b6;
+
+  /* Semantic tokens */
+  --background: #fafafa;
+  --foreground: #1a1035;
+  --card: #ffffff;
+  --card-foreground: #1a1035;
+  --popover: #ffffff;
+  --popover-foreground: #1a1035;
+  --primary: var(--maroon);
+  --primary-foreground: #ffffff;
+  --secondary: #f5f3ff;
+  --secondary-foreground: var(--maroon);
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --accent: var(--gold);
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #e4e0f5;
+  --input: #f1f0f9;
+  --ring: var(--gold-light);
+  --radius: 0.75rem;
+  --navy: #0f172a;
+  --navy-light: #1e293b;
+  --accent-gold: #7c3aed;
+
+  /* Chart */
+  --chart-1: var(--maroon);
+  --chart-2: var(--gold);
+  --chart-3: #5b21b6;
+  --chart-4: #a78bfa;
+  --chart-5: #2e1065;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
+  --font-serif: var(--font-merriweather), 'Merriweather', Georgia, serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Brand tokens */
+  --color-maroon: var(--maroon);
+  --color-maroon-light: var(--maroon-light);
+  --color-maroon-dark: var(--maroon-dark);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-gold-dark: var(--gold-dark);
+  --color-navy: var(--navy);
+  --color-navy-light: var(--navy-light);
+  --color-accent-gold: var(--accent-gold);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl;
+  }
+
+  .glass-dark {
+    @apply bg-slate-950/70 backdrop-blur-md border border-white/10 shadow-xl;
+  }
+
+  .premium-shadow {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+
+  .premium-gradient {
+    background: linear-gradient(135deg, var(--maroon) 0%, var(--maroon-light) 100%);
+  }
+
+  .accent-gradient {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+  }
+
+  .hover-lift {
+    @apply transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg;
+  }
+}

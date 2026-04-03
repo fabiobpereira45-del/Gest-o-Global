@@ -1,0 +1,17 @@
+{
+    "name": "IBAD - Instituto Bíblico",
+    "short_name": "IBAD",
+    "description": "Sistema de Gestão Teológica IBAD",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#2e1065",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/apple-icon.png",
+            "sizes": "180x180 192x192 512x512 any",
+            "type": "image/png"
+        }
+    ]
+}
