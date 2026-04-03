@@ -21,6 +21,7 @@ import {
   getAvailableSlots,
 } from "@/lib/store"
 import { BookOpen, GraduationCap, ClipboardList, User } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 type View = "landing" | "public-exam-login" | "student-portal-login" | "student-assessment" | "student-result" | "professor-login" | "admin" | "student-dashboard"
 
@@ -60,10 +61,8 @@ export default function HomePage() {
         if (existing) {
           setSession(studentSession)
           setSubmission(existing)
-          setView(existing.submittedAt ? "student-result" : "student-assessment")
         } else {
           setSession(studentSession)
-          setView("student-assessment")
         }
       }
     }
@@ -201,15 +200,37 @@ export default function HomePage() {
                 <p className="text-sm text-muted-foreground">Acesso restrito para alunos matriculados.</p>
               </button>
 
-              {/* Prova Pública */}
+              {/* Prova Pública ou Retomar Prova */}
               <button
-                onClick={() => setView("public-exam-login")}
-                className="group relative overflow-hidden bg-card border-2 border-border rounded-2xl p-6 text-left shadow-lg hover:shadow-xl hover:border-accent/40 hover:scale-[1.02] transition-all"
+                onClick={() => {
+                  if (session) {
+                    if (submission && submission.submittedAt) setView("student-result")
+                    else setView("student-assessment")
+                  } else {
+                    setView("public-exam-login")
+                  }
+                }}
+                className={cn(
+                  "group relative overflow-hidden bg-white border-2 rounded-2xl p-6 text-left shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all",
+                  session ? "border-indigo-400 bg-indigo-50/20" : "border-border hover:border-accent/40"
+                )}
               >
-                <div className="absolute inset-0 bg-accent/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <GraduationCap className="h-8 w-8 text-accent mb-3" />
-                <h2 className="text-xl font-extrabold mb-1 text-foreground">Prova Pública</h2>
-                <p className="text-sm text-muted-foreground">Acesso aberto para avaliações públicas sem matrícula.</p>
+                <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity", session ? "bg-indigo-400/5" : "bg-accent/5")} />
+                <GraduationCap className={cn("h-8 w-8 mb-3", session ? "text-indigo-600" : "text-accent")} />
+                <h2 className="text-xl font-extrabold mb-1 text-foreground">
+                  {session ? "Retomar minha Prova" : "Prova Pública"}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {session 
+                    ? "Você tem uma prova em andamento. Clique para continuar." 
+                    : "Acesso aberto para avaliações públicas sem matrícula."}
+                </p>
+                {session && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="h-2 w-2 bg-indigo-500 rounded-full animate-pulse" />
+                    <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Sessão Ativa</span>
+                  </div>
+                )}
               </button>
             </div>
 
