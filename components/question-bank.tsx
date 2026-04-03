@@ -204,7 +204,7 @@ function QuestionModal({
 
   function isValid() {
     if (!text.trim()) return false
-    if (type === "multiple-choice") {
+    if (type === "multiple-choice" || type === "incorrect-alternative") {
       const filled = choices.filter((c) => c.text.trim())
       return filled.length >= 2 && !!correctAnswer
     }
@@ -225,7 +225,7 @@ function QuestionModal({
       disciplineId,
       type,
       text: text.trim(),
-      choices: type === "multiple-choice" ? choices.filter((c) => c.text.trim()) : [],
+      choices: (type === "multiple-choice" || type === "incorrect-alternative") ? choices.filter((c) => c.text.trim()) : [],
       pairs: type === "matching" ? pairs.filter(p => p.left.trim() && p.right.trim()) : [],
       correctAnswer: type === "discursive" ? "" : correctAnswer,
       points,

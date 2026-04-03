@@ -36,6 +36,15 @@ export default function HomePage() {
   useEffect(() => {
     setMounted(true)
 
+    const { hash } = window.location
+    const isLoginHash = hash === "#admin" || hash === "#/admin" || hash === "#master"
+
+    // If there is an admin intent in the URL, prioritize the login screen
+    if (isLoginHash) {
+      setView("professor-login")
+      return
+    }
+
     // Restore professor session
     const profSession = getProfessorSession()
     if (profSession) {
@@ -43,7 +52,7 @@ export default function HomePage() {
       return
     }
 
-    // Restore student session
+    // Restore student session (only if not an admin intent)
     async function checkStudentSession() {
       const studentSession = getStudentSession()
       if (studentSession) {
@@ -66,14 +75,6 @@ export default function HomePage() {
 
     checkStudentSession()
     fetchSlots()
-  }, [])
-
-  // Hash routing for admin panel: /admin
-  useEffect(() => {
-    const { hash } = window.location
-    if (hash === "#admin" || hash === "#/admin") {
-      setView("professor-login")
-    }
   }, [])
 
   const handleStudentLogin = useCallback(async (sess: StudentSession) => {

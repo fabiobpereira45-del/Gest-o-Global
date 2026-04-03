@@ -16,6 +16,12 @@ import {
 } from "@/lib/store"
 import { cn } from "@/lib/utils"
 
+const SCROLL_HIDE_STYLE = {
+  msOverflowStyle: 'none',
+  scrollbarWidth: 'none',
+  '&::-webkit-scrollbar': { display: 'none' }
+} as any
+
 function PortraitGuard() {
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white p-8 text-center lg:hidden portrait:hidden">
@@ -320,52 +326,100 @@ export function AssessmentForm({ session, onSubmit }: Props) {
       <PortraitGuard />
       
       {/* Dynamic Header */}
-      <header className="p-4 sm:p-6 sm:px-8 border-b border-slate-100 bg-white flex flex-col gap-4 relative z-20 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-100 border border-slate-200 text-slate-700">
-              <BookOpenCheck className="h-5 w-5" />
+      <header className="px-4 py-3 sm:px-8 border-b border-slate-100 bg-white sticky top-0 z-30 shadow-sm flex flex-col gap-3">
+        {/* Row 1: Context & Meta */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="h-9 w-9 shrink-0 flex items-center justify-center rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600">
+              <BookOpenCheck className="h-4.5 w-4.5" />
             </div>
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-slate-500 line-clamp-1">{disc?.name ?? "Disciplina"}</h2>
-              <div className="font-bold text-slate-900 line-clamp-1 text-sm sm:text-base pr-4">
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 line-clamp-1 mb-0.5">{disc?.name ?? "Disciplina"}</p>
+              <h1 className="font-extrabold text-slate-800 line-clamp-1 text-sm sm:text-base leading-tight uppercase tracking-tight">
                 {assessment.title}
-              </div>
+              </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-             <Button variant="outline" size="sm" onClick={() => setShowGrid(true)} className="rounded-full bg-white hidden sm:flex border-slate-200 text-slate-600 hover:bg-slate-50">
-               <LayoutGrid className="h-4 w-4 mr-2" />
-               Mapa da Prova
-             </Button>
-             <button onClick={() => setShowGrid(true)} className="sm:hidden h-10 w-10 flex items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50">
-               <LayoutGrid className="h-5 w-5" />
-             </button>
-             <div className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-full font-mono text-sm sm:text-base font-bold transition-colors border",
+          <div className="flex items-center gap-2 shrink-0">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowGrid(true)}
+              className="hidden sm:flex items-center gap-2 h-9 rounded-xl border-slate-200 text-slate-600 font-bold text-xs ring-offset-white transition-all hover:bg-slate-50"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Mapa da Prova
+            </Button>
+
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-xl font-mono text-xs sm:text-sm font-black transition-all border shadow-sm",
               timeLeft !== null && timeLeft < 300 
                 ? "bg-red-50 text-red-600 border-red-200 animate-pulse ring-2 ring-red-500/20" 
-                : "bg-slate-100 text-slate-700 border-slate-200"
+                : "bg-slate-50 text-slate-700 border-slate-200"
             )}>
-              <Clock className={cn("h-4 w-4", timeLeft !== null && timeLeft < 300 ? "text-red-500" : "text-slate-500")} />
-               {timeLeft !== null ? (
-                <span title="Tempo restante">-{formatTime(timeLeft)}</span>
-              ) : (
-                formatTime(elapsed)
-              )}
-             </div>
+              <Clock className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", timeLeft !== null && timeLeft < 300 ? "text-red-500" : "text-slate-400")} />
+              {timeLeft !== null ? <span>{formatTime(timeLeft)}</span> : formatTime(elapsed)}
+            </div>
           </div>
         </div>
 
-        {/* Top Progress Bar */}
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <Progress value={progress} className="h-2.5 bg-slate-100" />
+        {/* Row 2: Main Navigation Row (Requested Layout) */}
+        <div className="flex items-center gap-2 w-full pt-1">
+           <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-10 px-2.5 rounded-xl border-slate-200 text-slate-600 shrink-0 hover:bg-slate-50 disabled:opacity-30"
+            disabled={currentStep === 0}
+            onClick={() => setCurrentStep(prev => prev - 1)}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+
+          <div className="flex-1 overflow-x-auto py-1 mx-1" style={SCROLL_HIDE_STYLE}>
+            <div className="flex items-center gap-1.5 px-0.5 min-w-max">
+              {questions.map((q, i) => {
+                const isActive = i === currentStep
+                const isAns = !!getAnswer(q.id)
+                const isFlg = flagged.has(q.id)
+                
+                return (
+                  <button 
+                    key={q.id}
+                    onClick={() => setCurrentStep(i)}
+                    className={cn(
+                      "w-9 h-9 rounded-xl flex items-center justify-center text-[12px] font-black transition-all relative shrink-0 border-2",
+                      isActive ? "bg-primary text-white border-primary shadow-md ring-2 ring-primary/20 scale-105 z-10" :
+                      isAns ? "bg-green-50 text-green-700 border-green-100 hover:bg-green-100" : 
+                      isFlg ? "bg-amber-50 text-amber-700 border-amber-100" :
+                      "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"
+                    )}
+                  >
+                    {i + 1}
+                  </button>
+                )
+              })}
+            </div>
           </div>
-          <span className="text-xs font-bold text-slate-400 min-w-[3rem] text-right">
-            {progress}%
-          </span>
+
+          <Button 
+            size="sm" 
+            className={cn(
+              "h-10 px-4 rounded-xl font-black transition-all shrink-0 shadow-sm",
+              isAnswered && !isLastQuestion && !isReviewStep 
+                ? "bg-primary text-white hover:bg-primary/90 shadow-primary/20" 
+                : "bg-slate-900 text-white hover:bg-slate-800"
+            )}
+            onClick={() => setCurrentStep(prev => Math.min(prev + 1, totalQs))}
+          >
+            <span className="hidden xs:inline mr-1">{isLastQuestion ? "Revisar" : isReviewStep ? "Fim" : "Próxima"}</span>
+            {!isLastQuestion && !isReviewStep ? <ChevronRight className="h-5 w-5" /> : <Check className="h-5 w-5" />}
+          </Button>
+        </div>
+
+        {/* Progress Bar moved slightly more discrete */}
+        <div className="w-full bg-slate-50 h-1 rounded-full overflow-hidden mt-1">
+          <div className="bg-primary/40 h-full transition-all duration-700" style={{ width: `${progress}%` }} />
         </div>
       </header>
 
@@ -443,31 +497,7 @@ export function AssessmentForm({ session, onSubmit }: Props) {
           </div>
         ) : currentQ && (
           /* SINGLE QUESTION RENDERER */
-          <div key={currentQ.id} className="flex-1 flex flex-col sm:flex-row overflow-hidden animate-in slide-in-from-right-8 fade-in duration-300">
-            {/* Question Sidebar Tracker (Desktop) */}
-            <div className="hidden lg:flex w-24 bg-slate-100/50 border-r border-slate-200 flex-col py-6 items-center gap-3 overflow-y-auto">
-              {questions.map((q, i) => {
-                const isActive = i === currentStep
-                const isAns = !!getAnswer(q.id)
-                const isFlg = flagged.has(q.id)
-                return (
-                  <button 
-                    key={q.id}
-                    onClick={() => setCurrentStep(i)}
-                    className={cn(
-                      "w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold transition-all relative shrink-0",
-                      isActive ? "bg-primary text-white scale-110 shadow-md ring-4 ring-primary/20" :
-                      isAns ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-white text-slate-500 border hover:bg-slate-50 border-slate-200",
-                      isFlg && !isActive && "ring-2 ring-amber-400"
-                    )}
-                  >
-                    {i + 1}
-                    {isFlg && <div className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-amber-500 rounded-full border-2 border-white" />}
-                  </button>
-                )
-              })}
-            </div>
-
+          <div key={currentQ.id} className="flex-1 flex flex-col overflow-hidden animate-in slide-in-from-right-8 fade-in duration-300">
             {/* Content Body */}
             <div className="flex-1 flex flex-col overflow-y-auto w-full max-w-4xl mx-auto px-4 sm:px-10 pb-32 pt-6 sm:pt-10">
               
@@ -494,7 +524,12 @@ export function AssessmentForm({ session, onSubmit }: Props) {
 
               <div className="flex gap-2 mb-4 items-center px-1">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  {currentQ.type === "multiple-choice" ? "Múltipla Escolha" : currentQ.type === "true-false" ? "Julgamento" : currentQ.type === "fill-in-the-blank" ? "Preenchimento" : "Discursiva"}
+                  {currentQ.type === "multiple-choice" ? "Múltipla Escolha" : 
+                   currentQ.type === "true-false" ? "Julgamento" : 
+                   currentQ.type === "fill-in-the-blank" ? "Preenchimento" : 
+                   currentQ.type === "incorrect-alternative" ? "Escolha a Incorreta" : 
+                   currentQ.type === "matching" ? "Relacionar Colunas" :
+                   "Discursiva"}
                 </span>
                 <span className="h-1 w-1 bg-slate-300 rounded-full"></span>
                 <span className="text-xs font-bold text-slate-400">{assessment.pointsPerQuestion} ponto{assessment.pointsPerQuestion !== 1 && 's'}</span>
@@ -505,8 +540,8 @@ export function AssessmentForm({ session, onSubmit }: Props) {
                 {currentQ.text}
               </h3>
 
-              {/* Múltipla Escolha */}
-              {currentQ.type === "multiple-choice" && (
+              {/* Múltipla Escolha & Escolha a Incorreta */}
+              {(currentQ.type === "multiple-choice" || currentQ.type === "incorrect-alternative") && (
                 <div className="flex flex-col gap-3 sm:gap-4">
                   {currentQ.choices?.map((c, idx) => {
                     const isSelected = currentAns === c.id
@@ -663,56 +698,19 @@ export function AssessmentForm({ session, onSubmit }: Props) {
         )}
       </main>
 
-      {/* Persistent Bottom Fixed Navigator */}
-      <footer className="bg-white border-t border-slate-200 p-4 sm:p-6 sticky bottom-0 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.04)] flex items-center justify-between">
-         <Button 
-            variant="outline" 
-            size="lg" 
-            className="rounded-xl h-14 px-4 sm:px-6 font-bold border-slate-300 text-slate-600 hover:text-slate-900"
-            disabled={currentStep === 0}
-            onClick={() => setCurrentStep(prev => prev - 1)}
-          >
-            <ChevronLeft className="h-5 w-5 sm:mr-2" /> <span className="hidden sm:inline">Anterior</span>
-         </Button>
-
-         <div className="flex flex-col items-center">
-             <div className="flex gap-1 mb-1">
-               {Array.from({ length: 5 }).map((_, i) => {
-                  // Just a cute dot indicator for proximity
-                  const relativeIdx = currentStep - 2 + i
-                  if(relativeIdx < 0 || relativeIdx >= totalQs) return null
-                  const isCur = relativeIdx === currentStep
-                  const isAns = !!getAnswer(questions[relativeIdx]?.id)
-                  return (
-                    <div key={i} className={cn(
-                      "h-2 rounded-full transition-all", 
-                      isCur ? "w-4 bg-primary" : "w-2 bg-slate-200 opacity-60 scale-75",
-                      isAns && !isCur && "bg-green-400"
-                    )}/>
-                  )
-               })}
-             </div>
-         </div>
-
-         <Button 
-            size="lg" 
-            className={cn(
-              "rounded-xl h-14 px-4 sm:px-8 font-bold transition-all shadow-md group",
-              isAnswered && !isLastQuestion && !isReviewStep 
-                ? "bg-primary text-white hover:bg-primary/90 shadow-primary/20 hover:shadow-lg animate-pulse ring-2 ring-primary ring-offset-2" 
-                : "bg-slate-900 text-white hover:bg-slate-800"
-            )}
-            onClick={() => setCurrentStep(prev => Math.min(prev + 1, totalQs))}
-          >
-            {isLastQuestion ? (
-              <span className="flex items-center">Revisar <Check className="ml-2 h-5 w-5" /></span>
-            ) : isReviewStep ? (
-              <span className="flex items-center">Fim</span>
-            ) : (
-              <span className="flex items-center"><span className="hidden sm:inline">Próxima</span> <ChevronRight className="h-5 w-5 sm:ml-2 transition-transform group-hover:translate-x-1" /></span>
-            )}
-         </Button>
-      </footer>
+      {/* Rodapé simplificado apenas para o botão de Finalizar quando estiver na Revisão */}
+      {isReviewStep && (
+        <footer className="bg-white border-t border-slate-200 p-4 sm:p-6 sticky bottom-0 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.04)] flex items-center justify-center">
+          <Button
+              size="lg"
+              className="rounded-2xl h-16 px-12 font-black text-lg bg-primary text-white hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95"
+              onClick={handleFinalize}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Enviando..." : "Finalizar Avaliação"}
+          </Button>
+        </footer>
+      )}
     </div>
   )
 }

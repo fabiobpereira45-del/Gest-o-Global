@@ -4,9 +4,10 @@ import { useEffect, useState } from "react"
 import {
   Users, FileText, BookOpen, Settings, BarChart3, Download, LogOut,
   Plus, Pencil, Trash2, Eye, EyeOff, Trophy, Clock, CheckCircle2,
-  ShieldCheck, Sparkles, AlertCircle, ChevronRight, ChevronLeft, Shuffle, Check, ListChecks, Search, HelpCircle, Variable,
+  ShieldCheck, Sparkles, AlertCircle, AlertTriangle, ChevronRight, ChevronLeft, Shuffle, Check, ListChecks, Search, HelpCircle, Variable,
   ArrowUp, ArrowDown, RefreshCw, List, Globe, Lock
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -307,7 +308,13 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label>Disciplina *</Label>
-                <Select value={disciplineId} onValueChange={setDisciplineId}>
+                <Select 
+                  value={disciplineId} 
+                  onValueChange={(v) => {
+                    setDisciplineId(v)
+                    setSelectedIds(new Set())
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a disciplina" />
                   </SelectTrigger>
@@ -558,8 +565,25 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
               )}
 
               {selectionMode === "auto" && (
-                <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
-                  {Math.min(questionCount, availableQuestions.length)} questão{Math.min(questionCount, availableQuestions.length) !== 1 ? "ões" : ""} será{Math.min(questionCount, availableQuestions.length) !== 1 ? "ão" : ""} selecionada{Math.min(questionCount, availableQuestions.length) !== 1 ? "s" : ""} aleatoriamente do banco de {availableQuestions.length} questão{availableQuestions.length !== 1 ? "ões" : ""} disponíveis.
+                <div className={cn(
+                  "rounded-lg p-4 text-sm font-medium transition-all",
+                  availableQuestions.length < questionCount 
+                    ? "bg-amber-50 text-amber-700 border border-amber-200" 
+                    : "bg-muted text-muted-foreground"
+                )}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold">
+                      {Math.min(questionCount, availableQuestions.length)} questão{Math.min(questionCount, availableQuestions.length) !== 1 ? "ões" : ""} será{Math.min(questionCount, availableQuestions.length) !== 1 ? "ão" : ""} selecionada{Math.min(questionCount, availableQuestions.length) !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <p className="opacity-90">
+                    Extraídas aleatoriamente do banco de {availableQuestions.length} questão{availableQuestions.length !== 1 ? "ões" : ""} disponíveis para os formatos selecionados.
+                  </p>
+                  {availableQuestions.length < questionCount && (
+                    <p className="mt-2 text-xs font-bold uppercase tracking-tight flex items-center gap-1 text-amber-600">
+                      <AlertTriangle className="h-3 w-3" /> Atenção: O banco possui menos questões que o solicitado ({questionCount}).
+                    </p>
+                  )}
                 </div>
               )}
             </div>
