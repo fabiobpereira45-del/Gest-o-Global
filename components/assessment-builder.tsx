@@ -80,11 +80,11 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
         setLogoBase64(assessment.logoBase64 ?? "")
         setRules(assessment.rules ?? "")
         setModality(assessment.modality ?? "public")
-        setPointsPerQuestion(assessment.pointsPerQuestion)
-        setPointsInput(assessment.pointsPerQuestion.toString())
+        setPointsPerQuestion(assessment.pointsPerQuestion || 0)
+        setPointsInput((assessment.pointsPerQuestion || 0).toString())
         setTimeLimitMinutes(assessment.timeLimitMinutes ?? 0)
-        setQuestionCount(assessment.questionIds.length)
-        setSelectedIds(new Set(assessment.questionIds))
+        setQuestionCount(assessment.questionIds?.length || 0)
+        setSelectedIds(new Set(assessment.questionIds || []))
         setStep(1)
       } else {
         setTitle("")
@@ -264,7 +264,7 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
   }
 
 
-  const totalPoints = questionCount * pointsPerQuestion
+  const totalPoints = (questionCount || 0) * (pointsPerQuestion || 0)
   const selectedDisc = disciplines.find((d) => d.id === disciplineId)
 
   return (
@@ -643,6 +643,11 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
                       }
                     }
                     const previewQs = previewIds.map(id => availableQuestions.find(q => q.id === id)).filter(Boolean) as Question[]
+                    
+                    if (previewQs.length === 0 && previewIds.length > 0 && availableQuestions.length > 0) {
+                      // Fallback: se não encontrou os IDs (ex: editando prova com questões que não estão no filtro de tipos atual)
+                      // Mostra um aviso ou ignora o filtro temporariamente?
+                    }
 
                     return previewQs.map((q, idx) => (
                       <div key={idx} className="flex flex-col gap-2 relative border border-gray-200 rounded-md p-4 bg-white shadow-sm hover:shadow-md transition-shadow">

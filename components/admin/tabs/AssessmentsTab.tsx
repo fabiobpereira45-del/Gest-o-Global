@@ -247,8 +247,8 @@ export function AssessmentsTab({ assessments, submissions, questions, discipline
                   </div>
                   <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
                     <span>{disc?.name ?? "Disciplina removida"}</span>
-                    <span>{a.questionIds.length} questão{a.questionIds.length !== 1 ? "ões" : ""}</span>
-                    <span>{a.totalPoints.toFixed(1)} pts</span>
+                    <span>{(a.questionIds?.length || 0)} {a.questionIds?.length === 1 ? "Questão" : "Questões"}</span>
+                    <span>{(a.totalPoints || 0).toFixed(1)} pts</span>
                     <span>{subCount} resposta{subCount !== 1 ? "s" : ""}</span>
                   </div>
                 </div>
