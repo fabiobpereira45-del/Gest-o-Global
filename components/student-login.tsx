@@ -98,7 +98,7 @@ export function StudentLogin({ onLogin, onResult, onBack, preloadedAssessmentId 
       setLoading(false); return
     }
     if (!isQuery && submitted) {
-      setError("Este e-mail já foi utilizado. Para consultar sua nota, clique em 'Ver Resultado Anterior'.")
+      setError("ACESSO BLOQUEADO: Você já finalizou esta prova anteriormente. Não é permitido refazer a avaliação.")
       setLoading(false); return
     }
 

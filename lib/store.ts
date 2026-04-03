@@ -863,13 +863,22 @@ export async function deleteSubmission(id: string): Promise<void> {
   await supabase.from('student_submissions').delete().eq('id', id)
 }
 export async function hasStudentSubmitted(email: string, assessmentId: string): Promise<boolean> {
+  if (!email || !assessmentId) return false
   const supabase = createClient()
-  const { count } = await supabase.from('student_submissions').select('*', { count: 'exact', head: true }).match({ assessment_id: assessmentId, student_email: email })
+  const cleanEmail = email.trim().toLowerCase()
+  const { count } = await supabase.from('student_submissions')
+    .select('*', { count: 'exact', head: true })
+    .match({ assessment_id: assessmentId, student_email: cleanEmail })
   return (count || 0) > 0
 }
 export async function getSubmissionByEmailAndAssessment(email: string, assessmentId: string): Promise<StudentSubmission | null> {
+  if (!email || !assessmentId) return null
   const supabase = createClient()
-  const { data } = await supabase.from('student_submissions').select('*').match({ assessment_id: assessmentId, student_email: email }).maybeSingle()
+  const cleanEmail = email.trim().toLowerCase()
+  const { data } = await supabase.from('student_submissions')
+    .select('*')
+    .match({ assessment_id: assessmentId, student_email: cleanEmail })
+    .maybeSingle()
   return data ? mapSubmission(data) : null
 }
 

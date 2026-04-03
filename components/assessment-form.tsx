@@ -11,6 +11,7 @@ import {
 import {
   getAssessmentById, getQuestionsByDiscipline, saveDraftAnswers, getDraftAnswers,
   saveSubmission, calculateScore, clearStudentSession, getDisciplines,
+  getSubmissionByEmailAndAssessment,
   type StudentSession, type StudentAnswer, type StudentSubmission, uid,
   type Assessment, type Question, type Discipline,
 } from "@/lib/store"
@@ -62,6 +63,14 @@ export function AssessmentForm({ session, onSubmit }: Props) {
   useEffect(() => {
     let mounted = true
     async function load() {
+      // Double-check if student already submitted (Security Block)
+      const existing = await getSubmissionByEmailAndAssessment(session.email, session.assessmentId)
+      if (existing && existing.submittedAt) {
+          console.log("Aluno já realizou esta prova. Redirecionando para o resultado.");
+          onSubmit(existing);
+          return;
+      }
+
       const a = await getAssessmentById(session.assessmentId)
       if (!mounted) return
       setAssessment(a)
