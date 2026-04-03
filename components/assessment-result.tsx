@@ -84,7 +84,11 @@ export function AssessmentResult({ submission, onBack }: Props) {
       let label = "—"
 
       if (q.type === "multiple-choice" || q.type === "true-false" || q.type === "incorrect-alternative") {
-        isCorrect = studentAns?.answer === q.correctAnswer
+        const isDirectMatch = studentAns?.answer === q.correctAnswer
+        const studentText = (q.choices?.find(c => c.id === studentAns?.answer)?.text || "").trim()
+        const correctText = (q.choices?.find(c => c.id === q.correctAnswer)?.text || "").trim()
+        const isTextMatch = studentText && correctText && studentText === correctText
+        isCorrect = isDirectMatch || isTextMatch
         label = q.type === "true-false"
           ? (q.correctAnswer === "true" ? "Verdadeiro" : "Falso")
           : q.choices?.find((c) => c.id === q.correctAnswer)?.text ?? "—"
@@ -241,7 +245,12 @@ export function AssessmentResult({ submission, onBack }: Props) {
             {questions.map((q, idx) => {
               const studentAns = submission.answers.find((a) => a.questionId === q.id)
               const isDiscursive = q.type === "discursive"
-              const isCorrect = !isDiscursive && studentAns?.answer === q.correctAnswer
+              
+              const isDirectMatch = studentAns?.answer === q.correctAnswer
+              const studentText = (q.choices?.find(c => c.id === studentAns?.answer)?.text || "").trim()
+              const correctText = (q.choices?.find(c => c.id === q.correctAnswer)?.text || "").trim()
+              const isTextMatch = studentText && correctText && studentText === correctText
+              const isCorrect = !isDiscursive && (isDirectMatch || isTextMatch)
 
               const studentLabel = isDiscursive
                 ? (studentAns?.answer || "Em branco")

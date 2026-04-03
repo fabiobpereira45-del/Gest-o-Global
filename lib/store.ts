@@ -1048,7 +1048,12 @@ export function calculateScore(answers: StudentAnswer[], questions: Question[], 
     if (!ans) return
 
     if (q.type === "multiple-choice" || q.type === "true-false" || q.type === "incorrect-alternative") {
-      if (ans.answer === q.correctAnswer) score += pointsPerQuestion
+      const isDirectMatch = ans.answer === q.correctAnswer
+      const studentText = (q.choices?.find(c => c.id === ans.answer)?.text || "").trim()
+      const correctText = (q.choices?.find(c => c.id === q.correctAnswer)?.text || "").trim()
+      const isTextMatch = studentText && correctText && studentText === correctText
+      
+      if (isDirectMatch || isTextMatch) score += pointsPerQuestion
     } else if (q.type === "fill-in-the-blank") {
       const matches = q.text.match(/\[\[(.*?)\]\]/g)
       if (matches) {
