@@ -40,6 +40,8 @@ export function AssessmentForm({ session, onSubmit }: Props) {
   const [questions, setQuestions] = useState<Question[]>([])
   const [disc, setDisc] = useState<Discipline | null>(null)
   const [isInitializing, setIsInitializing] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const hasSubmittedRef = useRef(false)
 
   const [answers, setAnswers] = useState<StudentAnswer[]>(() => getDraftAnswers())
   const [currentStep, setCurrentStep] = useState(0) // 0 to questions.length (last is review)
@@ -97,27 +99,38 @@ export function AssessmentForm({ session, onSubmit }: Props) {
   }, [session.assessmentId])
 
   const handleFinalize = useCallback(async () => {
-    if (!assessment) return
-    const elapsedSecs = Math.floor((Date.now() - startedAt.current.getTime()) / 1000)
-    const { score, totalPoints, percentage } = calculateScore(answers, questions, assessment.pointsPerQuestion)
+    if (!assessment || isSubmitting || hasSubmittedRef.current) return
+    
+    setIsSubmitting(true)
+    hasSubmittedRef.current = true
 
-    const sub: StudentSubmission = {
-      id: uid(),
-      assessmentId: assessment.id,
-      studentName: session.name,
-      studentEmail: session.email,
-      answers,
-      score,
-      totalPoints,
-      percentage,
-      submittedAt: new Date().toISOString(),
-      timeElapsedSeconds: elapsedSecs,
-      focusLostCount,
+    try {
+      const elapsedSecs = Math.floor((Date.now() - startedAt.current.getTime()) / 1000)
+      const { score, totalPoints, percentage } = calculateScore(answers, questions, assessment.pointsPerQuestion)
+
+      const sub: StudentSubmission = {
+        id: uid(),
+        assessmentId: assessment.id,
+        studentName: session.name,
+        studentEmail: session.email,
+        answers,
+        score,
+        totalPoints,
+        percentage,
+        submittedAt: new Date().toISOString(),
+        timeElapsedSeconds: elapsedSecs,
+        focusLostCount,
+      }
+      await saveSubmission(sub)
+      clearStudentSession()
+      onSubmit(sub)
+    } catch (err) {
+      console.error("Erro ao salvar submissão:", err)
+      setIsSubmitting(false)
+      hasSubmittedRef.current = false
+      alert("Ocorreu um erro ao enviar suas respostas. Por favor, tente novamente.")
     }
-    await saveSubmission(sub)
-    clearStudentSession()
-    onSubmit(sub)
-  }, [answers, assessment, questions, session, onSubmit, focusLostCount])
+  }, [answers, assessment, questions, session, onSubmit, focusLostCount, isSubmitting])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -408,10 +421,22 @@ export function AssessmentForm({ session, onSubmit }: Props) {
                 </Button>
                 <Button 
                   size="lg" 
-                  className="rounded-xl font-bold h-14 px-8 bg-black hover:bg-slate-800 text-white shadow-lg shadow-slate-300 transition-all w-full sm:w-auto"
+                  className={cn(
+                    "rounded-xl font-bold h-14 px-8 text-white shadow-lg shadow-slate-300 transition-all w-full sm:w-auto",
+                    isSubmitting ? "bg-slate-400 cursor-not-allowed" : "bg-black hover:bg-slate-800"
+                  )}
                   onClick={() => handleFinalize()}
+                  disabled={isSubmitting}
                 >
-                  Entregar Avaliação <Check className="ml-2 h-5 w-5" />
+                  {isSubmitting ? (
+                    <span className="flex items-center">
+                      <Clock className="mr-2 h-5 w-5 animate-spin" /> Enviando...
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      Entregar Avaliação <Check className="ml-2 h-5 w-5" />
+                    </span>
+                  )}
                 </Button>
               </div>
             </div>
