@@ -250,7 +250,20 @@ export function saveDraftAnswers(answers: StudentAnswer[]): void { writeLocal(KE
 // DB Mappers
 function mapSemester(row: any): Semester { return { id: row.id, name: row.name, order: row.order, shift: row.shift || undefined, createdAt: row.created_at } }
 function mapStudyMaterial(row: any): StudyMaterial { return { id: row.id, disciplineId: row.discipline_id, title: row.title, description: row.description || undefined, fileUrl: row.file_url, createdAt: row.created_at } }
-function mapDiscipline(row: any): Discipline { return { id: row.id, name: row.name, description: row.description || undefined, semesterId: row.semester_id || undefined, professorName: row.professor_name || undefined, dayOfWeek: row.day_of_week || undefined, shift: row.shift || undefined, order: Number(row.order || 0), createdAt: row.created_at } }
+function mapDiscipline(row: any): Discipline { 
+  return { 
+    id: row.id, 
+    name: row.name, 
+    description: row.description || undefined, 
+    semesterId: row.semester_id || undefined, 
+    professorName: row.professor_name || undefined, 
+    dayOfWeek: row.day_of_week || undefined, 
+    shift: row.shift || undefined, 
+    order: Number(row.order || 0), 
+    is_realized: !!row.is_realized,
+    createdAt: row.created_at 
+  } 
+}
 function mapQuestion(row: any): Question {
   const choices = Array.isArray(row.choices) ? row.choices : (row.choices?.options || [])
   const pairs = row.pairs || row.choices?.matchingPairs || undefined
