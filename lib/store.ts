@@ -1651,29 +1651,51 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
   
   const charges = existing || []
   const updates = []
+  const deletions = []
 
-  // 1. Update existing monthly charges
+  // 1. Process existing charges (Update or Delete)
   for (let i = 0; i < charges.length; i++) {
     const charge = charges[i]
     const installmentNum = i + 1
-    const newDescription = `Mensalidade ${installmentNum}/${settings.totalMonths}`
     
-    const updateObj: any = { description: newDescription }
-    
-    // Only update amount for non-paid charges
-    if (!['paid', 'bolsa100', 'bolsa50'].includes(charge.status)) {
-        updateObj.amount = settings.monthlyFee
-    }
+    if (i < settings.totalMonths) {
+      // Normal installment: update description and amount
+      const newDescription = `Mensalidade ${installmentNum}/${settings.totalMonths}`
+      const updateObj: any = { description: newDescription }
+      
+      if (!['paid', 'bolsa100', 'bolsa50'].includes(charge.status)) {
+          updateObj.amount = settings.monthlyFee
+      }
 
-    if (updateObj.amount !== charge.amount || updateObj.description !== charge.description) {
-        updates.push(supabase.from('financial_charges').update(updateObj).eq('id', charge.id))
+      if (updateObj.amount !== charge.amount || updateObj.description !== charge.description) {
+          updates.push(supabase.from('financial_charges').update(updateObj).eq('id', charge.id))
+      }
+    } else {
+      // Extra installment: delete if not paid
+      if (!['paid', 'bolsa100', 'bolsa50'].includes(charge.status)) {
+        deletions.push(supabase.from('financial_charges').delete().eq('id', charge.id))
+      } else {
+        // If it was already paid but is "extra" now, just keep it but maybe update description to show it is extra
+        const extraDesc = `Mensalidade Extra ${installmentNum} (Adicional)`
+        if (charge.description !== extraDesc) {
+            updates.push(supabase.from('financial_charges').update({ description: extraDesc }).eq('id', charge.id))
+        }
+      }
     }
   }
 
+  // Execute updates
   if (updates.length > 0) {
       const results = await Promise.all(updates)
       const err = results.find(r => r.error)
       if (err) throw new Error(err.error?.message)
+  }
+
+  // Execute deletions
+  if (deletions.length > 0) {
+    const results = await Promise.all(deletions)
+    const err = results.find(r => r.error)
+    if (err) throw new Error(err.error?.message)
   }
 
   // 2. Add missing charges if needed
