@@ -132,40 +132,6 @@ export function GradeViewer({ onClose }: GradeViewerProps) {
                                 )}
                             </section>
 
-                            {/* Informações Financeiras */}
-                            <section>
-                                <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
-                                    <DollarSign className="h-4 w-4" /> Valores do Curso
-                                </h3>
-                                {financial ? (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div className="flex items-center gap-4 bg-muted/50 rounded-xl p-4 border border-border">
-                                            <div className="h-10 w-10 bg-primary/10 text-primary rounded-full flex items-center justify-center shrink-0">
-                                                <Wallet className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Taxa de Matrícula</p>
-                                                <p className="text-xl font-bold text-foreground">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(financial.enrollmentFee)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-4 bg-muted/50 rounded-xl p-4 border border-border">
-                                            <div className="h-10 w-10 bg-accent/10 text-accent rounded-full flex items-center justify-center shrink-0">
-                                                <DollarSign className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Mensalidade ({financial.totalMonths}x)</p>
-                                                <p className="text-xl font-bold text-foreground">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(financial.monthlyFee)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground italic">Valores não configurados.</p>
-                                )}
-                            </section>
 
                             {/* Disciplinas por Semestre e Dia */}
                             <section>
