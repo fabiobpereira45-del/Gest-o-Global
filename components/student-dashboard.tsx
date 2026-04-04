@@ -130,7 +130,7 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
     const navItems: { id: Tab; label: string; icon: any }[] = [
         { id: "overview", label: "Visão Geral", icon: Home },
         { id: "class-info", label: "Meu Núcleo", icon: Users },
-        { id: "curriculum", label: "Grade Curricular", icon: CalendarDays },
+        { id: "curriculum", label: "Grade Curricular do Sistema", icon: CalendarDays },
         { id: "materials", label: "Materiais EAD", icon: Library },
         { id: "exams", label: "Avaliações", icon: BookOpenCheck },
         { id: "grades", label: "Boletim e Notas", icon: FileText },

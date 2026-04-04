@@ -164,7 +164,7 @@ export function AdminDashboard({ onLogout }: Props) {
       title: "Recursos",
       items: [
         { id: "materials", label: "Biblioteca (PDFs)", icon: <BookOpen className="h-4 w-4" /> },
-        { id: "semesters", label: "Grade Curricular", icon: <GraduationCap className="h-4 w-4" /> },
+        { id: "semesters", label: "Grade Curricular do Sistema", icon: <GraduationCap className="h-4 w-4" /> },
         { id: "class_schedules", label: "Quadro de Horários", icon: <CalendarDays className="h-4 w-4" />, masterOnly: true },
       ]
     }
