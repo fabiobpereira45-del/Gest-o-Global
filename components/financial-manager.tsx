@@ -42,6 +42,20 @@ export function FinancialManager() {
     const session = typeof window !== "undefined" ? getProfessorSession() : null;
     const isMaster = session?.role === "master";
 
+    // Tab persistence
+    const [activeTab, setActiveTab] = useState("dashboard")
+
+    useEffect(() => {
+        const savedTab = localStorage.getItem("financialActiveTab")
+        if (savedTab) setActiveTab(savedTab)
+    }, [])
+
+    useEffect(() => {
+        if (activeTab) {
+            localStorage.setItem("financialActiveTab", activeTab)
+        }
+    }, [activeTab])
+
     // Charge Modal
     const [chargeModal, setChargeModal] = useState(false)
 
@@ -74,7 +88,7 @@ export function FinancialManager() {
     // Expense Modal
     const [expenseModal, setExpenseModal] = useState(false)
     const [editExpenseId, setEditExpenseId] = useState<string | null>(null)
-    const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>("Outros")
+    const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>("outros")
     const [expenseAmount, setExpenseAmount] = useState("")
     const [expenseDescription, setExpenseDescription] = useState("")
     const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0])
@@ -493,7 +507,7 @@ export function FinancialManager() {
                     </Button>
                     <Button variant="outline" className="border-accent text-accent hover:bg-accent/10" onClick={() => {
                         setEditExpenseId(null)
-                        setExpenseCategory("Outros")
+                        setExpenseCategory("outros")
                         setExpenseDescription("")
                         setExpenseAmount("")
                         setExpenseDate(new Date().toISOString().split('T')[0])
@@ -505,7 +519,7 @@ export function FinancialManager() {
                 </div>
             </div>
 
-            <Tabs defaultValue="dashboard" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full sm:w-auto grid-cols-2 md:grid-cols-4 mb-4 gap-1 h-auto p-1 bg-muted/50 rounded-lg">
                     <TabsTrigger value="dashboard" className="h-9 px-4 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md"><TrendingUp className="h-3.5 w-3.5 mr-2"/> Painel & Gráficos</TabsTrigger>
                     <TabsTrigger value="charges" className="h-9 px-4 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md"><DollarSign className="h-3.5 w-3.5 mr-2"/> Receitas / Cobranças</TabsTrigger>
@@ -754,14 +768,14 @@ export function FinancialManager() {
                                     {disciplines.length === 0 ? (
                                         <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">Nenhuma disciplina cadastrada na Grade Curricular.</td></tr>
                                     ) : [...disciplines].sort((a,b) => (a.is_realized === b.is_realized) ? 0 : a.is_realized ? 1 : -1).map(d => (
-                                        <tr key={d.id} className={`hover:bg-muted/30 transition-colors ${d.is_realized ? 'opacity-60 bg-muted/10' : ''}`}>
+                                        <tr key={d.id} className={`hover:bg-muted/30 transition-colors ${d.is_realized ? 'bg-green-50/30' : ''}`}>
                                             <td className="px-4 py-3 font-semibold text-primary">{d.name}</td>
                                             <td className="px-4 py-3 text-muted-foreground">{d.professorName ? <span className="flex items-center gap-1.5"><FileText className="h-3 w-3 opacity-50"/> {d.professorName}</span> : <span className="italic opacity-50">Não definido</span>}</td>
                                             <td className="px-4 py-3 text-right font-bold text-destructive">R$ 300,00</td>
                                             <td className="px-4 py-3 text-center">
                                                 {d.is_realized ? 
-                                                    <span className="bg-green-100 text-green-700 text-xs px-2.5 py-1 rounded font-bold flex items-center gap-1.5 justify-center w-max mx-auto"><CheckCircle2 className="h-3.5 w-3.5" /> Realizada (Paga)</span> :
-                                                    <span className="bg-orange-100 text-orange-700 text-xs px-2.5 py-1 rounded font-bold flex items-center gap-1.5 justify-center w-max mx-auto"><Clock className="h-3.5 w-3.5" /> Provisão Pendente</span>
+                                                    <span className="bg-green-100 text-green-700 text-xs px-2.5 py-1 rounded font-bold flex items-center gap-1.5 justify-center w-max mx-auto"><CheckCircle2 className="h-3.5 w-3.5" /> Pagamento Realizado</span> :
+                                                    <span className="bg-orange-100 text-orange-700 text-xs px-2.5 py-1 rounded font-bold flex items-center gap-1.5 justify-center w-max mx-auto"><Clock className="h-3.5 w-3.5" /> Pagamento Pendente</span>
                                                 }
                                             </td>
                                             <td className="px-4 py-3 text-right">
