@@ -23,7 +23,7 @@ import {
   getSubmissions, deleteSubmission, updateSubmissionScore,
   getQuestions, getDisciplines, clearProfessorSession, MASTER_CREDENTIALS,
   getProfessorSession, getStudentGrades, saveStudentGrade, deleteStudentGrade, getStudents, updateProfessorAccount,
-  saveProfessorSession,
+  saveProfessorSession, repairAssessmentsData,
   type Semester, type StudyMaterial, type FinancialCharge, type ClassRoom, type ClassSchedule,
 } from "@/lib/store"
 import { printStudentPDF, printBlankAssessmentPDF, printCompiledSubmissionsPDF, printOverviewPDF, printAnswerKeyPDF, printSubmissionsTablePDF } from "@/lib/pdf"
@@ -113,7 +113,7 @@ export function AdminDashboard({ onLogout }: Props) {
   }
 
   useEffect(() => {
-    refresh()
+    repairAssessmentsData().then(() => refresh())
     async function fetchUser() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {

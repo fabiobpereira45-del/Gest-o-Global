@@ -134,6 +134,15 @@ export function printStudentPDF({ submission, assessment, questions }: PDFData):
     })
     .join("")
 
+  // Normalização de segurança para registros antigos
+  const displayInstitution = (!assessment.institution || assessment.institution.includes("ENSINO TEOLÓGICO"))
+    ? "Instituto Bíblico das Assembléias de Deus"
+    : assessment.institution
+
+  const displayProfessor = (!assessment.professor || assessment.professor.includes("Fábio Barreto") || assessment.professor === "Professor")
+    ? "Corpo Docente"
+    : assessment.professor
+
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -151,9 +160,9 @@ export function printStudentPDF({ submission, assessment, questions }: PDFData):
     <img src="${IBAD_LOGO}" style="height:60px;width:auto;" alt="Logo IBAD" />
     <div style="flex:1;display:flex;justify-content:space-between;align-items:flex-start;">
       <div>
-        <div style="font-size:11px;font-weight:700;color:#f97316;text-transform:uppercase;letter-spacing:1px;">${assessment.institution}</div>
+        <div style="font-size:11px;font-weight:700;color:#f97316;text-transform:uppercase;letter-spacing:1px;">${displayInstitution}</div>
         <h1 style="font-size:20px;font-weight:800;color:#1e3a5f;margin:4px 0;">${assessment.title}</h1>
-        <div style="font-size:12px;color:#6b7280;">Professor: ${assessment.professor}</div>
+        <div style="font-size:12px;color:#6b7280;">Professor: ${displayProfessor}</div>
       </div>
       <div style="text-align:right;">
         <div style="font-size:11px;color:#6b7280;">Data de entrega</div>
@@ -268,6 +277,14 @@ export function printBlankAssessmentPDF({ assessment, questions }: Omit<PDFData,
       })
       .join("")
 
+    const displayInstitution = (!assessment.institution || assessment.institution.includes("ENSINO TEOLÓGICO"))
+      ? "Instituto Bíblico das Assembléias de Deus"
+      : assessment.institution
+
+    const displayProfessor = (!assessment.professor || assessment.professor.includes("Fábio Barreto") || assessment.professor === "Professor")
+      ? "Corpo Docente"
+      : assessment.professor
+
     const header = `
       <div style="border:1px solid #cbd5e1;border-radius:8px;padding:16px;margin-bottom:24px;">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;">
@@ -275,9 +292,9 @@ export function printBlankAssessmentPDF({ assessment, questions }: Omit<PDFData,
           <div style="flex:1;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;">
               <div>
-                <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">${assessment.institution || 'IBAD — Núcleo Cosme de Fárias'}</div>
+                <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">${displayInstitution}</div>
                 <h1 style="font-size:22px;font-weight:800;color:#0f172a;margin:0 0 4px 0;">${assessment.title}</h1>
-                <div style="font-size:13px;color:#475569;">Professor(a): <span style="font-weight:600;">${assessment.professor}</span></div>
+                <div style="font-size:13px;color:#475569;">Professor(a): <span style="font-weight:600;">${displayProfessor}</span></div>
               </div>
               ${version.type ? `<div style="font-size:24px;font-weight:900;color:#1e3a5f;border:2px solid #1e3a5f;border-radius:8px;padding:4px 12px;">TIPO ${version.type}</div>` : ''}
             </div>

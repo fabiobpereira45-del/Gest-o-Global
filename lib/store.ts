@@ -1740,3 +1740,39 @@ export async function syncAllStudentsFinancialChargesBatch(settings: FinancialSe
         await syncStudentFinancialCharges(student.id, settings)
     }
 }
+
+export async function repairAssessmentsData(): Promise<void> {
+  const supabase = createClient()
+  const { data: assessments, error: fetchError } = await supabase.from('assessments').select('*')
+  if (fetchError || !assessments) return
+
+  const { data: disciplines } = await supabase.from('disciplines').select('id, name, professor_name')
+  const discMap = new Map(disciplines?.map(d => [d.id, d]) || [])
+
+  for (const ass of assessments) {
+    let needsUpdate = false
+    const updateData: any = {}
+
+    // Fix Institution
+    if (!ass.institution || ass.institution.includes("ENSINO TEOLÓGICO")) {
+      updateData.institution = "Instituto Bíblico das Assembléias de Deus"
+      needsUpdate = true
+    }
+
+    // Fix Professor fallback
+    if (!ass.professor || ass.professor.includes("Fábio Barreto") || ass.professor === "" || ass.professor === "Professor") {
+      const disc = discMap.get(ass.discipline_id)
+      if (disc?.professor_name) {
+        updateData.professor = disc.professor_name
+        needsUpdate = true
+      } else {
+        updateData.professor = "Corpo Docente"
+        needsUpdate = true
+      }
+    }
+
+    if (needsUpdate) {
+      await supabase.from('assessments').update(updateData).eq('id', ass.id)
+    }
+  }
+}
