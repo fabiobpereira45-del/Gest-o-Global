@@ -120,7 +120,7 @@ export function StudentAssessmentView({ studentName, studentEmail, studentDoc }:
                         ← Voltar para Lista de Provas
                     </Button>
                 </div>
-                <AssessmentForm session={session} onSubmit={handleCompleteTest} />
+                <AssessmentForm session={session} onSubmit={handleCompleteTest} onBack={handleBackToList} />
             </div>
         )
     }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { CheckCircle2, AlertTriangle, Clock, BookOpenCheck, RotateCcw, ChevronLeft, ChevronRight, LayoutGrid, Flag, Check, ArrowRight } from "lucide-react"
+import { CheckCircle2, AlertTriangle, Clock, BookOpenCheck, RotateCcw, ChevronLeft, ChevronRight, LayoutGrid, Flag, Check, ArrowRight, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
@@ -40,9 +40,10 @@ function PortraitGuard() {
 interface Props {
   session: StudentSession
   onSubmit: (sub: StudentSubmission) => void
+  onBack?: () => void
 }
 
-export function AssessmentForm({ session, onSubmit }: Props) {
+export function AssessmentForm({ session, onSubmit, onBack }: Props) {
   const [assessment, setAssessment] = useState<Assessment | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [disc, setDisc] = useState<Discipline | null>(null)
@@ -355,6 +356,17 @@ export function AssessmentForm({ session, onSubmit }: Props) {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {onBack && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onBack}
+                className="flex items-center gap-2 h-9 rounded-xl border-slate-200 text-slate-600 font-bold text-xs ring-offset-white transition-all hover:bg-slate-50 hover:text-red-600"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Voltar</span>
+              </Button>
+            )}
             <Button 
               variant="outline" 
               size="sm" 

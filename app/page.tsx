@@ -233,7 +233,7 @@ export default function HomePage() {
           <StudentDashboard session={null} onBack={() => setView("landing")} onLogout={handleLogout} />
         )}
         {view === "student-assessment" && session && (
-          <AssessmentForm session={session} onSubmit={handleSubmit} />
+          <AssessmentForm session={session} onSubmit={handleSubmit} onBack={() => setView("landing")} />
         )}
         {view === "student-result" && submission && (
           <AssessmentResult submission={submission} onBack={handleLogout} />

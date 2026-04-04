@@ -210,7 +210,7 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-primary text-primary-foreground rounded-t-2xl shrink-0">
                     <div>
                         <h2 className="font-bold text-lg">Faça sua Matrícula</h2>
-                        <p className="text-xs text-primary-foreground/70">IBAD — Instituto de Ensino Teológico</p>
+                        <p className="text-xs text-primary-foreground/70">Instituto Bíblico das Assembléias de Deus</p>
                     </div>
                     <button onClick={handleAttemptClose} className="rounded-full p-1.5 hover:bg-white/10 transition-colors">
                         <X className="h-5 w-5" />

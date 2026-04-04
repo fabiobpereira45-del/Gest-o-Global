@@ -28,7 +28,7 @@ export function AssessmentHeader({
             </div>
             <div>
               <p className="text-xs font-medium text-primary-foreground/70 uppercase tracking-widest hidden sm:block">
-                Instituto Bíblico das Assembleias de Deus
+                Instituto Bíblico das Assembléias de Deus
               </p>
               <p className="text-sm font-bold leading-tight text-primary-foreground">
                 IBAD — Núcleo Cosme de Fárias
