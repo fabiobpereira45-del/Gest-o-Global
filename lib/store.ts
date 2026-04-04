@@ -1806,40 +1806,44 @@ export async function repairAssessmentsData(): Promise<void> {
 export async function resetAndGenerateStudentMonthlyCharges(studentId: string, settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
   
-  // 1. Delete all existing monthly charges for this student
-  const { error: delError } = await supabase
+  // 1. Fetch ALL existing monthly charges to get their IDs
+  const { data: existing, error: fetchError } = await supabase
     .from('financial_charges')
-    .delete()
+    .select('id')
     .eq('student_id', studentId)
     .eq('type', 'monthly')
   
-  if (delError) throw new Error(delError.message)
+  if (fetchError) throw new Error("Erro ao buscar parcelas para reset: " + fetchError.message)
 
-  // 2. Generate new charges from 1 to totalMonths
+  // 2. Delete them by IDs (Atomic)
+  if (existing && existing.length > 0) {
+    const idsToDelete = existing.map(item => item.id)
+    const { error: delError } = await supabase
+      .from('financial_charges')
+      .delete()
+      .in('id', idsToDelete)
+    
+    if (delError) throw new Error("O banco de dados recusou a exclusão. Verifique permissões RLS. Erro: " + delError.message)
+  }
+
+  // 3. Generate exactly 25 new charges with NULL due_date
   const toInsert = []
-  let currentDate = new Date() // Start from today
   
   for (let i = 1; i <= settings.totalMonths; i++) {
-    const dateStr = currentDate.toISOString().split('T')[0]
-    
     toInsert.push({
       student_id: studentId,
       type: 'monthly',
       description: `Mensalidade ${i}/${settings.totalMonths}`,
       amount: settings.monthlyFee,
-      due_date: dateStr,
+      due_date: null, // Keep it empty as requested
       status: 'pending',
       created_at: new Date().toISOString()
     })
-
-    // Advance one month for the next installment
-    currentDate = new Date(currentDate)
-    currentDate.setMonth(currentDate.getMonth() + 1)
   }
 
   if (toInsert.length > 0) {
     const { error: insError } = await supabase.from('financial_charges').insert(toInsert)
-    if (insError) throw new Error(insError.message)
+    if (insError) throw new Error("Erro ao gerar novas parcelas: " + insError.message)
   }
 }
 
