@@ -178,7 +178,7 @@ export function StudentLogin({ onLogin, onResult, onBack, preloadedAssessmentId 
           <div className="flex flex-wrap justify-center gap-3 text-sm font-semibold text-white/90 border-t border-white/10 pt-6 w-full mt-2">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/5 shadow-sm">
               <BookOpenCheck className="h-4 w-4 text-accent-gold" />
-              <span>{assessment.questionIds.length} Questões</span>
+              <span>{assessment.questionIds.length} {assessment.questionIds.length === 1 ? "Questão" : "Questões"}</span>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/5 shadow-sm">
               <Sparkles className="h-4 w-4 text-accent-gold" />

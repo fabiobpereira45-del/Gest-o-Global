@@ -577,11 +577,11 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
                 )}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-bold">
-                      {Math.min(questionCount, availableQuestions.length)} questão{Math.min(questionCount, availableQuestions.length) !== 1 ? "ões" : ""} será{Math.min(questionCount, availableQuestions.length) !== 1 ? "ão" : ""} selecionada{Math.min(questionCount, availableQuestions.length) !== 1 ? "s" : ""}
+                      {Math.min(questionCount, availableQuestions.length)} {Math.min(questionCount, availableQuestions.length) === 1 ? "questão" : "questões"} {Math.min(questionCount, availableQuestions.length) === 1 ? "será" : "serão"} {Math.min(questionCount, availableQuestions.length) === 1 ? "selecionada" : "selecionadas"}
                     </span>
                   </div>
                   <p className="opacity-90">
-                    Extraídas aleatoriamente do banco de {availableQuestions.length} questão{availableQuestions.length !== 1 ? "ões" : ""} disponíveis para os formatos selecionados.
+                    Extraídas aleatoriamente do banco de {availableQuestions.length} {availableQuestions.length === 1 ? "questão" : "questões"} disponíveis para os formatos selecionados.
                   </p>
                   {availableQuestions.length < questionCount && (
                     <p className="mt-2 text-xs font-bold uppercase tracking-tight flex items-center gap-1 text-amber-600">

@@ -527,10 +527,7 @@ export async function getDisciplines(): Promise<Discipline[]> {
   const { data } = await supabase.from('disciplines').select('*')
   return (data || [])
     .map(mapDiscipline)
-    .sort((a, b) => {
-      if (a.order !== b.order) return a.order - b.order
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    })
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function getDisciplinesByProfessor(professorId: string): Promise<Discipline[]> {
@@ -565,7 +562,9 @@ export async function getDisciplinesByProfessor(professorId: string): Promise<Di
   if (!links || links.length === 0) return []
   const ids = links.map(l => l.discipline_id)
   const { data } = await supabase.from('disciplines').select('*').in('id', ids)
-  return (data || []).map(mapDiscipline)
+  return (data || [])
+    .map(mapDiscipline)
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function getProfessorDisciplines(professorId: string): Promise<ProfessorDiscipline[]> {

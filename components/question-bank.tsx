@@ -628,7 +628,7 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-bold truncate ${active ? "text-white" : "text-foreground"}`}>{d.name}</p>
-                    <p className={`text-[10px] uppercase font-bold tracking-wider ${active ? "text-white/70" : "text-muted-foreground"}`}>{count === undefined ? "Carregando" : count} questão{count !== 1 ? "ões" : ""}</p>
+                    <p className={`text-[10px] uppercase font-bold tracking-wider ${active ? "text-white/70" : "text-muted-foreground"}`}>{count === undefined ? "Carregando questões" : `${count} ${count === 1 ? "questão" : "questões"}`}</p>
                   </div>
                   {active && <ChevronRight className="h-4 w-4 flex-shrink-0 text-white" />}
                   <div className={`flex-shrink-0 flex gap-0.5 ${active ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
