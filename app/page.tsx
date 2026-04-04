@@ -178,16 +178,6 @@ export default function HomePage() {
 
             {/* Action Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Grade */}
-              <button
-                onClick={() => setShowGrade(true)}
-                className="group relative overflow-hidden bg-card border-2 border-border rounded-2xl p-6 text-left shadow-lg hover:shadow-xl hover:border-accent/40 hover:scale-[1.02] transition-all"
-              >
-                <div className="absolute inset-0 bg-accent/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <BookOpen className="h-8 w-8 text-accent mb-3" />
-                <h2 className="text-xl font-extrabold mb-1 text-foreground">Grade Curricular do Sistema</h2>
-                <p className="text-sm text-muted-foreground">Conheça as disciplinas, núcleos e turnos disponíveis</p>
-              </button>
 
               {/* Área do Aluno */}
               <button
