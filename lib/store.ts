@@ -1759,7 +1759,7 @@ export async function repairAssessmentsData(): Promise<void> {
   const { data: disciplines } = await supabase.from('disciplines').select('id, name, professor_name')
   const discMap = new Map(disciplines?.map(d => [d.id, d]) || [])
 
-  for (const ass of assessments) {
+    for (const ass of assessments) {
     let needsUpdate = false
     const updateData: any = {}
 
@@ -1784,5 +1784,63 @@ export async function repairAssessmentsData(): Promise<void> {
     if (needsUpdate) {
       await supabase.from('assessments').update(updateData).eq('id', ass.id)
     }
+  }
+}
+
+/**
+ * Destructive: Deletes all monthly charges for a student and generates totalMonths new charges.
+ */
+export async function resetAndGenerateStudentMonthlyCharges(studentId: string, settings: FinancialSettings): Promise<void> {
+  const supabase = createClient()
+  
+  // 1. Delete all existing monthly charges for this student
+  const { error: delError } = await supabase
+    .from('financial_charges')
+    .delete()
+    .eq('student_id', studentId)
+    .eq('type', 'monthly')
+  
+  if (delError) throw new Error(delError.message)
+
+  // 2. Generate new charges from 1 to totalMonths
+  const toInsert = []
+  let currentDate = new Date() // Start from today
+  
+  for (let i = 1; i <= settings.totalMonths; i++) {
+    const dateStr = currentDate.toISOString().split('T')[0]
+    
+    toInsert.push({
+      student_id: studentId,
+      type: 'monthly',
+      description: `Mensalidade ${i}/${settings.totalMonths}`,
+      amount: settings.monthlyFee,
+      due_date: dateStr,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    })
+
+    // Advance one month for the next installment
+    currentDate = new Date(currentDate)
+    currentDate.setMonth(currentDate.getMonth() + 1)
+  }
+
+  if (toInsert.length > 0) {
+    const { error: insError } = await supabase.from('financial_charges').insert(toInsert)
+    if (insError) throw new Error(insError.message)
+  }
+}
+
+/**
+ * Destructive: Resets all active students' monthly charges.
+ */
+export async function resetAllStudentsMonthlyChargesBatch(settings: FinancialSettings): Promise<void> {
+  const supabase = createClient()
+  const { data: students, error: sErr } = await supabase.from('students').select('id').eq('status', 'active')
+  if (sErr) throw new Error(sErr.message)
+  
+  if (!students) return
+
+  for (const student of students) {
+    await resetAndGenerateStudentMonthlyCharges(student.id, settings)
   }
 }

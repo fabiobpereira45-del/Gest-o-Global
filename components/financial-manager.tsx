@@ -21,7 +21,8 @@ import {
     getFinancialSettings, updateFinancialSettings, getAssessments, triggerN8nWebhook,
     generateMonthlyCharges, getExpenses, addExpense, deleteExpense, updateExpense, getProfessorAccounts, addProfessorAccount, type ProfessorAccount,
     getDisciplines, updateDiscipline, type Discipline, getProfessorSession,
-    syncStudentFinancialCharges, syncAllStudentsFinancialChargesBatch
+    syncStudentFinancialCharges, syncAllStudentsFinancialChargesBatch,
+    resetAndGenerateStudentMonthlyCharges, resetAllStudentsMonthlyChargesBatch
 
 } from "@/lib/store"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -489,10 +490,10 @@ export function FinancialManager() {
                         <Plus className="h-4 w-4 mr-2" />
                         Nova Cobrança
                     </Button>
-                    <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50" 
+                    <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50 transition-all font-bold" 
                         onClick={async () => {
                             if (!settings) return
-                            if (!confirm("Atenção: Deseja sincronizar as mensalidades de TODOS os alunos ativos com as configurações atuais? Isso atualizará valores e parcelas conforme definido.")) return
+                            if (!confirm("Atenção: Deseja sincronizar as mensalidades de TODOS os alunos ativos com as configurações atuais? Isso atualizará valores e parcelas conforme definido sem excluir dados existentes.")) return
                             setIsGenerating(true)
                             try {
                                 await syncAllStudentsFinancialChargesBatch(settings)
@@ -503,7 +504,23 @@ export function FinancialManager() {
                         }}
                         disabled={isGenerating}>
                         <Zap className="h-4 w-4 mr-2" />
-                        Sincronizar Todos (Lote)
+                        Sincronizar Todos
+                    </Button>
+                    <Button variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 transition-all font-bold" 
+                        onClick={async () => {
+                            if (!settings) return
+                            if (!confirm("⚠️ PERIGO: Esta ação excluirá TODAS as mensalidades atuais de TODOS os alunos ativos e gerará 25 novas do zero. Pagamentos marcados serão perdidos. Deseja CONTINUAR?")) return
+                            setIsGenerating(true)
+                            try {
+                                await resetAllStudentsMonthlyChargesBatch(settings)
+                                alert("Reset financeiro global concluído com sucesso!")
+                                load()
+                            } catch (e: any) { alert("Erro no reset: " + e.message) }
+                            finally { setIsGenerating(false) }
+                        }}
+                        disabled={isGenerating}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Zerar e Gerar Tudo (Lote)
                     </Button>
                     <Button variant="outline" className="border-accent text-accent hover:bg-accent/10" onClick={() => {
                         setEditExpenseId(null)
@@ -868,6 +885,22 @@ export function FinancialManager() {
                                     {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <DollarSign className="h-3 w-3 mr-2" />}
                                     Aplicar Bolsa (Lote)
                                 </Button>
+                                <Button size="sm" variant="outline" className="h-9 text-xs font-bold border-red-500 text-red-600 hover:bg-red-50"
+                                    onClick={async () => {
+                                        if (!settings || !selectedStudent) return
+                                        if (!confirm("⚠️ Atenção: Deseja EXCLUIR todas as mensalidades atuais deste aluno e gerar 25 novas? Isso limpará duplicatas e erros, mas você perderá o histórico de pagamentos atuais deste aluno.")) return
+                                        setIsGenerating(true)
+                                        try {
+                                            await resetAndGenerateStudentMonthlyCharges(selectedStudent.id, settings)
+                                            alert("Mensalidades reiniciadas com sucesso!")
+                                            load()
+                                        } catch (e: any) { alert("Erro ao resetar: " + e.message) }
+                                        finally { setIsGenerating(false) }
+                                    }}
+                                    disabled={isGenerating}>
+                                    <Trash2 className="h-3 w-3 mr-2 text-red-600" />
+                                    Zerar e Gerar 25x
+                                </Button>
                                 <Button size="sm" variant="outline" className="h-9 text-xs font-bold border-green-500 text-green-600 hover:bg-green-50" 
                                     onClick={async () => {
                                         if (!settings || !selectedStudent) return
@@ -887,7 +920,7 @@ export function FinancialManager() {
                                     onClick={() => handleGeneratePlan(selectedStudent!.id)}
                                     disabled={isGenerating}>
                                     {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <DollarSign className="h-3 w-3 mr-2" />}
-                                    Gerar Carnê 24x
+                                    Gerar Carnê 25x
                                 </Button>
                             </div>
                         </div>
