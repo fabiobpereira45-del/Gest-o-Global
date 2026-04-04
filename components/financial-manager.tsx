@@ -768,41 +768,37 @@ export function FinancialManager() {
                                     {disciplines.length === 0 ? (
                                         <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">Nenhuma disciplina cadastrada na Grade Curricular.</td></tr>
                                     ) : [...disciplines].sort((a,b) => (a.is_realized === b.is_realized) ? 0 : a.is_realized ? 1 : -1).map(d => (
-                                        <tr key={d.id} className={`hover:bg-muted/30 transition-colors ${d.is_realized ? 'bg-green-50/30' : ''}`}>
+                                        <tr key={d.id} className={`hover:bg-muted/30 transition-colors ${d.is_realized ? 'bg-emerald-50/40' : ''}`}>
                                             <td className="px-4 py-3 font-semibold text-primary">{d.name}</td>
                                             <td className="px-4 py-3 text-muted-foreground">{d.professorName ? <span className="flex items-center gap-1.5"><FileText className="h-3 w-3 opacity-50"/> {d.professorName}</span> : <span className="italic opacity-50">Não definido</span>}</td>
                                             <td className="px-4 py-3 text-right font-bold text-destructive">R$ 300,00</td>
                                             <td className="px-4 py-3 text-center">
                                                 {d.is_realized ? 
-                                                    <span className="bg-green-100 text-green-700 text-xs px-2.5 py-1 rounded font-bold flex items-center gap-1.5 justify-center w-max mx-auto"><CheckCircle2 className="h-3.5 w-3.5" /> Pagamento Realizado</span> :
-                                                    <span className="bg-orange-100 text-orange-700 text-xs px-2.5 py-1 rounded font-bold flex items-center gap-1.5 justify-center w-max mx-auto"><Clock className="h-3.5 w-3.5" /> Pagamento Pendente</span>
+                                                    <span className="bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-full border border-emerald-200 font-bold flex items-center gap-1.5 justify-center w-max mx-auto shadow-sm"><CheckCircle2 className="h-3.5 w-3.5" /> Pagamento Realizado</span> :
+                                                    <span className="bg-orange-100 text-orange-700 text-xs px-2.5 py-1 rounded-full border border-orange-200 font-bold flex items-center gap-1.5 justify-center w-max mx-auto shadow-sm"><Clock className="h-3.5 w-3.5" /> Pagamento Pendente</span>
                                                 }
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 {d.is_realized ? (
-                                                    isMaster ? (
-                                                        <Button size="sm" variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 font-bold" onClick={async () => {
-                                                            if(confirm(`Atenção Master: Deseja reverter a baixa de "${d.name}"? A despesa gerada não será excluída automaticamente.`)) {
-                                                                setSaving(true)
-                                                                try {
-                                                                    await updateDiscipline(d.id, { is_realized: false })
-                                                                    alert(`Baixa revertida com sucesso. Exclua a despesa gerada manualmente na aba Despesas Diversas se necessário.`)
-                                                                    load()
-                                                                } catch(e:any) {
-                                                                    alert('Erro ao reverter baixa: ' + e.message)
-                                                                } finally {
-                                                                    setSaving(false)
-                                                                }
+                                                    <Button size="sm" variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 font-bold px-4 transition-all" onClick={async () => {
+                                                        if(confirm(`Deseja ESTORNAR a baixa de "${d.name}"? O status voltará para Pendente, mas a despesa gerada anteriormente não será excluída automaticamente.`)) {
+                                                            setSaving(true)
+                                                            try {
+                                                                await updateDiscipline(d.id, { is_realized: false })
+                                                                alert(`Estorno realizado com sucesso. Lembre-se de verificar a aba "Despesas" se desejar remover o lançamento oficial de R$ 300,00.`)
+                                                                load()
+                                                            } catch(e:any) {
+                                                                alert('Erro ao estornar: ' + e.message)
+                                                            } finally {
+                                                                setSaving(false)
                                                             }
-                                                        }}>
-                                                            Reverter Baixa
-                                                        </Button>
-                                                    ) : (
-                                                        <Button size="sm" variant="outline" disabled className="pointer-events-none">Lançamento Oficializado</Button>
-                                                    )
+                                                        }
+                                                    }}>
+                                                        <AlertCircle className="h-3.5 w-3.5 mr-1.5" /> Estornar Baixa
+                                                    </Button>
                                                 ) : (
-                                                    <Button size="sm" variant="default" className="font-bold" onClick={async () => {
-                                                        if(confirm(`Tem certeza que deseja dar baixa nesta disciplina e GERAR UMA DESPESA oficial de Pagamento ao Professor de R$ 300,00 para a disciplina "${d.name}"? Essa ação não pode ser desfeita automaticamente.`)) {
+                                                    <Button size="sm" variant="default" className="font-bold px-4 bg-primary hover:bg-primary/90 shadow-md transition-all" onClick={async () => {
+                                                        if(confirm(`Confirmar BAIXA FINANCEIRA para a disciplina "${d.name}"? Isso registrará uma despesa de R$ 300,00 no sistema.`)) {
                                                             setSaving(true)
                                                             try {
                                                                 const profSuffix = d.professorName ? ` (Prof. ${d.professorName})` : ''
@@ -813,7 +809,7 @@ export function FinancialManager() {
                                                                     date: new Date().toISOString().split('T')[0] 
                                                                 })
                                                                 await updateDiscipline(d.id, { is_realized: true })
-                                                                alert(`Baixa executada com sucesso! Uma despesa de R$ 300,00 foi registrada na Categoria "Pagamento ao Professor" com a data de hoje.`)
+                                                                alert(`Baixa concluída! Despesa registrada na categoria "Pagamento ao Professor".`)
                                                                 load()
                                                             } catch(e:any) {
                                                                 alert('Erro ao dar baixa: ' + e.message)
@@ -822,7 +818,7 @@ export function FinancialManager() {
                                                             }
                                                         }
                                                     }}>
-                                                        Dar Baixa Financeira
+                                                        <DollarSign className="h-3.5 w-3.5 mr-1.5" /> Dar Baixa Financeira
                                                     </Button>
                                                 )}
                                             </td>
