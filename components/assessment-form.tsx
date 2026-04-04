@@ -98,7 +98,9 @@ export function AssessmentForm({ session, onSubmit }: Props) {
         }
         
         setQuestions(selectedQs)
-        setDisc(allDs.find(d => d.id === a.disciplineId) || null)
+        if (allDs.length > 0) {
+            setDisc(allDs.find(d => d.id === a.disciplineId) || null)
+        }
 
         // Initialize timer
         if (a.timeLimitMinutes) {
@@ -343,7 +345,9 @@ export function AssessmentForm({ session, onSubmit }: Props) {
               <BookOpenCheck className="h-4.5 w-4.5" />
             </div>
             <div className="min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 line-clamp-1 mb-0.5">{disc?.name ?? "Disciplina"}</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 line-clamp-1 mb-0.5">
+                {disc?.name ?? "Disciplina"} <span className="mx-1 opacity-50">|</span> Prof. {disc?.professorName || assessment.professor}
+              </p>
               <h1 className="font-extrabold text-slate-800 line-clamp-1 text-sm sm:text-base leading-tight uppercase tracking-tight">
                 {assessment.title}
               </h1>

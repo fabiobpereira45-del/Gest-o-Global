@@ -228,10 +228,14 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
         return
     }
 
+    const selectedDisc = disciplines.find(d => d.id === disciplineId)
+    const professorName = selectedDisc?.professorName || PROFESSOR_CREDENTIALS.name
+
     if (assessment) {
       await updateAssessment(assessment.id, {
         title: title.trim(),
         disciplineId,
+        professor: professorName,
         logoBase64,
         rules: rules.trim(),
         questionIds: finalIds,
@@ -244,7 +248,7 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
       await addAssessment({
         title: title.trim(),
         disciplineId,
-        professor: PROFESSOR_CREDENTIALS.name,
+        professor: professorName,
         institution: "Instituto de Ensino Teológico - IBAD",
         logoBase64,
         rules: rules.trim(),

@@ -171,7 +171,7 @@ export function StudentLogin({ onLogin, onResult, onBack, preloadedAssessmentId 
             <p className="mt-3 text-white/80 text-sm font-medium bg-black/20 px-4 py-1.5 rounded-full backdrop-blur-sm">
               <span className="font-semibold">{disc?.name ?? "Disciplina Geral"}</span>
               <span className="mx-2 opacity-40">|</span> 
-              Prof. {assessment.professor}
+              Prof. {disc?.professorName || assessment.professor}
             </p>
           </div>
 

@@ -20,7 +20,8 @@ import {
     getFinancialCharges, addFinancialCharge, updateFinancialChargeStatus, deleteFinancialCharge, updateFinancialCharge, updateFinancialChargesStatusBatch,
     getFinancialSettings, updateFinancialSettings, getAssessments, triggerN8nWebhook,
     generateMonthlyCharges, getExpenses, addExpense, deleteExpense, updateExpense, getProfessorAccounts, addProfessorAccount, type ProfessorAccount,
-    getDisciplines, updateDiscipline, type Discipline, getProfessorSession
+    getDisciplines, updateDiscipline, type Discipline, getProfessorSession,
+    syncStudentFinancialCharges, syncAllStudentsFinancialChargesBatch
 
 } from "@/lib/store"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -474,6 +475,22 @@ export function FinancialManager() {
                         <Plus className="h-4 w-4 mr-2" />
                         Nova Cobrança
                     </Button>
+                    <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50" 
+                        onClick={async () => {
+                            if (!settings) return
+                            if (!confirm("Atenção: Deseja sincronizar as mensalidades de TODOS os alunos ativos com as configurações atuais? Isso atualizará valores e parcelas conforme definido.")) return
+                            setIsGenerating(true)
+                            try {
+                                await syncAllStudentsFinancialChargesBatch(settings)
+                                alert("Sincronização em lote concluída com sucesso!")
+                                load()
+                            } catch (e: any) { alert("Erro na sincronização: " + e.message) }
+                            finally { setIsGenerating(false) }
+                        }}
+                        disabled={isGenerating}>
+                        <Zap className="h-4 w-4 mr-2" />
+                        Sincronizar Todos (Lote)
+                    </Button>
                     <Button variant="outline" className="border-accent text-accent hover:bg-accent/10" onClick={() => {
                         setEditExpenseId(null)
                         setExpenseCategory("Outros")
@@ -805,7 +822,7 @@ export function FinancialManager() {
             </Tabs>
 
             <Dialog open={!!selectedStudent} onOpenChange={(o: boolean) => !o && setSelectedStudent(null)}>
-                <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col p-0">
+                <DialogContent className="max-w-[98vw] w-full max-h-[96vh] overflow-hidden flex flex-col p-0">
                     <DialogHeader className="p-6 border-b border-border bg-muted/30">
                         <div className="flex items-center justify-between">
                             <div>
@@ -840,6 +857,21 @@ export function FinancialManager() {
                                     disabled={isGenerating}>
                                     {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <DollarSign className="h-3 w-3 mr-2" />}
                                     Aplicar Bolsa (Lote)
+                                </Button>
+                                <Button size="sm" variant="outline" className="h-9 text-xs font-bold border-green-500 text-green-600 hover:bg-green-50" 
+                                    onClick={async () => {
+                                        if (!settings || !selectedStudent) return
+                                        setIsGenerating(true)
+                                        try {
+                                            await syncStudentFinancialCharges(selectedStudent.id, settings)
+                                            alert("Sincronização individual concluída!")
+                                            load()
+                                        } catch (e: any) { alert("Erro ao sincronizar: " + e.message) }
+                                        finally { setIsGenerating(false) }
+                                    }}
+                                    disabled={isGenerating}>
+                                    <Zap className="h-3 w-3 mr-2" />
+                                    Sincronizar
                                 </Button>
                                 <Button size="sm" variant="outline" className="h-9 text-xs font-bold border-accent text-accent hover:bg-accent/10" 
                                     onClick={() => handleGeneratePlan(selectedStudent!.id)}
@@ -1312,7 +1344,8 @@ export function FinancialManager() {
                                         email: newProfEmail,
                                         password: newProfPass,
                                         role: "professor",
-                                    }, user.id)
+                                        id: user.id
+                                    })
                                     alert("Professor cadastrado com sucesso!")
                                     load()
                                     setReceiptProfessorId(user?.id || "manual")

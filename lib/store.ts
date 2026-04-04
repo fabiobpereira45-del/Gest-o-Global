@@ -1638,3 +1638,84 @@ export async function insertIBADDisciplines(): Promise<void> {
     }
 }
 
+export async function syncStudentFinancialCharges(studentId: string, settings: FinancialSettings): Promise<void> {
+  const supabase = createClient()
+  const { data: existing, error: fetchError } = await supabase
+    .from('financial_charges')
+    .select('*')
+    .eq('student_id', studentId)
+    .eq('type', 'monthly')
+    .order('due_date', { ascending: true })
+
+  if (fetchError) throw new Error(fetchError.message)
+  
+  const charges = existing || []
+  const updates = []
+
+  // 1. Update existing monthly charges
+  for (let i = 0; i < charges.length; i++) {
+    const charge = charges[i]
+    const installmentNum = i + 1
+    const newDescription = `Mensalidade ${installmentNum}/${settings.totalMonths}`
+    
+    const updateObj: any = { description: newDescription }
+    
+    // Only update amount for non-paid charges
+    if (!['paid', 'bolsa100', 'bolsa50'].includes(charge.status)) {
+        updateObj.amount = settings.monthlyFee
+    }
+
+    if (updateObj.amount !== charge.amount || updateObj.description !== charge.description) {
+        updates.push(supabase.from('financial_charges').update(updateObj).eq('id', charge.id))
+    }
+  }
+
+  if (updates.length > 0) {
+      const results = await Promise.all(updates)
+      const err = results.find(r => r.error)
+      if (err) throw new Error(err.error?.message)
+  }
+
+  // 2. Add missing charges if needed
+  if (charges.length < settings.totalMonths) {
+      const toInsert = []
+      let lastDate = charges.length > 0 
+        ? new Date(charges[charges.length - 1].due_date)
+        : new Date(2026, 3, 10) // Fallback April 2026
+      
+      for (let i = charges.length + 1; i <= settings.totalMonths; i++) {
+          // Increment one month from last
+          const nextDate = new Date(lastDate)
+          nextDate.setMonth(nextDate.getMonth() + 1)
+          const dateStr = nextDate.toISOString().split('T')[0]
+          
+          toInsert.push({
+            student_id: studentId,
+            type: 'monthly',
+            description: `Mensalidade ${i}/${settings.totalMonths}`,
+            amount: settings.monthlyFee,
+            due_date: dateStr,
+            status: 'pending',
+            created_at: new Date().toISOString()
+          })
+          lastDate = nextDate
+      }
+      
+      if (toInsert.length > 0) {
+          const { error: insError } = await supabase.from('financial_charges').insert(toInsert)
+          if (insError) throw new Error(insError.message)
+      }
+  }
+}
+
+export async function syncAllStudentsFinancialChargesBatch(settings: FinancialSettings): Promise<void> {
+    const supabase = createClient()
+    const { data: students, error: sErr } = await supabase.from('students').select('id').eq('status', 'active')
+    if (sErr) throw new Error(sErr.message)
+    
+    if (!students) return
+
+    for (const student of students) {
+        await syncStudentFinancialCharges(student.id, settings)
+    }
+}
