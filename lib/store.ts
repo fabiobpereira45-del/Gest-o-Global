@@ -1826,19 +1826,26 @@ export async function resetAndGenerateStudentMonthlyCharges(studentId: string, s
     if (delError) throw new Error("O banco de dados recusou a exclusão. Verifique permissões RLS. Erro: " + delError.message)
   }
 
-  // 3. Generate exactly 25 new charges with NULL due_date
+  // 3. Generate exactly 25 new charges with Sequential Dates (Avoid NOT NULL error)
   const toInsert = []
+  let currentDate = new Date() // Start from today as baseline
   
   for (let i = 1; i <= settings.totalMonths; i++) {
+    const dateStr = currentDate.toISOString().split('T')[0]
+    
     toInsert.push({
       student_id: studentId,
       type: 'monthly',
       description: `Mensalidade ${i}/${settings.totalMonths}`,
       amount: settings.monthlyFee,
-      due_date: null, // Keep it empty as requested
+      due_date: dateStr, // Database requires a valid date
       status: 'pending',
       created_at: new Date().toISOString()
     })
+
+    // Advance one month for the next installment
+    currentDate = new Date(currentDate)
+    currentDate.setMonth(currentDate.getMonth() + 1)
   }
 
   if (toInsert.length > 0) {
