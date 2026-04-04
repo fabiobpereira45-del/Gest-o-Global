@@ -514,7 +514,8 @@ export function FinancialManager() {
                             try {
                                 await resetAllStudentsMonthlyChargesBatch(settings)
                                 alert("Reset financeiro global concluído com sucesso!")
-                                load()
+                                // Delay to ensure global sync
+                                setTimeout(() => { load() }, 800)
                             } catch (e: any) { alert("Erro no reset: " + e.message) }
                             finally { setIsGenerating(false) }
                         }}
@@ -893,7 +894,8 @@ export function FinancialManager() {
                                         try {
                                             await resetAndGenerateStudentMonthlyCharges(selectedStudent.id, settings)
                                             alert("Mensalidades reiniciadas com sucesso!")
-                                            load()
+                                            // Small delay to ensure DB propagation
+                                            setTimeout(() => { load() }, 500)
                                         } catch (e: any) { alert("Erro ao resetar: " + e.message) }
                                         finally { setIsGenerating(false) }
                                     }}

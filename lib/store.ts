@@ -1824,11 +1824,22 @@ export async function resetAndGenerateStudentMonthlyCharges(studentId: string, s
       .in('id', idsToDelete)
     
     if (delError) throw new Error("O banco de dados recusou a exclusão. Verifique permissões RLS. Erro: " + delError.message)
+
+    // 3. VERIFICATION: Fetch again to make sure they are GONE
+    // If they persist, it's a silent RLS failure
+    const { data: verifyData } = await supabase
+      .from('financial_charges')
+      .select('id')
+      .in('id', idsToDelete)
+    
+    if (verifyData && verifyData.length > 0) {
+      throw new Error("FALHA DE PERSISTÊNCIA: As parcelas antigas não foram excluídas. O banco de dados Supabase está bloqueando a exclusão (RLS).")
+    }
   }
 
-  // 3. Generate exactly 25 new charges with Sequential Dates (Avoid NOT NULL error)
+  // 4. Generate exactly 25 new charges with Sequential Dates
   const toInsert = []
-  let currentDate = new Date() // Start from today as baseline
+  let currentDate = new Date() // Start from today
   
   for (let i = 1; i <= settings.totalMonths; i++) {
     const dateStr = currentDate.toISOString().split('T')[0]
@@ -1838,7 +1849,7 @@ export async function resetAndGenerateStudentMonthlyCharges(studentId: string, s
       type: 'monthly',
       description: `Mensalidade ${i}/${settings.totalMonths}`,
       amount: settings.monthlyFee,
-      due_date: dateStr, // Database requires a valid date
+      due_date: dateStr,
       status: 'pending',
       created_at: new Date().toISOString()
     })
