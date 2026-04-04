@@ -1644,88 +1644,98 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
     .select('*')
     .eq('student_id', studentId)
     .eq('type', 'monthly')
-    .order('due_date', { ascending: true })
 
   if (fetchError) throw new Error(fetchError.message)
   
   const charges = existing || []
   const updates = []
   const deletions = []
+  const toInsert = []
 
-  // 1. Process existing charges (Update or Delete)
-  for (let i = 0; i < charges.length; i++) {
-    const charge = charges[i]
-    const installmentNum = i + 1
-    
-    if (i < settings.totalMonths) {
-      // Normal installment: update description and amount
-      const newDescription = `Mensalidade ${installmentNum}/${settings.totalMonths}`
+  // Helper to extract installment number from description like "Mensalidade 5/25"
+  const getInstallmentNum = (desc: string) => {
+    const match = desc.match(/Mensalidade (\d+)\//i)
+    return match ? parseInt(match[1]) : null
+  }
+
+  // Map existing monthly charges by their installment number
+  const chargeMap = new Map<number, any>()
+  charges.forEach(c => {
+    const num = getInstallmentNum(c.description)
+    if (num) chargeMap.set(num, c)
+  })
+
+  // 1. Ensure all installments from 1 to totalMonths exist
+  for (let i = 1; i <= settings.totalMonths; i++) {
+    const existingCharge = chargeMap.get(i)
+    const newDescription = `Mensalidade ${i}/${settings.totalMonths}`
+
+    if (existingCharge) {
+      // Update existing
       const updateObj: any = { description: newDescription }
-      
-      if (!['paid', 'bolsa100', 'bolsa50'].includes(charge.status)) {
-          updateObj.amount = settings.monthlyFee
+      if (!['paid', 'bolsa100', 'bolsa50'].includes(existingCharge.status)) {
+        updateObj.amount = settings.monthlyFee
       }
 
-      if (updateObj.amount !== charge.amount || updateObj.description !== charge.description) {
-          updates.push(supabase.from('financial_charges').update(updateObj).eq('id', charge.id))
+      if (updateObj.amount !== existingCharge.amount || updateObj.description !== existingCharge.description) {
+        updates.push(supabase.from('financial_charges').update(updateObj).eq('id', existingCharge.id))
       }
     } else {
-      // Extra installment: delete if not paid
-      if (!['paid', 'bolsa100', 'bolsa50'].includes(charge.status)) {
-        deletions.push(supabase.from('financial_charges').delete().eq('id', charge.id))
+      // Create missing installment
+      // Date strategy: If we have installment i-1, use it+1month. Else use today.
+      let dueDate: string
+      const prev = chargeMap.get(i - 1)
+      if (prev) {
+        const d = new Date(prev.due_date)
+        d.setMonth(d.getMonth() + 1)
+        dueDate = d.toISOString().split('T')[0]
       } else {
-        // If it was already paid but is "extra" now, just keep it but maybe update description to show it is extra
-        const extraDesc = `Mensalidade Extra ${installmentNum} (Adicional)`
-        if (charge.description !== extraDesc) {
-            updates.push(supabase.from('financial_charges').update({ description: extraDesc }).eq('id', charge.id))
-        }
+        dueDate = new Date().toISOString().split('T')[0]
       }
+
+      toInsert.push({
+        student_id: studentId,
+        type: 'monthly',
+        description: newDescription,
+        amount: settings.monthlyFee,
+        due_date: dueDate,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
     }
   }
 
-  // Execute updates
+  // 2. Identify extra installments (indices > totalMonths) to delete if not paid
+  charges.forEach(c => {
+    const num = getInstallmentNum(c.description)
+    if (num && num > settings.totalMonths) {
+       if (!['paid', 'bolsa100', 'bolsa50'].includes(c.status)) {
+         deletions.push(supabase.from('financial_charges').delete().eq('id', c.id))
+       } else {
+         const extraDesc = `Mensalidade Extra ${num} (Adicional)`
+         if (c.description !== extraDesc) {
+           updates.push(supabase.from('financial_charges').update({ description: extraDesc }).eq('id', c.id))
+         }
+       }
+    }
+  })
+
+  // Execute Batch Operations
   if (updates.length > 0) {
-      const results = await Promise.all(updates)
-      const err = results.find(r => r.error)
-      if (err) throw new Error(err.error?.message)
+    const results = await Promise.all(updates)
+    const err = results.find(r => r.error)
+    if (err) throw new Error(err.error?.message)
   }
 
-  // Execute deletions
   if (deletions.length > 0) {
     const results = await Promise.all(deletions)
     const err = results.find(r => r.error)
     if (err) throw new Error(err.error?.message)
   }
 
-  // 2. Add missing charges if needed
-  if (charges.length < settings.totalMonths) {
-      const toInsert = []
-      let lastDate = charges.length > 0 
-        ? new Date(charges[charges.length - 1].due_date)
-        : new Date(2026, 3, 10) // Fallback April 2026
-      
-      for (let i = charges.length + 1; i <= settings.totalMonths; i++) {
-          // Increment one month from last
-          const nextDate = new Date(lastDate)
-          nextDate.setMonth(nextDate.getMonth() + 1)
-          const dateStr = nextDate.toISOString().split('T')[0]
-          
-          toInsert.push({
-            student_id: studentId,
-            type: 'monthly',
-            description: `Mensalidade ${i}/${settings.totalMonths}`,
-            amount: settings.monthlyFee,
-            due_date: dateStr,
-            status: 'pending',
-            created_at: new Date().toISOString()
-          })
-          lastDate = nextDate
-      }
-      
-      if (toInsert.length > 0) {
-          const { error: insError } = await supabase.from('financial_charges').insert(toInsert)
-          if (insError) throw new Error(insError.message)
-      }
+  if (toInsert.length > 0) {
+    const { error: insError } = await supabase.from('financial_charges').insert(toInsert)
+    if (insError) throw new Error(insError.message)
   }
 }
 

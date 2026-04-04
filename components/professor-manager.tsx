@@ -316,9 +316,9 @@ export function ProfessorManager() {
                       <p className="text-xs text-muted-foreground truncate">{account.email}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${account.active === false
-                        ? "bg-destructive/10 text-destructive"
-                        : "bg-green-500/10 text-green-600"
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shadow-sm border ${account.active === false
+                        ? "bg-red-50 text-red-600 border-red-200"
+                        : "bg-emerald-50 text-emerald-600 border-emerald-200"
                         }`}>
                         {account.active === false ? "Inativo" : "Ativo"}
                       </span>
@@ -331,11 +331,14 @@ export function ProfessorManager() {
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                       <Button
-                        size="sm" variant="ghost" className={`h-7 w-7 p-0 ${account.active === false ? 'text-green-600 hover:bg-green-50' : 'text-amber-600 hover:bg-amber-50'}`}
-                        onClick={() => handleEdit(account.id, { ...account, active: account.active === false ? true : false, password: "" })}
-                        title={account.active === false ? "Ativar" : "Desativar"}
+                        size="sm" variant="ghost" className={`h-7 w-7 p-0 transition-colors ${account.active === false ? 'text-emerald-600 hover:bg-emerald-50' : 'text-rose-600 hover:bg-rose-50'}`}
+                        onClick={async () => {
+                          const newStatus = account.active === false ? true : false
+                          await handleEdit(account.id, { ...account, active: newStatus, password: "" })
+                        }}
+                        title={account.active === false ? "Ativar Professor" : "Desativar Professor"}
                       >
-                        {account.active === false ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                        {account.active === false ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
                       </Button>
                       <Button
                         size="sm" variant="ghost" className="h-7 w-7 p-0 text-primary hover:bg-primary/10"
