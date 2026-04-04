@@ -249,7 +249,7 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
         title: title.trim(),
         disciplineId,
         professor: professorName,
-        institution: "Instituto de Ensino Teológico - IBAD",
+        institution: "Instituto Bíblico das Assembléias de Deus",
         logoBase64,
         rules: rules.trim(),
         questionIds: finalIds,

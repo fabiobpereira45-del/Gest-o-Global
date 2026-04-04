@@ -1520,14 +1520,14 @@ export async function generateMonthlyCharges(studentId: string, monthlyFee: numb
   let currentMonth = 3 // April (0-indexed)
   let currentYear = 2026
 
-  for (let i = 1; i <= 18; i++) {
+  for (let i = 1; i <= 24; i++) {
     const dueDate = new Date(currentYear, currentMonth, 10)
     const dateStr = dueDate.toISOString().split('T')[0]
     
     charges.push({
       student_id: studentId,
       type: 'monthly',
-      description: `Mensalidade ${i}/18`,
+      description: `Mensalidade ${i}/24`,
       amount: monthlyFee,
       due_date: dateStr,
       status: 'pending',

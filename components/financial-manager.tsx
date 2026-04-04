@@ -317,7 +317,7 @@ export function FinancialManager() {
             alert("Configure a mensalidade nas configurações antes de gerar.")
             return
         }
-        if (!confirm("Deseja gerar as 18 mensalidades (Abril 2026 a Setembro 2027) para este aluno?")) return
+        if (!confirm("Deseja gerar as 24 mensalidades (Abril 2026 a Março 2028) para este aluno?")) return
 
         setIsGenerating(true)
         try {
@@ -891,7 +891,7 @@ export function FinancialManager() {
                                     onClick={() => handleGeneratePlan(selectedStudent!.id)}
                                     disabled={isGenerating}>
                                     {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <DollarSign className="h-3 w-3 mr-2" />}
-                                    Gerar Carnê 18x
+                                    Gerar Carnê 24x
                                 </Button>
                             </div>
                         </div>
