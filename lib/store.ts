@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/client"
 import { triggerN8nWebhook } from "@/lib/n8n"
 export { triggerN8nWebhook }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export type QuestionType = "multiple-choice" | "true-false" | "discursive" | "incorrect-alternative" | "fill-in-the-blank" | "matching"
 export interface Choice { id: string; text: string }
 export interface MatchingPair { id: string; left: string; right: string }
@@ -24,7 +24,7 @@ export interface ChatMessage { id: string; studentId: string; disciplineId: stri
 export interface Attendance { id: string; studentId: string; disciplineId: string; date: string; isPresent: boolean; createdAt: string; }
 export interface BoardMember { id: string; name: string; role: string; category: string; avatar_url?: string | null; createdAt: string; }
 export interface ProfessorDiscipline { id: string; professorId: string; disciplineId: string; createdAt: string; }
-export type ExpenseCategory = "Pagamento ao Professor" | "Material de secretária" | "combustível" | "Transporte" | "Alimento" | "devolução" | "outros"
+export type ExpenseCategory = "Pagamento ao Professor" | "Material de secretÃ¡ria" | "combustÃ­vel" | "Transporte" | "Alimento" | "devoluÃ§Ã£o" | "outros"
 export interface Expense { id: string; category: ExpenseCategory; description: string; amount: number; date: string; createdAt: string; }
 export interface ClassRoom { id: string; name: string; shift: "morning" | "afternoon" | "evening" | "ead" | "hibrido"; dayOfWeek?: string; maxStudents: number; studentCount?: number; createdAt: string; }
 export interface ClassSchedule { id: string; classId: string; disciplineId: string; professorName: string; dayOfWeek: string; timeStart: string; timeEnd: string; lessonsCount: number; workload: number; startDate?: string; endDate?: string; createdAt: string; }
@@ -79,7 +79,7 @@ export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
 }
 
-// ─── Auth / Session (Local Storage) ──────────────────────────────────────────
+// â”€â”€â”€ Auth / Session (Local Storage) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function getProfessorSession(): ProfessorSession | null {
   const s = readLocal<ProfessorSession | null>(KEYS.PROFESSOR_SESSION, null)
@@ -92,7 +92,7 @@ export function saveProfessorSession(professorId: string, role: "master" | "prof
     const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
     writeLocal<ProfessorSession>(KEYS.PROFESSOR_SESSION, { loggedIn: true, professorId, role, avatar_url, expiresAt })
   } catch (err) {
-    console.error("Erro ao salvar sessão do professor:", err)
+    console.error("Erro ao salvar sessÃ£o do professor:", err)
   }
 }
 export function clearProfessorSession(): void {
@@ -110,7 +110,7 @@ export async function registerStudentAuth(name: string, cpf: string, password: s
     options: { data: { name, type: 'student' } }
   })
   if (authError) throw new Error(authError.message)
-  if (!authData.user) throw new Error("Erro ao criar usuário na base de dados.")
+  if (!authData.user) throw new Error("Erro ao criar usuÃ¡rio na base de dados.")
 
   const matricula = `2026${Math.floor(1000 + Math.random() * 9000)}`
 
@@ -135,7 +135,7 @@ export async function registerStudentByAdmin(data: any): Promise<void> {
     if (cls) {
       const { count } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('class_id', data.classId)
       if (count !== null && count >= cls.max_students) {
-        throw new Error("Esta turma já está com as vagas esgotadas.")
+        throw new Error("Esta turma jÃ¡ estÃ¡ com as vagas esgotadas.")
       }
     }
   }
@@ -153,7 +153,7 @@ export async function registerStudentByAdmin(data: any): Promise<void> {
     options: { data: { name: nameUC, type: 'student' } }
   })
   if (authError) throw new Error(authError.message)
-  if (!authData.user) throw new Error("Erro ao criar usuário na base de dados (Auth).")
+  if (!authData.user) throw new Error("Erro ao criar usuÃ¡rio na base de dados (Auth).")
 
   const matricula = `2026${Math.floor(1000 + Math.random() * 9000)}`
 
@@ -198,15 +198,15 @@ export async function loginStudentAuth(identifier: string, password: string) {
       email = studentData?.email || `${cleanId}@student.ibad.com`
     } else {
       const { data } = await supabase.from('students').select('email').eq('enrollment_number', cleanId).maybeSingle()
-      if (!data) throw new Error("Identificador não encontrado (CPF, Matrícula ou E-mail).")
+      if (!data) throw new Error("Identificador nÃ£o encontrado (CPF, MatrÃ­cula ou E-mail).")
       email = data.email
     }
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw new Error("Credenciais inválidas.")
+  if (error) throw new Error("Credenciais invÃ¡lidas.")
 
-  // Auto-healing: se logou mas o vínculo no DB está quebrado, conserta agora
+  // Auto-healing: se logou mas o vÃ­nculo no DB estÃ¡ quebrado, conserta agora
   if (data.user) {
     const { data: profile } = await supabase.from('students').select('id, auth_user_id').eq('email', email).maybeSingle()
     if (profile && !profile.auth_user_id) {
@@ -323,7 +323,7 @@ function mapProfessor(p: any): ProfessorAccount {
     active: p.active !== false // Default to true if null/undefined
   }
 }
-function mapFinancialSettings(row: any): FinancialSettings { return { id: row.id, enrollmentFee: Number(row.enrollment_fee), monthlyFee: Number(row.monthly_fee), secondCallFee: Number(row.second_call_fee), finalExamFee: Number(row.final_exam_fee), totalMonths: Number(row.total_months), creditCardUrl: row.credit_card_url || undefined, pixKey: row.pix_key || undefined, updatedAt: row.updated_at } }
+function mapFinancialSettings(row: any): FinancialSettings { return { id: row.id, enrollmentFee: Number(row.enrollment_fee), monthlyFee: Number(row.monthly_fee), secondCallFee: Number(row.second_call_fee), finalExamFee: Number(row.final_exam_fee), total_months: Number(row.total_months), creditCardUrl: row.credit_card_url || undefined, pixKey: row.pix_key || undefined, updatedAt: row.updated_at } }
 function mapFinancialCharge(row: any): FinancialCharge { return { id: row.id, studentId: row.student_id, type: row.type, description: row.description, amount: Number(row.amount), dueDate: row.due_date, status: row.status, paymentDate: row.payment_date || undefined, pixQrcode: row.pix_qrcode || undefined, pixCopyPaste: row.pix_copy_paste || undefined, createdAt: row.created_at } }
 function mapExpense(row: any): Expense { return { id: row.id, category: row.category as ExpenseCategory, description: row.description || "", amount: Number(row.amount), date: row.date, createdAt: row.created_at } }
 function mapStudentProfile(row: any): StudentProfile { return { id: row.id, auth_user_id: row.auth_user_id, name: row.name, cpf: row.cpf, enrollment_number: row.enrollment_number, phone: row.phone || undefined, church: row.church || undefined, pastor_name: row.pastor_name || undefined, class_id: row.class_id || undefined, payment_status: row.payment_status || undefined, avatar_url: row.avatar_url || null, bio: row.bio || null, status: row.status || 'pending', created_at: row.created_at } }
@@ -335,19 +335,19 @@ function mapStudentGrade(row: any): StudentGrade { return { id: row.id, studentI
 function mapBoardMember(row: any): BoardMember { return { id: row.id, name: row.name, role: row.role, category: row.category, avatar_url: row.avatar_url, createdAt: row.created_at } }
 function mapProfessorDiscipline(row: any): ProfessorDiscipline { return { id: row.id, professorId: row.professor_id, disciplineId: row.discipline_id, createdAt: row.created_at } }
 
-// ─── Async Supabase Operations ───────────────────────────────────────────────
+// â”€â”€â”€ Async Supabase Operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function getFinancialSettings(): Promise<FinancialSettings | null> {
   try {
     const supabase = createClient()
     const { data, error } = await supabase.from('financial_settings').select('*').limit(1).maybeSingle()
     if (error) {
-      console.error("Erro ao buscar configurações financeiras:", error.message)
+      console.error("Erro ao buscar configuraÃ§Ãµes financeiras:", error.message)
       return null
     }
     return data ? mapFinancialSettings(data) : null
   } catch (err) {
-    console.error("Falha fatal ao carregar configurações financeiras:", err)
+    console.error("Falha fatal ao carregar configuraÃ§Ãµes financeiras:", err)
     return null
   }
 }
@@ -433,12 +433,12 @@ export async function getFinancialCharges(studentId?: string): Promise<Financial
     
     const { data, error } = await query
     if (error) {
-      console.error("Erro ao buscar cobranças financeiras:", error.message)
+      console.error("Erro ao buscar cobranÃ§as financeiras:", error.message)
       return []
     }
     return (data || []).map(mapFinancialCharge)
   } catch (err) {
-    console.error("Falha fatal ao carregar cobranças financeiras:", err)
+    console.error("Falha fatal ao carregar cobranÃ§as financeiras:", err)
     return []
   }
 }
@@ -557,10 +557,13 @@ export async function deleteSemester(id: string): Promise<void> {
 
 export async function getDisciplines(): Promise<Discipline[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('disciplines').select('*')
+  const { data } = await supabase.from('disciplines').select('*').order('order', { ascending: true })
   return (data || [])
     .map(mapDiscipline)
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => {
+      if (a.order !== b.order) return a.order - b.order
+      return a.name.localeCompare(b.name)
+    })
 }
 
 export async function getDisciplinesByProfessor(professorId: string): Promise<Discipline[]> {
@@ -716,7 +719,7 @@ export async function addQuestion(data: Omit<Question, "id" | "createdAt">): Pro
 
   const supabase = createClient()
   const { error } = await supabase.from('questions').insert(q)
-  if (error) throw new Error(`Erro ao salvar questão: ${error.message}`)
+  if (error) throw new Error(`Erro ao salvar questÃ£o: ${error.message}`)
 
   // Create a proper Question object for the return
   return mapQuestion({
@@ -746,7 +749,7 @@ export async function updateQuestion(id: string, data: Partial<Omit<Question, "i
 
   const supabase = createClient()
   const { error } = await supabase.from('questions').update(updateData).eq('id', id)
-  if (error) throw new Error(`Erro ao atualizar questão: ${error.message}`)
+  if (error) throw new Error(`Erro ao atualizar questÃ£o: ${error.message}`)
 }
 export async function deleteQuestion(id: string): Promise<void> {
   const supabase = createClient()
@@ -798,16 +801,6 @@ export async function updateAssessment(id: string, data: Partial<Omit<Assessment
   if (data.timeLimitMinutes !== undefined) dbData.time_limit_minutes = data.timeLimitMinutes
 
   const supabase = createClient()
-
-  // Workaround for missing 'archived' column
-  if (data.archived !== undefined || data.modality !== undefined) {
-    const { data: current } = await supabase.from('assessments').select('modality').eq('id', id).maybeSingle()
-    const currentModality = (current?.modality || "public").replace("_archived", "")
-    const newModalityBase = data.modality || currentModality
-    const newArchived = data.archived !== undefined ? data.archived : (current?.modality?.includes("_archived") || false)
-
-    dbData.modality = newArchived ? `${newModalityBase}_archived` : newModalityBase
-  }
   const { error } = await supabase.from('assessments').update(dbData).eq('id', id)
   if (error) throw new Error(error.message)
 
@@ -879,7 +872,7 @@ export async function saveSubmission(sub: StudentSubmission): Promise<StudentSub
       });
     }
   } catch (err) {
-    console.error("Erro ao disparar WhatsApp n8n de conclusão de prova:", err);
+    console.error("Erro ao disparar WhatsApp n8n de conclusÃ£o de prova:", err);
   }
 
   return result
@@ -990,12 +983,12 @@ export async function updateProfessorAccount(id: string, data: Partial<Pick<Prof
 
     if (!res.ok) {
         const err = await res.json()
-        console.warn("Sincronização Auth Master falhou:", err)
+        console.warn("SincronizaÃ§Ã£o Auth Master falhou:", err)
     }
     
     // Fetch newly updated/created master record
     const updatedMaster = await getProfessorByEmail(MASTER_CREDENTIALS.email)
-    if (!updatedMaster) throw new Error("Falha ao recuperar conta Master após salvamento")
+    if (!updatedMaster) throw new Error("Falha ao recuperar conta Master apÃ³s salvamento")
     return updatedMaster
   }
 
@@ -1020,7 +1013,7 @@ export async function updateProfessorAccount(id: string, data: Partial<Pick<Prof
     })
     if (!res.ok) {
         const err = await res.json()
-        throw new Error("Erro de sincronização S-Auth: " + (err.error || res.statusText))
+        throw new Error("Erro de sincronizaÃ§Ã£o S-Auth: " + (err.error || res.statusText))
     }
   }
 
@@ -1044,7 +1037,7 @@ export async function updateProfessorAccount(id: string, data: Partial<Pick<Prof
       if (!updated2) throw new Error("Nenhum professor encontrado com ID " + id + " ou E-mail " + fallbackEmail)
       updated = updated2
     } else {
-        throw new Error("Erro ao atualizar: Professor não encontrado e e-mail não disponível.")
+        throw new Error("Erro ao atualizar: Professor nÃ£o encontrado e e-mail nÃ£o disponÃ­vel.")
     }
   }
   return mapProfessor(updated)
@@ -1313,9 +1306,9 @@ export async function saveAttendance(studentId: string, disciplineId: string, da
   }
 }
 
-// ─── n8n WhatsApp Integration ──────────────────────────────────────────────
+// â”€â”€â”€ n8n WhatsApp Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// ─── Notas (Student Grades) ───────────────────────────────────────────────────
+// â”€â”€â”€ Notas (Student Grades) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function getStudentGrades(): Promise<StudentGrade[]> {
   const supabase = createClient()
@@ -1386,7 +1379,7 @@ export async function deleteStudentGrade(id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
-// ─── Profile / Avatar Management ──────────────────────────────────────────
+// â”€â”€â”€ Profile / Avatar Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function uploadAvatar(file: File, userId: string, folder: 'students' | 'professors' | 'board'): Promise<string> {
   const supabase = createClient()
@@ -1440,7 +1433,7 @@ export async function updateProfileAvatar(
   else if (type === 'professor') table = 'professor_accounts'
   else if (type === 'board') table = 'board_members'
 
-  if (!table) throw new Error("Tipo de perfil inválido para atualização de avatar.");
+  if (!table) throw new Error("Tipo de perfil invÃ¡lido para atualizaÃ§Ã£o de avatar.");
 
   let success = false;
   let lastError = "";
@@ -1456,10 +1449,10 @@ export async function updateProfileAvatar(
 
   if (idUpdate && !idError) {
     success = true;
-    console.log("DEBUG-V1.2.2: Atualização por ID concluída com sucesso.");
+    console.log("DEBUG-V1.2.2: AtualizaÃ§Ã£o por ID concluÃ­da com sucesso.");
   } else {
     lastError = idError?.message || "Nenhum registro encontrado por ID.";
-    console.warn("DEBUG-V1.2.2: Atualização por ID falhou ou não encontrou registro:", lastError);
+    console.warn("DEBUG-V1.2.2: AtualizaÃ§Ã£o por ID falhou ou nÃ£o encontrou registro:", lastError);
   }
 
   // Attempt 2: Fallback to Email (for professors or students where we might have email)
@@ -1479,7 +1472,7 @@ export async function updateProfileAvatar(
 
         if (emailUpdate && !emailError) {
             success = true;
-            console.log("DEBUG-V1.2.2: Atualização por Email concluída com sucesso.");
+            console.log("DEBUG-V1.2.2: AtualizaÃ§Ã£o por Email concluÃ­da com sucesso.");
         } else {
             lastError = emailError?.message || "Nenhum registro encontrado por Email.";
             console.warn("DEBUG-V1.2.2: Fallback por email falhou:", lastError);
@@ -1596,8 +1589,7 @@ export async function updateFinancialCharge(id: string, data: {
 
 // Build timestamp: 2026-03-13 10:59
 
-// ─── Expenses ───────────────────────────────────────────────────────────────
-
+// â”€â”€â”€ Expenses â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function getExpenses(): Promise<Expense[]> {
   const supabase = createClient()
   const { data } = await supabase.from('expenses').select('*').order('date', { ascending: false })
@@ -1638,18 +1630,18 @@ export async function deleteExpense(id: string): Promise<void> {
   await supabase.from('expenses').delete().eq('id', id)
 }
 
-// ─── Bulk Disciplines ───────────────────────────────────────────────────────
+// â”€â”€â”€ Bulk Disciplines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function insertIBADDisciplines(): Promise<void> {
   const disciplines = [
-    "Cristologia", "Epístolas Paulinas", "Escatologia", "Escola Dominical",
-    "Evangelhos e Atos", "Evangelismo", "Evidência Cristã",
-    "Fundamentos da Psicologia e do Aconselhamento", "Geografia Bíblica",
-    "Hebreus e Epístolas Gerais", "Hermenêutica", "História da Igreja",
-    "Homilética", "Introdução ao Novo Testamento", "Introdução Bíblica",
-    "Livros Históricos", "Livros Poéticos", "Maneiras e Costumes Bíblicos",
+    "Cristologia", "EpÃ­stolas Paulinas", "Escatologia", "Escola Dominical",
+    "Evangelhos e Atos", "Evangelismo", "EvidÃªncia CristÃ£",
+    "Fundamentos da Psicologia e do Aconselhamento", "Geografia BÃ­blica",
+    "Hebreus e EpÃ­stolas Gerais", "HermenÃªutica", "HistÃ³ria da Igreja",
+    "HomilÃ©tica", "IntroduÃ§Ã£o ao Novo Testamento", "IntroduÃ§Ã£o BÃ­blica",
+    "Livros HistÃ³ricos", "Livros PoÃ©ticos", "Maneiras e Costumes BÃ­blicos",
     "Missiologia", "Pentateuco", "Profetas Maiores e Menores",
-    "Religiões Comparadas", "Teologia Pastoral", "Teologia Sistemática"
+    "ReligiÃµes Comparadas", "Teologia Pastoral", "Teologia SistemÃ¡tica"
   ]
   const supabase = createClient()
   const { data: existing } = await supabase.from('disciplines').select('name')
@@ -1681,9 +1673,9 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
   if (fetchError) throw new Error(fetchError.message)
   
   const charges = existing || []
-  const updates = []
-  const deletions = []
-  const toInsert = []
+  const updates: any[] = []
+  const deletions: any[] = []
+  const toInsert: any[] = []
 
   // Helper to extract installment number from description like "Mensalidade 5/25"
   const getInstallmentNum = (desc: string) => {
@@ -1699,9 +1691,9 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
   })
 
   // 1. Ensure all installments from 1 to totalMonths exist
-  for (let i = 1; i <= settings.totalMonths; i++) {
+  for (let i = 1; i <= settings.total_months; i++) {
     const existingCharge = chargeMap.get(i)
-    const newDescription = `Mensalidade ${i}/${settings.totalMonths}`
+    const newDescription = `Mensalidade ${i}/${settings.total_months}`
 
     if (existingCharge) {
       // Update existing
@@ -1715,7 +1707,6 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
       }
     } else {
       // Create missing installment
-      // Date strategy: If we have installment i-1, use it+1month. Else use today.
       let dueDate: string
       const prev = chargeMap.get(i - 1)
       if (prev) {
@@ -1741,7 +1732,7 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
   // 2. Identify extra installments (indices > totalMonths) to delete if not paid
   charges.forEach(c => {
     const num = getInstallmentNum(c.description)
-    if (num && num > settings.totalMonths) {
+    if (num && num > settings.total_months) {
        if (!['paid', 'bolsa100', 'bolsa50'].includes(c.status)) {
          deletions.push(supabase.from('financial_charges').delete().eq('id', c.id))
        } else {
@@ -1797,13 +1788,13 @@ export async function repairAssessmentsData(): Promise<void> {
     const updateData: any = {}
 
     // Fix Institution
-    if (!ass.institution || ass.institution.includes("ENSINO TEOLÓGICO")) {
-      updateData.institution = "Instituto Bíblico das Assembléias de Deus"
+    if (!ass.institution || ass.institution.includes("ENSINO TEOLÃ“GICO")) {
+      updateData.institution = "Instituto BÃ­blico das AssemblÃ©ias de Deus"
       needsUpdate = true
     }
 
     // Fix Professor fallback
-    if (!ass.professor || ass.professor.includes("Fábio Barreto") || ass.professor === "" || ass.professor === "Professor") {
+    if (!ass.professor || ass.professor.includes("FÃ¡bio Barreto") || ass.professor === "" || ass.professor === "Professor") {
       const disc = discMap.get(ass.discipline_id)
       if (disc?.professor_name) {
         updateData.professor = disc.professor_name
@@ -1821,100 +1812,29 @@ export async function repairAssessmentsData(): Promise<void> {
 }
 
 /**
- * Destructive: Deletes all monthly charges for a student and generates totalMonths new charges.
+ * DEFINITIVE: Calls RPC to reset and generate student monthly charges.
  */
 export async function resetAndGenerateStudentMonthlyCharges(studentId: string, settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
+  const { error } = await supabase.rpc('reset_single_student_financials', {
+    p_student_id: studentId,
+    p_total_months: settings.totalMonths,
+    p_monthly_fee: settings.monthlyFee
+  })
   
-  // 1. Delete ALL monthly charges for this specific student
-  const { error: delError } = await supabase
-    .from('financial_charges')
-    .delete()
-    .eq('student_id', studentId)
-    .eq('type', 'monthly')
-  
-  if (delError) throw new Error("Erro ao limpar registros: " + delError.message)
-
-  // 2. Generate new sequence starting from April 2026 (Marco Zero)
-  const toInsert = []
-  let currentMonth = 3 // April (0-indexed)
-  let currentYear = 2026
-  
-  for (let i = 1; i <= settings.totalMonths; i++) {
-    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-10`
-    
-    toInsert.push({
-      student_id: studentId,
-      type: 'monthly',
-      description: `Mensalidade ${i}/${settings.totalMonths}`,
-      amount: settings.monthlyFee,
-      due_date: dateStr,
-      status: 'pending',
-      created_at: new Date().toISOString()
-    })
-
-    currentMonth++
-    if (currentMonth > 11) {
-      currentMonth = 0
-      currentYear++
-    }
-  }
-
-  if (toInsert.length > 0) {
-    const { error: insError } = await supabase.from('financial_charges').insert(toInsert)
-    if (insError) throw new Error("Erro ao gerar novas parcelas: " + insError.message)
-  }
+  if (error) throw new Error("Erro definitivo ao limpar registros: " + error.message)
 }
 
 /**
- * Destructive: Resets all active students' monthly charges.
+ * DEFINITIVE: Calls RPC to reset ALL active students' monthly charges.
  */
 export async function resetAllStudentsMonthlyChargesBatch(settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
-  
-  // 1. CLEAR ABSOLUTELY EVERYTHING monthly to fix "persistence" bugs once and for all
-  const { error: delError } = await supabase
-    .from('financial_charges')
-    .delete()
-    .eq('type', 'monthly')
+  const { error } = await supabase.rpc('reset_all_active_students_financials', {
+    p_total_months: settings.total_months,
+    p_monthly_fee: settings.monthlyFee
+  })
 
-  if (delError) throw new Error("Erro Crítico ao limpar registros antigos: " + delError.message)
-
-  // 2. Fetch Active Students
-  const { data: students, error: sErr } = await supabase.from('students').select('id').eq('status', 'active')
-  if (sErr) throw new Error(sErr.message)
-  if (!students || students.length === 0) return
-
-  // 3. Prepare Bulk Data with strictly calculated dates (April 10, 2026 START)
-  const allToInsert = []
-  for (const student of students) {
-    let currentMonth = 3 // April (0-indexed)
-    let currentYear = 2026
-    for (let i = 1; i <= settings.totalMonths; i++) {
-      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-10`
-      allToInsert.push({
-        student_id: student.id,
-        type: 'monthly',
-        description: `Mensalidade ${i}/${settings.totalMonths}`,
-        amount: settings.monthlyFee,
-        due_date: dateStr,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      })
-      
-      currentMonth++
-      if (currentMonth > 11) {
-        currentMonth = 0
-        currentYear++
-      }
-    }
-  }
-
-  // 4. Batch Insert in chunks (handling Supabase limits)
-  const CHUNK_SIZE = 500
-  for (let i = 0; i < allToInsert.length; i += CHUNK_SIZE) {
-    const chunk = allToInsert.slice(i, i + CHUNK_SIZE)
-    const { error: insError } = await supabase.from('financial_charges').insert(chunk)
-    if (insError) throw new Error(`Erro no processamento do lote ${i/CHUNK_SIZE + 1}: ${insError.message}`)
-  }
+  if (error) throw new Error("Erro CrÃ­tico no Reset Global: " + error.message)
 }
+
