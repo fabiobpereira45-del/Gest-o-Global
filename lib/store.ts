@@ -673,9 +673,13 @@ export async function updateDiscipline(id: string, data: Partial<Pick<Discipline
   if (data.shift !== undefined) updateData.shift = data.shift || null
   if (data.order !== undefined) updateData.order = data.order
   if (data.is_realized !== undefined) updateData.is_realized = data.is_realized
-  if (data.executionDate !== undefined) updateData.execution_date = data.executionDate || null
+  if (data.executionDate !== undefined) {
+    console.log('[updateDiscipline] executionDate:', data.executionDate, 'type:', typeof data.executionDate)
+    updateData.execution_date = data.executionDate
+  }
 
   const supabase = createClient()
+  console.log('[updateDiscipline] updateData:', updateData)
   await supabase.from('disciplines').update(updateData).eq('id', id)
 }
 export async function deleteDiscipline(id: string): Promise<void> {

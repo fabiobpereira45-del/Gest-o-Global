@@ -145,16 +145,19 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
     }
 
     async function handleSaveDisc() {
+        console.log('[handleSaveDisc] Saving discipline. executionDate:', discExecutionDate, 'editingDisc:', editingDisc?.id)
         if (!discName.trim() && !selectedPoolDisc) return
         const semId = discSemId === "none" ? null : (discSemId || null)
         const prof = discProfName === "none" ? null : discProfName
         const execDate = discExecutionDate || null
 
         if (selectedPoolDisc) {
+            console.log('[handleSaveDisc] Updating pool disc:', selectedPoolDisc.id, 'executionDate:', execDate)
             await updateDiscipline(selectedPoolDisc.id, {
                 semesterId: semId, professorName: prof, executionDate: execDate
             })
         } else if (editingDisc) {
+            console.log('[handleSaveDisc] Updating existing disc:', editingDisc.id, 'executionDate:', execDate)
             await updateDiscipline(editingDisc.id, {
                 name: discName.trim(), description: discDesc.trim() || null,
                 semesterId: semId, professorName: prof, executionDate: execDate
