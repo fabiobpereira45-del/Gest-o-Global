@@ -228,21 +228,6 @@ export async function loginStudentAuth(identifier: string, password: string) {
 
   return data
 }
-  }
-
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw new Error("Credenciais invÃ¡lidas.")
-
-  // Auto-healing: se logou mas o vÃ­nculo no DB estÃ¡ quebrado, conserta agora
-  if (data.user) {
-    const { data: profile } = await supabase.from('students').select('id, auth_user_id').eq('email', email).maybeSingle()
-    if (profile && !profile.auth_user_id) {
-      await supabase.from('students').update({ auth_user_id: data.user.id }).eq('id', profile.id)
-    }
-  }
-
-  return data
-}
 
 export async function getStudentProfileAuth(): Promise<StudentProfile | null> {
   const supabase = createClient()
