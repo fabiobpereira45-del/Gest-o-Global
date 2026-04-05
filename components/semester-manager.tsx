@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react"
 import {
     Plus, Pencil, Trash2, CalendarDays, BookOpen, AlertCircle, X,
-    Search, LogOut, ArrowRightCircle, ChevronUp, ChevronDown, Download
+    Search, LogOut, ArrowRightCircle, ChevronUp, ChevronDown, Download, Check
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -172,6 +172,18 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
         await deleteDiscipline(id); setDeleteDiscId(null); load()
     }
 
+    // ── Toggle discipline completed ───────────────────────────────────────────
+    async function handleToggleDisciplineCompleted(disc: Discipline) {
+        await updateDiscipline(disc.id, { is_realized: !disc.is_realized })
+        load()
+    }
+
+    // ── Toggle semester completed ─────────────────────────────────────────────
+    async function handleToggleSemesterCompleted(sem: Semester) {
+        await updateSemester(sem.id, { is_completed: !sem.is_completed })
+        load()
+    }
+
     async function handleMoveDisc(disc: Discipline, direction: 'up' | 'down', semDiscs: Discipline[]) {
         const idx = semDiscs.findIndex(d => d.id === disc.id)
         if (direction === 'up' && idx === 0) return
@@ -242,24 +254,29 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
 
                 {semesters.map(sem => {
                     const semDiscs = disciplines.filter(d => d.semesterId === sem.id)
+                    const isCompleted = sem.is_completed === true
 
                     return (
-                        <div key={sem.id} className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+                        <div key={sem.id} className={`bg-card border rounded-2xl shadow-sm overflow-hidden ${isCompleted ? 'border-green-300 bg-green-50' : 'border-border'}`}>
                             {/* Semester header */}
-                            <div className="bg-primary/5 px-5 py-4 border-b border-border flex items-start justify-between gap-3">
+                            <div className={`px-5 py-4 border-b flex items-start justify-between gap-3 ${isCompleted ? 'bg-green-100/50 border-green-200' : 'bg-primary/5 border-border'}`}>
                                 <div className="flex items-start gap-3 min-w-0">
-                                    <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                                        <CalendarDays className="h-4 w-4 text-primary" />
+                                    <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${isCompleted ? 'bg-green-200 text-green-700' : 'bg-primary/10 text-primary'}`}>
+                                        {isCompleted ? <Check className="h-4 w-4" /> : <CalendarDays className="h-4 w-4" />}
                                     </div>
                                     <div className="min-w-0">
                                         <h3 className="font-bold text-foreground">{sem.name}</h3>
                                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                             <span className="text-xs text-muted-foreground">Ordem {sem.order}</span>
                                             <span className="text-xs text-muted-foreground">· {semDiscs.length} disciplina{semDiscs.length !== 1 ? "s" : ""}</span>
+                                            {isCompleted && <span className="text-xs font-bold text-green-600 bg-green-200 px-1.5 py-0.5 rounded">Concluído</span>}
                                         </div>
                                     </div>
                                 </div>
                                 <div className="flex gap-1 shrink-0">
+                                    <Button size="sm" variant={isCompleted ? "default" : "ghost"} className={isCompleted ? "h-8 px-2 text-xs bg-green-600 hover:bg-green-700 text-white gap-1" : "h-8 px-2 text-xs text-primary gap-1"} onClick={() => handleToggleSemesterCompleted(sem)} title={isCompleted ? "Marcar como não concluído" : "Marcar como concluído"}>
+                                        <Check className="h-3.5 w-3.5" /> {isCompleted ? "Concluído" : "Concluir"}
+                                    </Button>
                                     <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-primary gap-1" onClick={() => openNewDisc(sem.id)}>
                                         <Plus className="h-3.5 w-3.5" /> Disciplina
                                     </Button>
@@ -286,48 +303,57 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
                                     </div>
                                 ) : (
                                     <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                        {semDiscs.map(disc => (
-                                            <div key={disc.id} className="group relative border border-border rounded-xl px-4 py-3 bg-background hover:border-primary/40 hover:shadow-sm transition-all flex flex-col justify-between">
-                                                <div>
-                                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                                                        <button className="h-6 w-6 rounded flex items-center justify-center bg-card border border-border hover:bg-muted text-muted-foreground" onClick={() => openEditDisc(disc)} title="Editar">
-                                                            <Pencil className="h-3 w-3" />
-                                                        </button>
-                                                        {isMaster && (
-                                                            <>
-                                                                <button
-                                                                    className="h-6 w-6 rounded flex items-center justify-center bg-card border border-border hover:bg-muted text-muted-foreground"
-                                                                    onClick={() => handleMoveDisc(disc, 'up', semDiscs)}
-                                                                    title="Mover para cima"
-                                                                >
-                                                                    <ChevronUp className="h-3 w-3" />
-                                                                </button>
-                                                                <button
-                                                                    className="h-6 w-6 rounded flex items-center justify-center bg-card border border-border hover:bg-muted text-muted-foreground"
-                                                                    onClick={() => handleMoveDisc(disc, 'down', semDiscs)}
-                                                                    title="Mover para baixo"
-                                                                >
-                                                                    <ChevronDown className="h-3 w-3" />
-                                                                </button>
-                                                                <button
-                                                                    className="h-6 w-6 rounded flex items-center justify-center bg-card border border-amber-300 hover:bg-amber-50 text-amber-600"
-                                                                    onClick={() => setUnlinkDiscId(disc.id)}
-                                                                    title="Remover do semestre"
-                                                                >
-                                                                    <LogOut className="h-3 w-3" />
-                                                                </button>
-                                                            </>
-                                                        )}
+                                        {semDiscs.map(disc => {
+                                            const isDiscCompleted = disc.is_realized === true
+                                            return (
+                                                <div key={disc.id} className={`group relative border rounded-xl px-4 py-3 bg-background hover:shadow-sm transition-all flex flex-col justify-between ${isDiscCompleted ? 'border-green-300 bg-green-50 hover:border-green-400' : 'border-border hover:border-primary/40'}`}>
+                                                    <div>
+                                                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                                            <button className="h-6 w-6 rounded flex items-center justify-center bg-card border border-border hover:bg-muted text-muted-foreground" onClick={() => handleToggleDisciplineCompleted(disc)} title={isDiscCompleted ? "Marcar como não concluída" : "Marcar como concluída"}>
+                                                                <Check className={`h-3 w-3 ${isDiscCompleted ? 'text-green-600' : 'text-muted-foreground'}`} />
+                                                            </button>
+                                                            <button className="h-6 w-6 rounded flex items-center justify-center bg-card border border-border hover:bg-muted text-muted-foreground" onClick={() => openEditDisc(disc)} title="Editar">
+                                                                <Pencil className="h-3 w-3" />
+                                                            </button>
+                                                            {isMaster && (
+                                                                <>
+                                                                    <button
+                                                                        className="h-6 w-6 rounded flex items-center justify-center bg-card border border-border hover:bg-muted text-muted-foreground"
+                                                                        onClick={() => handleMoveDisc(disc, 'up', semDiscs)}
+                                                                        title="Mover para cima"
+                                                                    >
+                                                                        <ChevronUp className="h-3 w-3" />
+                                                                    </button>
+                                                                    <button
+                                                                        className="h-6 w-6 rounded flex items-center justify-center bg-card border border-border hover:bg-muted text-muted-foreground"
+                                                                        onClick={() => handleMoveDisc(disc, 'down', semDiscs)}
+                                                                        title="Mover para baixo"
+                                                                    >
+                                                                        <ChevronDown className="h-3 w-3" />
+                                                                    </button>
+                                                                    <button
+                                                                        className="h-6 w-6 rounded flex items-center justify-center bg-card border border-amber-300 hover:bg-amber-50 text-amber-600"
+                                                                        onClick={() => setUnlinkDiscId(disc.id)}
+                                                                        title="Remover do semestre"
+                                                                    >
+                                                                        <LogOut className="h-3 w-3" />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <h4 className="font-semibold text-sm leading-snug">{disc.name}</h4>
+                                                            {isDiscCompleted && <span className="text-[10px] font-bold text-green-600 bg-green-200 px-1.5 py-0.5 rounded">Concluída</span>}
+                                                        </div>
+                                                        {disc.professorName && <p className="text-xs text-primary font-medium mt-1 truncate">Prof. {disc.professorName}</p>}
                                                     </div>
-                                                    <h4 className="font-semibold text-sm pr-14 leading-snug">{disc.name}</h4>
-                                                    {disc.professorName && <p className="text-xs text-primary font-medium mt-1 truncate">Prof. {disc.professorName}</p>}
+                                                    {disc.description && <div className="mt-3 pt-3 border-t border-border/50">
+                                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Carga Horária / Info</span>
+                                                        <p className="text-xs text-muted-foreground line-clamp-2" title={disc.description}>{disc.description}</p>
+                                                    </div>}
                                                 </div>
-                                                {disc.description && <div className="mt-3 pt-3 border-t border-border/50">
-                                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Carga Horária / Info</span>
-                                                    <p className="text-xs text-muted-foreground line-clamp-2" title={disc.description}>{disc.description}</p>
-                                                </div>}
-                                            </div>
-                                        ))}
+                                            )
+                                        })}
                                     </div>
                                 )}
                             </div>

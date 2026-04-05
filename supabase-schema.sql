@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS public.semesters (
   name       TEXT NOT NULL,
   "order"    INTEGER NOT NULL DEFAULT 0,
   shift      TEXT,
+  is_completed BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -57,6 +58,7 @@ CREATE TABLE IF NOT EXISTS public.disciplines (
   day_of_week    TEXT,
   shift          TEXT,
   "order"        INTEGER NOT NULL DEFAULT 0,
+  is_realized     BOOLEAN DEFAULT FALSE,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

@@ -7,7 +7,7 @@ export { triggerN8nWebhook }
 export type QuestionType = "multiple-choice" | "true-false" | "discursive" | "incorrect-alternative" | "fill-in-the-blank" | "matching"
 export interface Choice { id: string; text: string }
 export interface MatchingPair { id: string; left: string; right: string }
-export interface Semester { id: string; name: string; order: number; shift?: string; createdAt: string }
+export interface Semester { id: string; name: string; order: number; shift?: string; is_completed?: boolean; createdAt: string }
 export interface Discipline { id: string; name: string; description?: string | null; semesterId?: string | null; professorName?: string | null; dayOfWeek?: string | null; shift?: string | null; order: number; is_realized?: boolean; createdAt: string }
 export interface StudyMaterial { id: string; disciplineId: string; title: string; description?: string; fileUrl: string; createdAt: string }
 export interface FinancialSettings { id: string; enrollmentFee: number; monthlyFee: number; secondCallFee: number; finalExamFee: number; totalMonths: number; creditCardUrl?: string; pixKey?: string; updatedAt: string; }
@@ -248,7 +248,7 @@ export function getDraftAnswers(): StudentAnswer[] { return readLocal<StudentAns
 export function saveDraftAnswers(answers: StudentAnswer[]): void { writeLocal(KEYS.DRAFT_ANSWERS, answers) }
 
 // DB Mappers
-function mapSemester(row: any): Semester { return { id: row.id, name: row.name, order: row.order, shift: row.shift || undefined, createdAt: row.created_at } }
+function mapSemester(row: any): Semester { return { id: row.id, name: row.name, order: row.order, shift: row.shift || undefined, is_completed: row.is_completed || false, createdAt: row.created_at } }
 function mapStudyMaterial(row: any): StudyMaterial { return { id: row.id, disciplineId: row.discipline_id, title: row.title, description: row.description || undefined, fileUrl: row.file_url, createdAt: row.created_at } }
 function mapDiscipline(row: any): Discipline { 
   return { 
@@ -338,9 +338,18 @@ function mapProfessorDiscipline(row: any): ProfessorDiscipline { return { id: ro
 // ─── Async Supabase Operations ───────────────────────────────────────────────
 
 export async function getFinancialSettings(): Promise<FinancialSettings | null> {
-  const supabase = createClient()
-  const { data } = await supabase.from('financial_settings').select('*').limit(1).maybeSingle()
-  return data ? mapFinancialSettings(data) : null
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from('financial_settings').select('*').limit(1).maybeSingle()
+    if (error) {
+      console.error("Erro ao buscar configurações financeiras:", error.message)
+      return null
+    }
+    return data ? mapFinancialSettings(data) : null
+  } catch (err) {
+    console.error("Falha fatal ao carregar configurações financeiras:", err)
+    return null
+  }
 }
 export async function updateFinancialSettings(settings: Omit<FinancialSettings, "id" | "updatedAt">): Promise<void> {
   const supabase = createClient()
@@ -417,12 +426,21 @@ export async function deleteClass(id: string): Promise<void> {
 }
 
 export async function getFinancialCharges(studentId?: string): Promise<FinancialCharge[]> {
-  const supabase = createClient()
-  let query = supabase.from('financial_charges').select('*').order('due_date', { ascending: false })
-  if (studentId) query = query.eq('student_id', studentId)
-
-  const { data } = await query
-  return (data || []).map(mapFinancialCharge)
+  try {
+    const supabase = createClient()
+    let query = supabase.from('financial_charges').select('*').limit(5000).order('due_date', { ascending: false })
+    if (studentId) query = query.eq('student_id', studentId)
+    
+    const { data, error } = await query
+    if (error) {
+      console.error("Erro ao buscar cobranças financeiras:", error.message)
+      return []
+    }
+    return (data || []).map(mapFinancialCharge)
+  } catch (err) {
+    console.error("Falha fatal ao carregar cobranças financeiras:", err)
+    return []
+  }
 }
 export async function addFinancialCharge(charge: Omit<FinancialCharge, "id" | "createdAt" | "status" | "paymentDate">): Promise<FinancialCharge> {
   const supabase = createClient()
@@ -522,12 +540,14 @@ export async function addSemester(name: string, order: number, shift?: string): 
   if (error) throw new Error(error.message)
   return mapSemester(data)
 }
-export async function updateSemester(id: string, data: Partial<Pick<Semester, "name" | "order" | "shift">>): Promise<void> {
+export async function updateSemester(id: string, data: Partial<Pick<Semester, "name" | "order" | "shift" | "is_completed">>): Promise<void> {
   const supabase = createClient()
   const updatePayload: any = {}
   if (data.name !== undefined) updatePayload.name = data.name
   if (data.order !== undefined) updatePayload.order = data.order
   if (data.shift !== undefined) updatePayload.shift = data.shift || null
+  if (data.is_completed !== undefined) updatePayload.is_completed = data.is_completed
+
   await supabase.from('semesters').update(updatePayload).eq('id', id)
 }
 export async function deleteSemester(id: string): Promise<void> {
@@ -1806,43 +1826,22 @@ export async function repairAssessmentsData(): Promise<void> {
 export async function resetAndGenerateStudentMonthlyCharges(studentId: string, settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
   
-  // 1. Fetch ALL existing monthly charges to get their IDs
-  const { data: existing, error: fetchError } = await supabase
+  // 1. Delete ALL monthly charges for this specific student
+  const { error: delError } = await supabase
     .from('financial_charges')
-    .select('id')
+    .delete()
     .eq('student_id', studentId)
     .eq('type', 'monthly')
   
-  if (fetchError) throw new Error("Erro ao buscar parcelas para reset: " + fetchError.message)
+  if (delError) throw new Error("Erro ao limpar registros: " + delError.message)
 
-  // 2. Delete them by IDs (Atomic)
-  if (existing && existing.length > 0) {
-    const idsToDelete = existing.map(item => item.id)
-    const { error: delError } = await supabase
-      .from('financial_charges')
-      .delete()
-      .in('id', idsToDelete)
-    
-    if (delError) throw new Error("O banco de dados recusou a exclusão. Verifique permissões RLS. Erro: " + delError.message)
-
-    // 3. VERIFICATION: Fetch again to make sure they are GONE
-    // If they persist, it's a silent RLS failure
-    const { data: verifyData } = await supabase
-      .from('financial_charges')
-      .select('id')
-      .in('id', idsToDelete)
-    
-    if (verifyData && verifyData.length > 0) {
-      throw new Error("FALHA DE PERSISTÊNCIA: As parcelas antigas não foram excluídas. O banco de dados Supabase está bloqueando a exclusão (RLS).")
-    }
-  }
-
-  // 4. Generate exactly 25 new charges with Sequential Dates
+  // 2. Generate new sequence starting from April 2026 (Marco Zero)
   const toInsert = []
-  let currentDate = new Date() // Start from today
+  let currentMonth = 3 // April (0-indexed)
+  let currentYear = 2026
   
   for (let i = 1; i <= settings.totalMonths; i++) {
-    const dateStr = currentDate.toISOString().split('T')[0]
+    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-10`
     
     toInsert.push({
       student_id: studentId,
@@ -1854,9 +1853,11 @@ export async function resetAndGenerateStudentMonthlyCharges(studentId: string, s
       created_at: new Date().toISOString()
     })
 
-    // Advance one month for the next installment
-    currentDate = new Date(currentDate)
-    currentDate.setMonth(currentDate.getMonth() + 1)
+    currentMonth++
+    if (currentMonth > 11) {
+      currentMonth = 0
+      currentYear++
+    }
   }
 
   if (toInsert.length > 0) {
@@ -1870,12 +1871,50 @@ export async function resetAndGenerateStudentMonthlyCharges(studentId: string, s
  */
 export async function resetAllStudentsMonthlyChargesBatch(settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
+  
+  // 1. CLEAR ABSOLUTELY EVERYTHING monthly to fix "persistence" bugs once and for all
+  const { error: delError } = await supabase
+    .from('financial_charges')
+    .delete()
+    .eq('type', 'monthly')
+
+  if (delError) throw new Error("Erro Crítico ao limpar registros antigos: " + delError.message)
+
+  // 2. Fetch Active Students
   const { data: students, error: sErr } = await supabase.from('students').select('id').eq('status', 'active')
   if (sErr) throw new Error(sErr.message)
-  
-  if (!students) return
+  if (!students || students.length === 0) return
 
+  // 3. Prepare Bulk Data with strictly calculated dates (April 10, 2026 START)
+  const allToInsert = []
   for (const student of students) {
-    await resetAndGenerateStudentMonthlyCharges(student.id, settings)
+    let currentMonth = 3 // April (0-indexed)
+    let currentYear = 2026
+    for (let i = 1; i <= settings.totalMonths; i++) {
+      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-10`
+      allToInsert.push({
+        student_id: student.id,
+        type: 'monthly',
+        description: `Mensalidade ${i}/${settings.totalMonths}`,
+        amount: settings.monthlyFee,
+        due_date: dateStr,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
+      
+      currentMonth++
+      if (currentMonth > 11) {
+        currentMonth = 0
+        currentYear++
+      }
+    }
+  }
+
+  // 4. Batch Insert in chunks (handling Supabase limits)
+  const CHUNK_SIZE = 500
+  for (let i = 0; i < allToInsert.length; i += CHUNK_SIZE) {
+    const chunk = allToInsert.slice(i, i + CHUNK_SIZE)
+    const { error: insError } = await supabase.from('financial_charges').insert(chunk)
+    if (insError) throw new Error(`Erro no processamento do lote ${i/CHUNK_SIZE + 1}: ${insError.message}`)
   }
 }
