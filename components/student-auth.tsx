@@ -49,9 +49,10 @@ export function StudentAuth({ onSuccess }: Props) {
                 // clear fields except identifier to let them login easily
                 setPassword("")
             } else {
-                if (!identifier) throw new Error("Informe seu CPF ou Matrícula.")
+                if (!identifier) throw new Error("Informe seu CPF, Matrícula ou E-mail.")
                 if (!password) throw new Error("Informe sua senha.")
 
+                console.log('[StudentAuth] Login with identifier:', identifier)
                 await loginStudentAuth(identifier, password)
                 onSuccess()
             }

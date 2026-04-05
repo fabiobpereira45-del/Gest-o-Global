@@ -188,9 +188,16 @@ export async function loginStudentAuth(identifier: string, password: string) {
   const supabase = createClient()
   let email = ''
 
-  // Se for um e-mail, usa diretamente
+  // Se for um e-mail, usa diretamente (agora também procura no banco para verificar se existe)
   if (identifier.includes('@')) {
     email = identifier.trim().toLowerCase()
+    
+    // Verifica se existe aluno com este e-mail
+    const { data: studentByEmail } = await supabase.from('students').select('email').eq('email', email).maybeSingle()
+    if (!studentByEmail) {
+      console.log('[loginStudentAuth] No student found with email:', email)
+      // Allow anyway - will fail at auth if not registered
+    }
   } else {
     const cleanId = identifier.replace(/\D/g, '')
     if (cleanId.length === 11) {
@@ -198,9 +205,29 @@ export async function loginStudentAuth(identifier: string, password: string) {
       email = studentData?.email || `${cleanId}@student.ibad.com`
     } else {
       const { data } = await supabase.from('students').select('email').eq('enrollment_number', cleanId).maybeSingle()
-      if (!data) throw new Error("Identificador nÃ£o encontrado (CPF, MatrÃ­cula ou E-mail).")
+      if (!data) throw new Error("Identificador não encontrado (CPF, Matrícula ou E-mail).")
       email = data.email
     }
+  }
+
+  console.log('[loginStudentAuth] Trying to login with email:', email)
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) {
+    console.error('[loginStudentAuth] Auth error:', error.message)
+    throw new Error("Credenciais inválidas.")
+  }
+
+  // Auto-healing: se logou mas o vínculo no DB está quebrado, conserta agora
+  if (data.user) {
+    const { data: profile } = await supabase.from('students').select('id, auth_user_id').eq('email', email).maybeSingle()
+    if (profile && !profile.auth_user_id) {
+      await supabase.from('students').update({ auth_user_id: data.user.id }).eq('id', profile.id)
+    }
+  }
+
+  return data
+}
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -1831,10 +1858,10 @@ export async function resetAndGenerateStudentMonthlyCharges(studentId: string, s
 export async function resetAllStudentsMonthlyChargesBatch(settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase.rpc('reset_all_active_students_financials', {
-    p_total_months: settings.total_months,
+    p_total_months: settings.totalMonths,
     p_monthly_fee: settings.monthlyFee
   })
 
-  if (error) throw new Error("Erro CrÃ­tico no Reset Global: " + error.message)
+  if (error) throw new Error("Erro Crítico no Reset Global: " + error.message)
 }
 
