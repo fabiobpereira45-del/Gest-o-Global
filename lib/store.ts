@@ -10,7 +10,8 @@ export interface MatchingPair { id: string; left: string; right: string }
 export interface Semester { id: string; name: string; order: number; shift?: string; is_completed?: boolean; createdAt: string }
 export interface Discipline { id: string; name: string; description?: string | null; semesterId?: string | null; professorName?: string | null; dayOfWeek?: string | null; shift?: string | null; order: number; is_realized?: boolean; executionDate?: string | null; createdAt: string }
 export interface StudyMaterial { id: string; disciplineId: string; title: string; description?: string; fileUrl: string; createdAt: string }
-export interface FinancialSettings { id: string; enrollmentFee: number; monthlyFee: number; secondCallFee: number; finalExamFee: number; totalMonths: number; creditCardUrl?: string; pixKey?: string; installmentDates?: string[]; updatedAt: string; }
+export interface FinancialSettings { id: string; enrollmentFee: number; monthlyFee: number; secondCallFee: number; finalExamFee: number; totalMonths: number; creditCardUrl?: string; pixKey?: string; installmentDates?: string[]; whatsappNumber?: string; updatedAt: string; }
+export interface GradingSettings { id: string; pointsPerPresence: number; onlinePresencePoints: number; interactionPoints: number; bookActivityPoints: number; passingAverage: number; totalDivisor: number; updatedAt: string; }
 export interface FinancialCharge { id: string; studentId: string; type: "enrollment" | "monthly" | "second_call" | "final_exam" | "other"; description: string; amount: number; dueDate: string; status: "pending" | "paid" | "cancelled" | "late" | "bolsa100" | "bolsa50"; paymentDate?: string; pixQrcode?: string; pixCopyPaste?: string; createdAt: string; }
 export interface Question { id: string; disciplineId: string; type: QuestionType; text: string; choices: Choice[]; pairs?: MatchingPair[]; correctAnswer: string; points: number; createdAt: string }
 export interface Assessment { id: string; title: string; disciplineId: string; professor: string; institution: string; questionIds: string[]; pointsPerQuestion: number; totalPoints: number; openAt: string | null; closeAt: string | null; isPublished: boolean; archived: boolean; shuffleVariants?: boolean; timeLimitMinutes?: number | null; logoBase64?: string; rules?: string; releaseResults?: boolean; modality?: "public" | "private"; createdAt: string }
@@ -21,7 +22,7 @@ export interface ProfessorSession { loggedIn: boolean; professorId: string; role
 export interface StudentSession { name: string; email: string; assessmentId: string; startedAt: string }
 export interface StudentProfile { id: string; auth_user_id: string; name: string; cpf: string; enrollment_number: string; phone?: string; church?: string; pastor_name?: string; class_id?: string; payment_status?: string; avatar_url?: string | null; bio?: string | null; status: "pending" | "active" | "inactive"; created_at: string; }
 export interface ChatMessage { id: string; studentId: string; disciplineId: string; message: string; isFromStudent: boolean; read: boolean; createdAt: string; }
-export interface Attendance { id: string; studentId: string; disciplineId: string; date: string; isPresent: boolean; createdAt: string; }
+export interface Attendance { id: string; studentId: string; disciplineId: string; date: string; isPresent: boolean; type?: "presencial" | "ead"; createdAt: string; }
 export interface BoardMember { id: string; name: string; role: string; category: string; avatar_url?: string | null; createdAt: string; }
 export interface ProfessorDiscipline { id: string; professorId: string; disciplineId: string; createdAt: string; }
 export type ExpenseCategory = "Pagamento ao Professor" | "Material de secretÃ¡ria" | "combustÃ­vel" | "Transporte" | "Alimento" | "devoluÃ§Ã£o" | "outros"
@@ -347,14 +348,29 @@ function mapFinancialSettings(row: any): FinancialSettings {
     creditCardUrl: row.credit_card_url || undefined, 
     pixKey: row.pix_key || undefined, 
     installmentDates: row.installment_dates || [],
+    whatsappNumber: row.whatsapp_number || undefined,
     updatedAt: row.updated_at 
   } 
 }
+
+function mapGradingSettings(row: any): GradingSettings {
+  return {
+    id: row.id,
+    pointsPerPresence: Number(row.points_per_presence || 0),
+    onlinePresencePoints: Number(row.online_presence_points || 0),
+    interactionPoints: Number(row.interaction_points || 0),
+    bookActivityPoints: Number(row.book_activity_points || 0),
+    passingAverage: Number(row.passing_average || 70),
+    totalDivisor: Number(row.total_divisor || 4),
+    updatedAt: row.updated_at
+  }
+}
+
 function mapFinancialCharge(row: any): FinancialCharge { return { id: row.id, studentId: row.student_id, type: row.type, description: row.description, amount: Number(row.amount), dueDate: row.due_date, status: row.status, paymentDate: row.payment_date || undefined, pixQrcode: row.pix_qrcode || undefined, pixCopyPaste: row.pix_copy_paste || undefined, createdAt: row.created_at } }
 function mapExpense(row: any): Expense { return { id: row.id, category: row.category as ExpenseCategory, description: row.description || "", amount: Number(row.amount), date: row.date, createdAt: row.created_at } }
 function mapStudentProfile(row: any): StudentProfile { return { id: row.id, auth_user_id: row.auth_user_id, name: row.name, cpf: row.cpf, enrollment_number: row.enrollment_number, phone: row.phone || undefined, church: row.church || undefined, pastor_name: row.pastor_name || undefined, class_id: row.class_id || undefined, payment_status: row.payment_status || undefined, avatar_url: row.avatar_url || null, bio: row.bio || null, status: row.status || 'pending', created_at: row.created_at } }
 function mapChatMessage(row: any): ChatMessage { return { id: row.id, studentId: row.student_id, disciplineId: row.discipline_id, message: row.message, isFromStudent: row.is_from_student, read: row.read, createdAt: row.created_at } }
-function mapAttendance(row: any): Attendance { return { id: row.id, studentId: row.student_id, disciplineId: row.discipline_id, date: row.date, isPresent: row.is_present, createdAt: row.created_at } }
+function mapAttendance(row: any): Attendance { return { id: row.id, studentId: row.student_id, disciplineId: row.discipline_id, date: row.date, isPresent: row.is_present, type: row.type || "presencial", createdAt: row.created_at } }
 function mapClassRoom(row: any): ClassRoom { return { id: row.id, name: row.name, shift: row.shift as ClassRoom['shift'], dayOfWeek: row.day_of_week || undefined, maxStudents: Number(row.max_students), studentCount: row.student_count !== undefined ? Number(row.student_count) : undefined, createdAt: row.created_at } }
 function mapClassSchedule(row: any): ClassSchedule { return { id: row.id, classId: row.class_id, disciplineId: row.discipline_id, professorName: row.professor_name, dayOfWeek: row.day_of_week, timeStart: row.time_start, timeEnd: row.time_end, lessonsCount: Number(row.lessons_count || 1), workload: Number(row.workload || 0), startDate: row.start_date || undefined, endDate: row.end_date || undefined, createdAt: row.created_at } }
 function mapStudentGrade(row: any): StudentGrade { return { id: row.id, studentIdentifier: row.student_identifier, studentName: row.student_name, disciplineId: row.discipline_id || undefined, isPublic: row.is_public, examGrade: Number(row.exam_grade), worksGrade: Number(row.works_grade), seminarGrade: Number(row.seminar_grade), participationBonus: Number(row.participation_bonus), attendanceScore: Number(row.attendance_score), customDivisor: Number(row.custom_divisor), createdAt: row.created_at } }
@@ -388,6 +404,7 @@ export async function updateFinancialSettings(settings: Omit<FinancialSettings, 
     credit_card_url: settings.creditCardUrl || null,
     pix_key: settings.pixKey || null,
     installment_dates: settings.installmentDates || [],
+    whatsapp_number: settings.whatsappNumber || null,
     updated_at: new Date().toISOString()
   }
   const { data: existing } = await supabase.from('financial_settings').select('id').limit(1).maybeSingle()
@@ -398,6 +415,42 @@ export async function updateFinancialSettings(settings: Omit<FinancialSettings, 
   }
 }
 
+export async function getGradingSettings(): Promise<GradingSettings> {
+  const supabase = createClient()
+  const { data } = await supabase.from('grading_settings').select('*').limit(1).maybeSingle()
+  if (data) return mapGradingSettings(data)
+  
+  // Default values
+  return {
+    id: 'default',
+    pointsPerPresence: 10,
+    onlinePresencePoints: 10,
+    interactionPoints: 10,
+    bookActivityPoints: 10,
+    passingAverage: 70,
+    totalDivisor: 4,
+    updatedAt: new Date().toISOString()
+  }
+}
+
+export async function updateGradingSettings(settings: Omit<GradingSettings, "id" | "updatedAt">): Promise<void> {
+  const supabase = createClient()
+  const updateData = {
+    points_per_presence: settings.pointsPerPresence,
+    online_presence_points: settings.onlinePresencePoints,
+    interaction_points: settings.interactionPoints,
+    book_activity_points: settings.bookActivityPoints,
+    passing_average: settings.passingAverage,
+    total_divisor: settings.totalDivisor,
+    updated_at: new Date().toISOString()
+  }
+  const { data: existing } = await supabase.from('grading_settings').select('id').limit(1).maybeSingle()
+  if (existing) {
+    await supabase.from('grading_settings').update(updateData).eq('id', existing.id)
+  } else {
+    await supabase.from('grading_settings').insert({ id: uid(), ...updateData })
+  }
+}
 
 export async function getClasses(): Promise<ClassRoom[]> {
   const supabase = createClient()
@@ -1312,13 +1365,13 @@ export async function getAttendances(disciplineId: string): Promise<Attendance[]
   return (data || []).map(mapAttendance)
 }
 
-export async function saveAttendance(studentId: string, disciplineId: string, date: string, isPresent: boolean): Promise<void> {
+export async function saveAttendance(studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial" | "ead" = "presencial"): Promise<void> {
   const supabase = createClient()
   const { data: existing } = await supabase.from('attendances').select('id').match({ student_id: studentId, discipline_id: disciplineId, date }).maybeSingle()
   if (existing) {
-    await supabase.from('attendances').update({ is_present: isPresent }).eq('id', existing.id)
+    await supabase.from('attendances').update({ is_present: isPresent, type }).eq('id', existing.id)
   } else {
-    const dbData = { student_id: studentId, discipline_id: disciplineId, date, is_present: isPresent, created_at: new Date().toISOString() }
+    const dbData = { student_id: studentId, discipline_id: disciplineId, date, is_present: isPresent, type, created_at: new Date().toISOString() }
     await supabase.from('attendances').insert(dbData)
   }
 
@@ -1677,7 +1730,7 @@ export async function insertIBADDisciplines(): Promise<void> {
   ]
   const supabase = createClient()
   const { data: existing } = await supabase.from('disciplines').select('name')
-  const existingNames = new Set(existing?.map(d => d.name) || [])
+  const existingNames = new Set(existing?.map((d: { name: string }) => d.name) || [])
 
     const toInsert = disciplines
       .filter(name => !existingNames.has(name))
@@ -1696,6 +1749,12 @@ export async function insertIBADDisciplines(): Promise<void> {
 
 export async function syncStudentFinancialCharges(studentId: string, settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
+  
+  // Fetch all curriculum disciplines that belong to a semester and have an executionDate
+  const { data: disciplines } = await supabase.from('disciplines').select('*').not('semester_id', 'is', null)
+  const validDisciplines = (disciplines || []).filter(d => d.execution_date)
+
+  // Fetch current charges
   const { data: existing, error: fetchError } = await supabase
     .from('financial_charges')
     .select('*')
@@ -1706,53 +1765,32 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
   
   const charges = existing || []
   const updates: any[] = []
-  const deletions: any[] = []
   const toInsert: any[] = []
 
-  // Helper to extract installment number from description like "Mensalidade 5/25"
-  const getInstallmentNum = (desc: string) => {
-    const match = desc.match(/Mensalidade (\d+)\//i)
-    return match ? parseInt(match[1]) : null
-  }
+  // Map existing monthly charges by discipline ID (stored implicitly or we match by description, but we can't easily match if description changes).
+  // Easiest is to match by exact description since it's "Discipline Name - Mês/Ano"
+  // Wait, if discipline name changes? Best is we just check if a charge for that discipline description exists.
+  const existingDescSet = new Set(charges.map(c => c.description))
 
-  // Map existing monthly charges by their installment number
-  const chargeMap = new Map<number, any>()
-  charges.forEach(c => {
-    const num = getInstallmentNum(c.description)
-    if (num) chargeMap.set(num, c)
-  })
-
-  // 1. Ensure all installments from 1 to totalMonths exist
-  for (let i = 1; i <= settings.total_months; i++) {
-    const existingCharge = chargeMap.get(i)
-    const newDescription = `Mensalidade ${i}/${settings.total_months}`
-
+  // 1. Ensure all disciplines have a corresponding charge
+  for (const disc of validDisciplines) {
+    const [yr, mo] = disc.execution_date.split('-')
+    const expectedDesc = `${disc.name} - ${mo}/${yr}`
+    
+    // If it exists, skip. If we need to update amount, we could do it only if pending.
+    const existingCharge = charges.find(c => c.description === expectedDesc)
     if (existingCharge) {
-      // Update existing
-      const updateObj: any = { description: newDescription }
       if (!['paid', 'bolsa100', 'bolsa50'].includes(existingCharge.status)) {
-        updateObj.amount = settings.monthlyFee
-      }
-
-      if (updateObj.amount !== existingCharge.amount || updateObj.description !== existingCharge.description) {
-        updates.push(supabase.from('financial_charges').update(updateObj).eq('id', existingCharge.id))
+         if (existingCharge.amount !== settings.monthlyFee) {
+           updates.push(supabase.from('financial_charges').update({ amount: settings.monthlyFee }).eq('id', existingCharge.id))
+         }
       }
     } else {
-      // Create missing installment
-      let dueDate: string
-      const prev = chargeMap.get(i - 1)
-      if (prev) {
-        const d = new Date(prev.due_date)
-        d.setMonth(d.getMonth() + 1)
-        dueDate = d.toISOString().split('T')[0]
-      } else {
-        dueDate = new Date().toISOString().split('T')[0]
-      }
-
+      let dueDate = `${yr}-${mo}-10` // Default dia 10
       toInsert.push({
         student_id: studentId,
         type: 'monthly',
-        description: newDescription,
+        description: expectedDesc,
         amount: settings.monthlyFee,
         due_date: dueDate,
         status: 'pending',
@@ -1761,30 +1799,9 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
     }
   }
 
-  // 2. Identify extra installments (indices > totalMonths) to delete if not paid
-  charges.forEach(c => {
-    const num = getInstallmentNum(c.description)
-    if (num && num > settings.total_months) {
-       if (!['paid', 'bolsa100', 'bolsa50'].includes(c.status)) {
-         deletions.push(supabase.from('financial_charges').delete().eq('id', c.id))
-       } else {
-         const extraDesc = `Mensalidade Extra ${num} (Adicional)`
-         if (c.description !== extraDesc) {
-           updates.push(supabase.from('financial_charges').update({ description: extraDesc }).eq('id', c.id))
-         }
-       }
-    }
-  })
-
   // Execute Batch Operations
   if (updates.length > 0) {
     const results = await Promise.all(updates)
-    const err = results.find(r => r.error)
-    if (err) throw new Error(err.error?.message)
-  }
-
-  if (deletions.length > 0) {
-    const results = await Promise.all(deletions)
     const err = results.find(r => r.error)
     if (err) throw new Error(err.error?.message)
   }
@@ -1844,31 +1861,26 @@ export async function repairAssessmentsData(): Promise<void> {
 }
 
 /**
- * DEFINITIVE: Calls RPC to reset and generate student monthly charges.
+ * DEFINITIVE: Rewritten to delete ALL charges and regenerate strictly from Curriculum disciplines for one student.
  */
 export async function resetAndGenerateStudentMonthlyCharges(studentId: string, settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
-  const { error } = await supabase.rpc('reset_single_student_financials', {
-    p_student_id: studentId,
-    p_total_months: settings.totalMonths,
-    p_monthly_fee: settings.monthlyFee,
-    p_custom_dates: settings.installmentDates || []
-  })
+  const { error: delError } = await supabase.from('financial_charges').delete().eq('student_id', studentId).eq('type', 'monthly')
+  if (delError) throw new Error("Erro ao limpar registros anteriores do aluno: " + delError.message)
   
-  if (error) throw new Error("Erro definitivo ao limpar registros: " + error.message)
+  await syncStudentFinancialCharges(studentId, settings);
 }
 
 /**
- * DEFINITIVE: Calls RPC to reset ALL active students' monthly charges.
+ * DEFINITIVE: Rewritten to delete ALL charges and regenerate strictly from Curriculum for ALL active students.
  */
 export async function resetAllStudentsMonthlyChargesBatch(settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
-  const { error } = await supabase.rpc('reset_all_active_students_financials', {
-    p_total_months: settings.totalMonths,
-    p_monthly_fee: settings.monthlyFee,
-    p_custom_dates: settings.installmentDates || []
-  })
+  // 1. Delete all monthly charges of the system
+  const { error: delError } = await supabase.from('financial_charges').delete().eq('type', 'monthly')
+  if (delError) throw new Error("Erro ao limpar a base financeira: " + delError.message)
 
-  if (error) throw new Error("Erro Crítico no Reset Global: " + error.message)
+  // 2. We can call syncAllStudentsFinancialChargesBatch to recreate them cleanly.
+  await syncAllStudentsFinancialChargesBatch(settings);
 }
 

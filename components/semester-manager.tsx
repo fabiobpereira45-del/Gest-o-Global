@@ -356,7 +356,10 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
                                                         {disc.executionDate && (
                                                             <p className="text-[10px] text-orange-600 font-medium mt-1 flex items-center gap-1">
                                                                 <CalendarDays className="h-3 w-3" />
-                                                                {new Date(disc.executionDate).toLocaleDateString('pt-BR')}
+                                                                {(() => {
+                                                                    const [yr, mo] = disc.executionDate.split('-');
+                                                                    return `${mo}/${yr}`;
+                                                                })()}
                                                             </p>
                                                         )}
                                                     </div>
@@ -572,10 +575,10 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
                                     </Select>
                                 </div>
                                 <div className="flex flex-col gap-1.5">
-                                    <Label>Data de Execução</Label>
-                                    <p className="text-[11px] text-muted-foreground mb-1 leading-tight">Data prevista para realização da disciplina.</p>
+                                    <Label>Mês/Ano de Execução</Label>
+                                    <p className="text-[11px] text-muted-foreground mb-1 leading-tight">Define quando a matéria ocorrerá (Mês/Ano) e será usado pelo sistema financeiro.</p>
                                     <Input 
-                                        type="date" 
+                                        type="month" 
                                         value={discExecutionDate} 
                                         onChange={e => setDiscExecutionDate(e.target.value)}
                                     />

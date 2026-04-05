@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Plus, Trash2, Pencil, Save, X, Users, Clock, GraduationCap, Loader2, Calendar, Link, Check, Copy } from "lucide-react"
 import { getClasses, addClass, updateClass, deleteClass, getStudents, type ClassRoom, type StudentProfile } from "@/lib/store"
 import jsPDF from "jspdf"
-import "jspdf-autotable"
+import autoTable from "jspdf-autotable"
 
 const SHIFTS = [
     { value: "morning", label: "Manhã" },
@@ -208,7 +208,7 @@ export function ClassManager() {
             s.payment_status === "paid" ? "Pago" : "Pendente"
         ])
 
-        ;(doc as any).autoTable({
+        autoTable(doc, {
             startY: 40,
             head: [['#', 'Nome do Aluno', 'Matrícula', 'Telefone', 'Status Fin.']],
             body: tableData,
@@ -343,7 +343,7 @@ export function ClassManager() {
                                     <Users className="h-3.5 w-3.5" />
                                     Alunos Matriculados ({students.filter(s => s.class_id === c.id).length})
                                 </h4>
-                                <div className="flex flex-col gap-1.5 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                                <div className="flex flex-col gap-1.5 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
                                     {students.filter(s => s.class_id === c.id).length === 0 ? (
                                         <span className="text-xs text-muted-foreground italic px-1">Nenhum aluno matriculado ainda.</span>
                                     ) : (

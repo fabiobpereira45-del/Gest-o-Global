@@ -115,7 +115,12 @@ export function AdminDashboard({ onLogout }: Props) {
   useEffect(() => {
     repairAssessmentsData().then(() => refresh())
     async function fetchUser() {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data, error } = await supabase.auth.getUser()
+      if (error) {
+        console.error("Auth error:", error.message)
+        return
+      }
+      const user = data?.user
       if (user) {
         setUsername(user.user_metadata?.full_name || "Professor")
         setUserEmail(user.email || "")
@@ -349,22 +354,28 @@ export function AdminDashboard({ onLogout }: Props) {
             </div>
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-              {tab === "overview" && <OverviewTab assessments={assessments} submissions={submissions} questions={questions} disciplines={disciplines} />}
-              {tab === "students" && <StudentManager isMaster={isMaster} />}
-              {tab === "grades" && <GradesManager isMaster={isMaster} />}
-              {tab === "submissions" && <SubmissionsTab assessments={assessments} allSubmissions={submissions} questions={questions} onRefresh={refresh} isMaster={isMaster} />}
-              {tab === "questions" && <QuestionBank isMaster={isMaster} />}
-              {tab === "assessments" && <AssessmentsTab assessments={assessments} submissions={submissions} questions={questions} disciplines={disciplines} onRefresh={refresh} isMaster={isMaster} />}
-              {tab === "materials" && <StudyMaterialManager />}
-              {tab === "semesters" && <SemesterManager isMaster={isMaster} />}
-              {tab === "class_schedules" && isMaster && <ClassScheduleManager />}
-              {tab === "attendance" && <AttendanceManager />}
-              {tab === "classes" && isMaster && <ClassManager />}
-              {tab === "chat" && <ProfessorChatView />}
-              {tab === "financial" && <FinancialManager />}
-              {tab === "professors" && isMaster && <ProfessorManager />}
-              {tab === "institutional" && <InstitutionalManager />}
-              {tab === "settings" && <SettingsTab assessments={assessments} onRefresh={refresh} onLogout={onLogout} />}
+              <ErrorBoundary fallback={<div className="p-10 bg-red-50 text-red-600 rounded-xl border border-red-200">
+                <h2 className="font-bold mb-2 text-lg">Ops! Algo deu errado nesta aba.</h2>
+                <p className="text-sm">Ocorreu um erro ao carregar os dados desta seção. Tente recarregar a página ou mudar de aba.</p>
+                <Button variant="outline" className="mt-4 border-red-300 text-red-700" onClick={() => window.location.reload()}>Recarregar Sistema</Button>
+              </div>}>
+                {tab === "overview" && <OverviewTab assessments={assessments || []} submissions={submissions || []} questions={questions || []} disciplines={disciplines || []} />}
+                {tab === "students" && <StudentManager isMaster={isMaster} />}
+                {tab === "grades" && <GradesManager isMaster={isMaster} />}
+                {tab === "submissions" && <SubmissionsTab assessments={assessments || []} allSubmissions={submissions || []} questions={questions || []} onRefresh={refresh} isMaster={isMaster} />}
+                {tab === "questions" && <QuestionBank isMaster={isMaster} />}
+                {tab === "assessments" && <AssessmentsTab assessments={assessments || []} submissions={submissions || []} questions={questions || []} disciplines={disciplines || []} onRefresh={refresh} isMaster={isMaster} />}
+                {tab === "materials" && <StudyMaterialManager />}
+                {tab === "semesters" && <SemesterManager isMaster={isMaster} />}
+                {tab === "class_schedules" && isMaster && <ClassScheduleManager />}
+                {tab === "attendance" && <AttendanceManager />}
+                {tab === "classes" && isMaster && <ClassManager />}
+                {tab === "chat" && <ProfessorChatView />}
+                {tab === "financial" && <FinancialManager />}
+                {tab === "professors" && isMaster && <ProfessorManager />}
+                {tab === "institutional" && <InstitutionalManager />}
+                {tab === "settings" && <SettingsTab assessments={assessments || []} onRefresh={refresh} onLogout={onLogout} />}
+              </ErrorBoundary>
             </div>
           )}
         </main>

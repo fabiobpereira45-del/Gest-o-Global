@@ -1,6 +1,6 @@
 "use client"
 
-import { BookOpen } from "lucide-react"
+import { BookOpen, CheckCircle2 } from "lucide-react"
 import type { Semester, Discipline } from "@/lib/store"
 
 interface CurriculumTabProps {
@@ -22,11 +22,14 @@ export function CurriculumTab({ semesters, disciplines }: CurriculumTabProps) {
                     return (
                         <div key={sem.id} className="relative">
                             <div className="flex items-center gap-4 mb-8">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-navy text-accent font-bold text-xl shadow-lg shadow-navy/20">
-                                    {idx + 1}
+                                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl font-bold text-xl shadow-lg transition-colors ${sem.is_completed ? 'bg-green-600 text-white shadow-green-600/20' : 'bg-navy text-accent shadow-navy/20'}`}>
+                                    {sem.is_completed ? <CheckCircle2 className="h-6 w-6" /> : idx + 1}
                                 </div>
                                 <div className="flex flex-col">
-                                    <h3 className="text-2xl font-bold text-foreground">{sem.name}</h3>
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="text-2xl font-bold text-foreground">{sem.name}</h3>
+                                        {sem.is_completed && <span className="bg-green-100 text-green-800 text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full">Concluído</span>}
+                                    </div>
                                     <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">{sem.shift || "Turno Regular"}</p>
                                 </div>
                                 <div className="h-px bg-border flex-1 ml-4" />
@@ -37,16 +40,19 @@ export function CurriculumTab({ semesters, disciplines }: CurriculumTabProps) {
                                     <p className="text-sm text-muted-foreground italic col-span-full">Disciplinas em definição para este semestre.</p>
                                 ) : (
                                     semDisciplines.map(disc => (
-                                        <div key={disc.id} className="bg-white border border-border/50 rounded-2xl p-6 flex flex-col shadow-sm hover:shadow-xl hover:border-primary/30 transition-all group">
+                                        <div key={disc.id} className={`border rounded-2xl p-6 flex flex-col transition-all group ${disc.is_realized ? 'bg-green-50/50 border-green-200/60 shadow-sm' : 'bg-white border-border/50 shadow-sm hover:shadow-xl hover:border-primary/30'}`}>
                                             <div className="mb-4">
-                                                <h4 className="font-bold text-lg text-foreground mb-2 group-hover:text-primary transition-colors leading-tight">{disc.name}</h4>
+                                                <div className="flex items-start justify-between gap-2 mb-2">
+                                                    <h4 className={`font-bold text-lg leading-tight ${disc.is_realized ? 'text-green-800' : 'text-foreground group-hover:text-primary transition-colors'}`}>{disc.name}</h4>
+                                                    {disc.is_realized && <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />}
+                                                </div>
                                                 {disc.description && <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{disc.description}</p>}
                                             </div>
 
-                                            <div className="mt-auto pt-4 border-t border-border/50">
+                                            <div className={`mt-auto pt-4 border-t ${disc.is_realized ? 'border-green-200/50' : 'border-border/50'}`}>
                                                 <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-widest">
                                                     <span className="text-muted-foreground">Docente</span>
-                                                    <span className="text-navy">{disc.professorName || "A definir"}</span>
+                                                    <span className={disc.is_realized ? "text-green-700" : "text-navy"}>{disc.professorName || "A definir"}</span>
                                                 </div>
                                             </div>
                                         </div>

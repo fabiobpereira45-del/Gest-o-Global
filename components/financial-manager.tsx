@@ -152,6 +152,7 @@ export function FinancialManager() {
     const [tempSecondCall, setTempSecondCall] = useState("")
     const [tempFinalExam, setTempFinalExam] = useState("")
     const [tempMonths, setTempMonths] = useState("")
+    const [tempInstallmentDates, setTempInstallmentDates] = useState<string[]>([])
 
     useEffect(() => { load() }, [])
 
@@ -315,15 +316,15 @@ export function FinancialManager() {
 
     async function handleGeneratePlan(uid: string) {
         if (!settings?.monthlyFee) {
-            alert("Configure a mensalidade nas configurações antes de gerar.")
+            alert("Configure o valor base nas configurações antes de gerar.")
             return
         }
-        if (!confirm("Deseja gerar as 24 mensalidades (Abril 2026 a Março 2028) para este aluno?")) return
+        if (!confirm(`Deseja recriar as cobranças deste aluno baseando-se estritamente na Grade Curricular vigente?`)) return
 
         setIsGenerating(true)
         try {
-            await generateMonthlyCharges(uid, settings.monthlyFee)
-            alert("Mensalidades geradas com sucesso!")
+            await resetAndGenerateStudentMonthlyCharges(uid, settings)
+            alert("Cobranças curriculares geradas com sucesso!")
             load()
         } catch (actErr: any) {
             alert("Erro ao gerar mensalidades: " + actErr.message)
@@ -379,7 +380,8 @@ export function FinancialManager() {
                 finalExamFee: Number(tempFinalExam),
                 totalMonths: Number(tempMonths),
                 creditCardUrl: tempCard,
-                pixKey: tempPix
+                pixKey: tempPix,
+                installmentDates: tempInstallmentDates
             })
             alert("Configurações salvas com sucesso!")
             setSettingsModal(false)
@@ -466,11 +468,12 @@ export function FinancialManager() {
                     <Button variant="outline" onClick={() => {
                         setTempCard(settings?.creditCardUrl || "")
                         setTempPix(settings?.pixKey || "")
-                        setTempEnrollment(settings?.enrollmentFee.toString() || "0")
-                        setTempMonthly(settings?.monthlyFee.toString() || "0")
-                        setTempSecondCall(settings?.secondCallFee.toString() || "0")
-                        setTempFinalExam(settings?.finalExamFee.toString() || "0")
-                        setTempMonths(settings?.totalMonths.toString() || "12")
+                        setTempEnrollment(settings?.enrollmentFee?.toString() || "0")
+                        setTempMonthly(settings?.monthlyFee?.toString() || "0")
+                        setTempSecondCall(settings?.secondCallFee?.toString() || "0")
+                        setTempFinalExam(settings?.finalExamFee?.toString() || "0")
+                        setTempMonths(settings?.totalMonths?.toString() || "12")
+                        setTempInstallmentDates(settings?.installmentDates || [])
                         setSettingsModal(true)
                     }} className="border-primary text-primary hover:bg-primary/10">
                         Configurar Pagamentos
@@ -493,7 +496,7 @@ export function FinancialManager() {
                     <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50 transition-all font-bold" 
                         onClick={async () => {
                             if (!settings) return
-                            if (!confirm("Atenção: Deseja sincronizar as mensalidades de TODOS os alunos ativos com as configurações atuais? Isso atualizará valores e parcelas conforme definido sem excluir dados existentes.")) return
+                            if (!confirm("Atenção: Deseja sincronizar as cobranças de TODOS os alunos ativos com a Grade Curricular atual? Isso adicionará as disciplinas novas para todos os alunos.")) return
                             setIsGenerating(true)
                             try {
                                 await syncAllStudentsFinancialChargesBatch(settings)
@@ -509,7 +512,7 @@ export function FinancialManager() {
                     <Button variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 transition-all font-bold" 
                         onClick={async () => {
                             if (!settings) return
-                            if (!confirm("⚠️ PERIGO: Esta ação excluirá TODAS as mensalidades atuais de TODOS os alunos ativos e gerará 25 novas do zero. Pagamentos marcados serão perdidos. Deseja CONTINUAR?")) return
+                            if (!confirm(`⚠️ LIMPEZA PROFUNDA: Esta ação apagará permanentemente TODAS as cobranças padronizadas (Mensalidade) de TODOS os alunos ativos e gerará uma nova carteira para todos baseando-se estritamente na Grade Curricular. Esta é uma ação irreversível. Continuar?`)) return
                             setIsGenerating(true)
                             try {
                                 await resetAllStudentsMonthlyChargesBatch(settings)
@@ -521,7 +524,7 @@ export function FinancialManager() {
                         }}
                         disabled={isGenerating}>
                         <Trash2 className="h-4 w-4 mr-2" />
-                        Zerar e Gerar Tudo (Lote)
+                        Resetar e Aplicar Curriculo (Lote)
                     </Button>
                     <Button variant="outline" className="border-accent text-accent hover:bg-accent/10" onClick={() => {
                         setEditExpenseId(null)
@@ -889,19 +892,18 @@ export function FinancialManager() {
                                 <Button size="sm" variant="outline" className="h-9 text-xs font-bold border-red-500 text-red-600 hover:bg-red-50"
                                     onClick={async () => {
                                         if (!settings || !selectedStudent) return
-                                        if (!confirm("⚠️ Atenção: Deseja EXCLUIR todas as mensalidades atuais deste aluno e gerar 25 novas? Isso limpará duplicatas e erros, mas você perderá o histórico de pagamentos atuais deste aluno.")) return
+                                        if (!confirm(`⚠️ Atenção: Deseja RECRIAR todas as cobranças deste aluno com base na Grade Curricular vigente? Isso eliminará as antigas e gerará novas por disciplina.`)) return
                                         setIsGenerating(true)
                                         try {
                                             await resetAndGenerateStudentMonthlyCharges(selectedStudent.id, settings)
-                                            alert("Mensalidades reiniciadas com sucesso!")
-                                            // Small delay to ensure DB propagation
+                                            alert("Cobranças curriculares recriadas com sucesso!")
                                             setTimeout(() => { load() }, 500)
                                         } catch (e: any) { alert("Erro ao resetar: " + e.message) }
                                         finally { setIsGenerating(false) }
                                     }}
                                     disabled={isGenerating}>
                                     <Trash2 className="h-3 w-3 mr-2 text-red-600" />
-                                    Zerar e Gerar 25x
+                                    Resgatar Grade Curricular
                                 </Button>
                                 <Button size="sm" variant="outline" className="h-9 text-xs font-bold border-green-500 text-green-600 hover:bg-green-50" 
                                     onClick={async () => {
@@ -909,20 +911,14 @@ export function FinancialManager() {
                                         setIsGenerating(true)
                                         try {
                                             await syncStudentFinancialCharges(selectedStudent.id, settings)
-                                            alert("Sincronização individual concluída!")
+                                            alert("Cobranças sincronizadas com a grade curricular!")
                                             load()
                                         } catch (e: any) { alert("Erro ao sincronizar: " + e.message) }
                                         finally { setIsGenerating(false) }
                                     }}
                                     disabled={isGenerating}>
                                     <Zap className="h-3 w-3 mr-2" />
-                                    Sincronizar
-                                </Button>
-                                <Button size="sm" variant="outline" className="h-9 text-xs font-bold border-accent text-accent hover:bg-accent/10" 
-                                    onClick={() => handleGeneratePlan(selectedStudent!.id)}
-                                    disabled={isGenerating}>
-                                    {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <DollarSign className="h-3 w-3 mr-2" />}
-                                    Gerar Carnê 25x
+                                    Sincronizar Grade
                                 </Button>
                             </div>
                         </div>
@@ -944,8 +940,10 @@ export function FinancialManager() {
                                     {charges.filter(c => c.studentId === selectedStudent?.id).sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()).map(c => (
                                         <tr key={c.id} className="hover:bg-muted/30 transition-colors">
                                             <td className="px-4 py-4">
-                                                <div className="font-medium text-foreground leading-tight">{c.description}</div>
-                                                <div className="text-[10px] text-muted-foreground mt-1 uppercase tracking-tighter">{{ enrollment: "Matrícula", monthly: "Mensalidade", second_call: "2ª Chamada", final_exam: "Prova Final", other: "Outros" }[c.type] || c.type}</div>
+                                                <div className="font-semibold text-foreground leading-tight">{c.description}</div>
+                                                <div className="text-[10px] text-muted-foreground mt-1 uppercase tracking-tighter flex items-center gap-1">
+                                                    {{ enrollment: "📋 Matrícula", monthly: "📚 Disciplina Curricular", second_call: "📝 2ª Chamada", final_exam: "🎓 Prova Final", other: "📌 Avulso" }[c.type] || c.type}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-4 text-muted-foreground text-center tabular-nums whitespace-nowrap">
                                                 {new Date(c.dueDate).toLocaleDateString("pt-BR")}
@@ -1104,6 +1102,55 @@ export function FinancialManager() {
                                 onChange={e => setTempPix(e.target.value)}
                                 placeholder="E-mail, CPF, CNPJ ou Aleatória"
                             />
+                        </div>
+
+                        <div className="flex flex-col gap-3 pt-4 border-t mt-2">
+                            <div className="flex items-center justify-between">
+                                <Label className="font-bold">Cronograma de Parcelas ({tempMonths}x)</Label>
+                                <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="h-7 text-[10px] uppercase font-bold border-violet-500 text-violet-600"
+                                    onClick={() => {
+                                        const start = window.prompt("Data de início da 1ª parcela (AAAA-MM-DD):", "2026-04-10")
+                                        if (!start) return
+                                        const num = Number(tempMonths) || 25
+                                        const newDates: string[] = []
+                                        let currDate = new Date(start + 'T12:00:00')
+                                        for(let i=0; i<num; i++) {
+                                            newDates.push(currDate.toISOString().split('T')[0])
+                                            currDate.setMonth(currDate.getMonth() + 1)
+                                        }
+                                        setTempInstallmentDates(newDates)
+                                        alert(`${num} datas geradas em lote! Role para baixo para revisar.`)
+                                    }}
+                                >
+                                    Gerar Sequência (Lote)
+                                </Button>
+                            </div>
+                            
+                            <ScrollArea className="h-[250px] border rounded-md p-3 bg-muted/20">
+                                <div className="grid grid-cols-1 gap-3">
+                                    {Array.from({ length: Number(tempMonths) || 0 }).map((_, i) => (
+                                        <div key={i} className="flex items-center gap-3">
+                                            <div className="w-8 text-[10px] font-bold text-muted-foreground uppercase">{i+1}ª</div>
+                                            <Input 
+                                                type="date" 
+                                                className="h-8 text-xs font-bold"
+                                                value={tempInstallmentDates[i] || ""}
+                                                onChange={(e) => {
+                                                    const d = [...tempInstallmentDates]
+                                                    d[i] = e.target.value
+                                                    setTempInstallmentDates(d)
+                                                }}
+                                            />
+                                        </div>
+                                    ))}
+                                    {(Number(tempMonths) || 0) === 0 && (
+                                        <div className="text-center py-10 text-xs text-muted-foreground italic">Defina a duração do curso para ver as parcelas.</div>
+                                    )}
+                                </div>
+                            </ScrollArea>
                         </div>
                     </div>
                     <DialogFooter>

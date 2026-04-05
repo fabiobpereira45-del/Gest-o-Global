@@ -10,7 +10,7 @@ import {
     type StudentSession, type StudentProfile, getStudentProfileAuth, logoutStudentAuth,
     type Semester, type Discipline, type StudyMaterial, type FinancialCharge, type ClassRoom, type ClassSchedule,
     getSemesters, getDisciplines, getStudyMaterials, getFinancialCharges, getClasses, getClassSchedules,
-    getClassmates, getStudentGrades, type StudentGrade
+    getClassmates, getStudentGrades, type StudentGrade, getFinancialSettings
 } from "@/lib/store"
 import { StudentAuth } from "@/components/student-auth"
 import { FinancialStudentView } from "@/components/financial-student-view"
@@ -59,6 +59,7 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
     const [mySchedules, setMySchedules] = useState<ClassSchedule[]>([])
     const [classmates, setClassmates] = useState<StudentProfile[]>([])
     const [officialGrades, setOfficialGrades] = useState<StudentGrade[]>([])
+    const [settings, setSettings] = useState<any>(null)
 
     const [dataLoading, setDataLoading] = useState(false)
 
@@ -68,10 +69,11 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
         setProfile(p)
         if (p) {
             setDataLoading(true)
-            const [s, d, m, c, cls, sch] = await Promise.all([
+            const [s, d, m, c, cls, sch, fin] = await Promise.all([
                 getSemesters(), getDisciplines(), getStudyMaterials(), getFinancialCharges(p.id),
-                getClasses(), getClassSchedules()
+                getClasses(), getClassSchedules(), getFinancialSettings()
             ])
+            setSettings(fin)
             setSemesters(s)
             setDisciplines(d)
             setMaterials(m)
@@ -202,7 +204,7 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
                         <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#7c3aed' }}>Suporte Direto</p>
                         <p className="text-xs text-slate-400 mb-4 leading-relaxed">Dúvidas sobre o curso ou notas? Fale conosco.</p>
                         <Button variant="outline" size="sm" className="w-full bg-white/10 text-xs text-white border-white/20 hover:bg-white/20 h-8 gap-2" asChild>
-                            <a href="https://wa.me/5571987483103" target="_blank" rel="noopener noreferrer">
+                            <a href={`https://wa.me/${settings?.whatsappNumber || "5571987483103"}`} target="_blank" rel="noopener noreferrer">
                                 <MessageSquare className="h-3 w-3" /> WhatsApp
                             </a>
                         </Button>
@@ -287,12 +289,12 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
 
                         <Button 
                             variant="ghost" 
-                            size="icon" 
                             onClick={handlePortalLogout}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50 sm:hidden h-10 w-10"
+                            className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 h-10 px-3 rounded-xl transition-colors border border-transparent hover:border-red-100"
                             title="Sair do Portal"
                         >
                             <LogOut className="h-5 w-5" />
+                            <span className="hidden sm:inline font-bold text-sm">Sair</span>
                         </Button>
                     </div>
                 </header>

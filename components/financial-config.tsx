@@ -23,6 +23,7 @@ export function FinancialConfig() {
     const [finalExamFee, setFinalExamFee] = useState("0")
     const [totalMonths, setTotalMonths] = useState("24")
     const [creditCardUrl, setCreditCardUrl] = useState("")
+    const [whatsappNumber, setWhatsappNumber] = useState("")
 
 
 
@@ -40,6 +41,7 @@ export function FinancialConfig() {
             setFinalExamFee(data.finalExamFee.toString())
             setTotalMonths(data.totalMonths.toString())
             setCreditCardUrl(data.creditCardUrl || "")
+            setWhatsappNumber(data.whatsappNumber || "")
         }
 
 
@@ -58,7 +60,8 @@ export function FinancialConfig() {
                     secondCallFee: parseFloat(secondCallFee) || 0,
                     finalExamFee: parseFloat(finalExamFee) || 0,
                     totalMonths: parseInt(totalMonths) || 12,
-                    creditCardUrl: creditCardUrl
+                    creditCardUrl: creditCardUrl,
+                    whatsappNumber: whatsappNumber
                 })
             ])
             alert("Configurações salvas com sucesso!")
@@ -147,6 +150,20 @@ export function FinancialConfig() {
                         className="border-blue-200 focus:ring-blue-500"
                     />
                     <span className="text-[10px] text-blue-600 font-medium italic">Insira o link externo (Mercado Pago, PicPay, etc.) para recebimento via cartão.</span>
+                </div>
+
+                <div className="flex flex-col gap-1.5 md:col-span-2 bg-green-50/50 p-4 rounded-xl border border-green-100">
+                    <div className="flex items-center gap-2 mb-1">
+                        <Label className="text-green-700 font-bold text-sm">WhatsApp da Secretaria</Label>
+                    </div>
+                    <Input
+                        type="text"
+                        value={whatsappNumber}
+                        onChange={(e) => setWhatsappNumber(e.target.value)}
+                        placeholder="Ex: 5571987483103"
+                        className="border-green-200 focus:ring-green-500"
+                    />
+                    <span className="text-[10px] text-green-600 font-medium italic">Insira o número com DDI e DDD (ex: 55 = Brasil). Este número receberá contatos e comprovantes.</span>
                 </div>
             </div>
 

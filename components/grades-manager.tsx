@@ -238,12 +238,12 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Nota de Prova</Label>
-                                <Input type="number" step="0.1" value={formData.examGrade} onChange={(e) => setFormData({ ...formData, examGrade: e.target.value })} />
+                                <Label>Nota de Prova (Automático)</Label>
+                                <Input type="number" step="0.1" value={formData.examGrade} disabled title="Nota gerada automaticamente pela Prova Online" />
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Nota de Trabalhos</Label>
+                                <Label>Atividade no Livro</Label>
                                 <Input type="number" step="0.1" value={formData.worksGrade} onChange={(e) => setFormData({ ...formData, worksGrade: e.target.value })} />
                             </div>
 
@@ -253,13 +253,13 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Bônus de Participação</Label>
+                                <Label>Interação (Bônus de Participação)</Label>
                                 <Input type="number" step="0.1" value={formData.participationBonus} onChange={(e) => setFormData({ ...formData, participationBonus: e.target.value })} />
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Nota de Presença / Assiduidade</Label>
-                                <Input type="number" step="0.1" value={formData.attendanceScore} onChange={(e) => setFormData({ ...formData, attendanceScore: e.target.value })} />
+                                <Label>Nota de Presença (Automático)</Label>
+                                <Input type="number" step="0.1" value={formData.attendanceScore} disabled title="Soma calculada pelo Diário de Classe" />
                             </div>
 
                             <div className="space-y-2">

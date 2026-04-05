@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
 import { type Assessment, getProfessorSession, saveProfessorSession, updateProfessorAccount } from "@/lib/store"
 import { FinancialConfig } from "@/components/financial-config"
+import { GradingConfig } from "@/components/grading-config"
 import { AvatarUpload } from "@/components/avatar-upload"
 
 interface Props {
@@ -92,7 +93,10 @@ export function SettingsTab({ assessments, onRefresh, onLogout }: Props) {
       </div>
 
       {isMaster && (
-        <FinancialConfig />
+        <>
+          <FinancialConfig />
+          <GradingConfig />
+        </>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

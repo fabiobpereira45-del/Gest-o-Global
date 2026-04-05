@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, BookOpen, Users, Clock, ChevronDown, ChevronUp, Calendar, DollarSign, Wallet } from "lucide-react"
+import { X, BookOpen, Users, Clock, ChevronDown, ChevronUp, Calendar, CheckCircle2 } from "lucide-react"
 import { getClasses, getSemesters, getDisciplines, getFinancialSettings, getClassSchedules, type ClassRoom, type Semester, type Discipline, type FinancialSettings, type ClassSchedule } from "@/lib/store"
 
 const SHIFT_LABEL: Record<string, string> = {
@@ -156,9 +156,12 @@ export function GradeViewer({ onClose }: GradeViewerProps) {
                                                 <div key={sem.id} className="border border-border rounded-xl overflow-hidden">
                                                     <button
                                                         onClick={() => setOpenSem(isOpen ? null : sem.id)}
-                                                        className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors text-left"
+                                                        className={`w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors text-left ${sem.is_completed ? 'bg-green-50/50 border-b border-green-100' : 'bg-muted/30'}`}
                                                     >
-                                                        <span className="font-semibold text-sm">{sem.name}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`font-semibold text-sm ${sem.is_completed ? 'text-green-800' : ''}`}>{sem.name}</span>
+                                                            {sem.is_completed && <span className="bg-green-100 text-green-800 text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full">Concluído</span>}
+                                                        </div>
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-xs text-muted-foreground">{semDiscs.length} disciplina{semDiscs.length !== 1 ? "s" : ""}</span>
                                                             {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -180,11 +183,18 @@ export function GradeViewer({ onClose }: GradeViewerProps) {
                                                                                 <span className="text-xs text-muted-foreground ml-2">({dayDiscs.length})</span>
                                                                             </div>
                                                                             {dayDiscs.map(d => (
-                                                                                <div key={d.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-muted/20 transition-colors">
-                                                                                    <BookOpen className="h-3.5 w-3.5 text-accent shrink-0" />
+                                                                                <div key={d.id} className={`px-4 py-2.5 flex items-center gap-3 transition-colors ${d.is_realized ? 'bg-green-50/30 hover:bg-green-50/50' : 'hover:bg-muted/20'}`}>
+                                                                                    {d.is_realized ? (
+                                                                                        <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                                                                                    ) : (
+                                                                                        <BookOpen className="h-3.5 w-3.5 text-accent shrink-0" />
+                                                                                    )}
                                                                                     <div className="flex-1 min-w-0">
-                                                                                        <span className="text-sm font-medium">{d.name}</span>
-                                                                                        {d.professorName && <span className="text-xs text-muted-foreground ml-2">— {d.professorName}</span>}
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className={`text-sm font-medium ${d.is_realized ? 'text-green-800' : ''}`}>{d.name}</span>
+                                                                                            {d.is_realized && <span className="text-[9px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full uppercase font-bold tracking-wider">Concluída</span>}
+                                                                                        </div>
+                                                                                        {d.professorName && <span className="text-xs text-muted-foreground">— {d.professorName}</span>}
                                                                                     </div>
                                                                                 </div>
                                                                             ))}
@@ -197,9 +207,14 @@ export function GradeViewer({ onClose }: GradeViewerProps) {
                                                                             <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Sem dia definido</span>
                                                                         </div>
                                                                         {semDiscs.filter(d => !d.dayOfWeek).map(d => (
-                                                                            <div key={d.id} className="px-4 py-2.5 flex items-center gap-3">
-                                                                                <BookOpen className="h-3.5 w-3.5 text-accent shrink-0" />
-                                                                                <span className="text-sm">{d.name}</span>
+                                                                            <div key={d.id} className={`px-4 py-2.5 flex items-center gap-3 ${d.is_realized ? 'bg-green-50/30' : ''}`}>
+                                                                                {d.is_realized ? (
+                                                                                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                                                                                ) : (
+                                                                                    <BookOpen className="h-3.5 w-3.5 text-accent shrink-0" />
+                                                                                )}
+                                                                                <span className={`text-sm ${d.is_realized ? 'text-green-800 font-medium' : ''}`}>{d.name}</span>
+                                                                                {d.is_realized && <span className="text-[9px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full uppercase font-bold tracking-wider ml-2">Concluída</span>}
                                                                             </div>
                                                                         ))}
                                                                     </div>

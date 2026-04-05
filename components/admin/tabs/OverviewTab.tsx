@@ -27,15 +27,15 @@ export function OverviewTab({ assessments, submissions, questions, disciplines }
     }
   }, [assessments, selectedAssessmentId])
 
-  const totalStudents = submissions.length
+  const totalStudents = submissions?.length || 0
   const avgScore = totalStudents > 0
-    ? Math.round(submissions.reduce((acc, s) => acc + s.score, 0) / totalStudents)
+    ? Math.round((submissions || []).reduce((acc, s) => acc + (s?.score || 0), 0) / totalStudents)
     : 0
 
-  const activeAssessment = assessments.find(a => a.id === selectedAssessmentId) || null
-  const activeSubs = activeAssessment ? submissions.filter(s => s.assessmentId === activeAssessment.id) : []
+  const activeAssessment = (assessments || []).find(a => a.id === selectedAssessmentId) || null
+  const activeSubs = activeAssessment ? (submissions || []).filter(s => s.assessmentId === activeAssessment.id) : []
   const activeQuestions = activeAssessment
-    ? activeAssessment.questionIds.map((id) => questions.find((q) => q.id === id)).filter(Boolean)
+    ? activeAssessment.questionIds.map((id) => (questions || []).find((q) => q.id === id)).filter(Boolean) as Question[]
     : []
 
   const questionStats = (activeQuestions as ReturnType<typeof questions.find>[]).map((q) => {

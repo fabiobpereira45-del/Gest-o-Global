@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import { FileText, Award, CalendarCheck, Loader2, Calculator, CheckCircle2 } from "lucide-react"
 import {
-    type Discipline, type Semester, type StudentSubmission, type Attendance, type Assessment, type StudentGrade,
-    getDisciplines, getSemesters, getSubmissions, getAttendances, getAssessments, getStudentGrades
+    type Discipline, type Semester, type StudentSubmission, type Attendance, type Assessment, type StudentGrade, type GradingSettings,
+    getDisciplines, getSemesters, getSubmissions, getAttendances, getAssessments, getStudentGrades, getGradingSettings
 } from "@/lib/store"
 
 interface Props {
@@ -16,21 +16,27 @@ export function StudentGradesView({ studentId, studentEmail }: Props) {
     const [officialGrades, setOfficialGrades] = useState<StudentGrade[]>([])
     const [submissions, setSubmissions] = useState<StudentSubmission[]>([])
     const [attendances, setAttendances] = useState<Attendance[]>([])
+    const [gradingSettings, setGradingSettings] = useState<GradingSettings | null>(null)
+    const [assessments, setAssessments] = useState<Assessment[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         async function loadData() {
             setLoading(true)
             try {
-                const [d, sem, sub, allGrades] = await Promise.all([
+                const [d, sem, sub, allGrades, setts, asses] = await Promise.all([
                     getDisciplines(),
                     getSemesters(),
                     getSubmissions(),
-                    getStudentGrades()
+                    getStudentGrades(),
+                    getGradingSettings(),
+                    getAssessments()
                 ])
 
                 setDisciplines(d)
                 setSemesters(sem)
+                setGradingSettings(setts)
+                setAssessments(asses)
 
                 // Filter official grades by student identifier (email or session id)
                 const myGrades = allGrades.filter(g =>
@@ -63,16 +69,47 @@ export function StudentGradesView({ studentId, studentEmail }: Props) {
         return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
     }
 
-    const calculateAverage = (grade: StudentGrade) => {
+    const calculateDynamicGrade = (grade: StudentGrade) => {
+        let finalExamGrade = grade.examGrade || 0;
+        let finalAttendanceScore = grade.attendanceScore || 0;
+
+        // Dynamic Exam Grade
+        if (grade.disciplineId) {
+            const disciplineAssessments = assessments.filter(a => a.disciplineId === grade.disciplineId && a.releaseResults === true);
+            const assessmentIds = disciplineAssessments.map(a => a.id);
+            const studentDisciplineSubs = submissions.filter(s => assessmentIds.includes(s.assessmentId));
+            if (studentDisciplineSubs.length > 0) {
+                // Get highest score from released assessments
+                finalExamGrade = Math.max(...studentDisciplineSubs.map(s => s.percentage));
+            }
+
+            // Dynamic Attendance
+            const disciplineAtts = attendances.filter(a => a.disciplineId === grade.disciplineId && a.isPresent);
+            if (gradingSettings && disciplineAtts.length > 0) {
+                let score = 0;
+                disciplineAtts.forEach(att => {
+                    score += att.type === 'ead' ? gradingSettings.onlinePresencePoints : gradingSettings.pointsPerPresence;
+                });
+                finalAttendanceScore = score;
+            }
+        }
+
         const total =
-            (grade.examGrade || 0) +
+            finalExamGrade +
             (grade.worksGrade || 0) +
             (grade.seminarGrade || 0) +
             (grade.participationBonus || 0) +
-            (grade.attendanceScore || 0)
+            finalAttendanceScore;
 
-        const divisor = grade.customDivisor > 0 ? grade.customDivisor : 1;
-        return (total / divisor).toFixed(2)
+        const divisor = gradingSettings?.totalDivisor && gradingSettings.totalDivisor > 0 ? gradingSettings.totalDivisor : (grade.customDivisor > 0 ? grade.customDivisor : 1);
+        
+        return {
+            examGrade: finalExamGrade,
+            attendanceScore: finalAttendanceScore,
+            total,
+            avg: (total / divisor).toFixed(2),
+            divisor
+        }
     }
 
     return (
@@ -110,11 +147,14 @@ export function StudentGradesView({ studentId, studentEmail }: Props) {
                     <div className="grid grid-cols-1 gap-4">
                         {officialGrades.map(grade => {
                             const disc = disciplines.find(d => d.id === grade.disciplineId)
-                            const avg = parseFloat(calculateAverage(grade))
+                            const dyn = calculateDynamicGrade(grade)
+                            const avg = parseFloat(dyn.avg)
+                            const minAverage = gradingSettings?.passingAverage || 70
+                            const isPassing = avg >= minAverage
 
                             return (
                                 <div key={grade.id} className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                                    <div className="flex flex-col md:flex-row justify-between gap-4">
+                                    <div className="flex flex-col md:flex-row justify-between gap-4 mb-4">
                                         <div className="space-y-1">
                                             <h4 className="font-bold text-lg text-foreground">{disc?.name || "Disciplina Geral"}</h4>
                                             <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Semestre: {semesters.find(s => s.id === disc?.semesterId)?.name || "N/A"}</p>
@@ -122,24 +162,29 @@ export function StudentGradesView({ studentId, studentEmail }: Props) {
 
                                         <div className="flex items-center gap-4 bg-muted/50 p-3 rounded-xl border border-border">
                                             <div className="text-right">
-                                                <div className="text-[10px] uppercase font-bold text-muted-foreground">Média Final</div>
-                                                <div className={`text-2xl font-black ${avg >= 7 ? 'text-green-600' : 'text-amber-600'}`}>
+                                                <div className="text-[10px] uppercase font-bold text-muted-foreground">Média Final ({dyn.total} / {dyn.divisor})</div>
+                                                <div className={`text-2xl font-black ${isPassing ? 'text-green-600' : 'text-amber-600'}`}>
                                                     {avg.toFixed(2)}
                                                 </div>
                                             </div>
-                                            <div className={`h-10 w-10 rounded-full flex items-center justify-center ${avg >= 7 ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
-                                                {avg >= 7 ? <CheckCircle2 className="h-6 w-6" /> : <Award className="h-6 w-6" />}
+                                            <div className={`h-10 w-10 border rounded-full flex items-center justify-center ${isPassing ? 'bg-green-100 text-green-600 border-green-200' : 'bg-red-100 text-red-600 border-red-200'}`}>
+                                                {isPassing ? <CheckCircle2 className="h-6 w-6" /> : <Award className="h-6 w-6" />}
                                             </div>
                                         </div>
+                                    </div>
+                                    
+                                    <div className={`mb-6 text-sm font-bold p-3 rounded-lg flex items-center gap-2 ${isPassing ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                        <CheckCircle2 className="h-5 w-5" />
+                                        {isPassing ? 'Aprovado' : 'Reprovado'}
                                     </div>
 
                                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
                                         {[
-                                            { label: "Prova", val: grade.examGrade },
-                                            { label: "Trabalhos", val: grade.worksGrade },
-                                            { label: "Seminários", val: grade.seminarGrade },
-                                            { label: "Participação", val: grade.participationBonus },
-                                            { label: "Presença", val: grade.attendanceScore },
+                                            { label: "Prova Online", val: dyn.examGrade },
+                                            { label: "Ativ. Livro", val: grade.worksGrade || 0 },
+                                            { label: "Trabalhos Extras", val: grade.seminarGrade || 0 },
+                                            { label: "Interação", val: grade.participationBonus || 0 },
+                                            { label: "Presença", val: dyn.attendanceScore },
                                         ].map(item => (
                                             <div key={item.label} className="bg-background border border-border rounded-lg p-3 text-center">
                                                 <div className="text-[10px] text-muted-foreground font-bold uppercase mb-1">{item.label}</div>
@@ -148,7 +193,7 @@ export function StudentGradesView({ studentId, studentEmail }: Props) {
                                         ))}
                                     </div>
                                     <div className="mt-4 text-[10px] text-muted-foreground text-right italic">
-                                        Cálculo: (Soma das notas) / {grade.customDivisor}
+                                        Cálculo: (Soma das notas) / {dyn.divisor} ({gradingSettings?.passingAverage}% para fechar)
                                     </div>
                                 </div>
                             )

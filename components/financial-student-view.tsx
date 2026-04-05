@@ -73,7 +73,8 @@ export function FinancialStudentView({ studentId }: Props) {
 
         const message = `Olá! Realizei o pagamento das seguintes faturas no IBAD:\n\n${selectedDescriptions}\n\n*Estou enviando o comprovante de pagamento em anexo.*`
         const encoded = encodeURIComponent(message)
-        window.open(`https://wa.me/5521974796365?text=${encoded}`, "_blank")
+        const wapp = settings?.whatsappNumber || "5571987483103"
+        window.open(`https://wa.me/${wapp}?text=${encoded}`, "_blank")
     }
 
     if (loading) {
@@ -86,9 +87,6 @@ export function FinancialStudentView({ studentId }: Props) {
 
     const selectedCharges = sortedCharges.filter(c => selectedChargeIds.includes(c.id))
     const totalSelectedAmount = selectedCharges.reduce((acc, curr) => acc + curr.amount, 0)
-    const monthlyCount = selectedCharges.filter(c => c.type === 'monthly').length
-    const hasDiscount = monthlyCount >= 2
-    const finalAmount = hasDiscount ? totalSelectedAmount * 0.95 : totalSelectedAmount
 
     return (
         <div className="flex flex-col gap-6">
@@ -108,9 +106,7 @@ export function FinancialStudentView({ studentId }: Props) {
                         </div>
 
                         <div className="bg-muted/40 rounded-xl p-4 text-center mb-6 flex flex-col items-center">
-                            {hasDiscount && <span className="text-[10px] bg-green-100 text-green-700 px-3 py-1 rounded-full font-black mb-2 uppercase tracking-tight">Economia de R$ {(totalSelectedAmount - finalAmount).toFixed(2)} acumulada!</span>}
-                            <span className="text-3xl font-black text-foreground tracking-tight">R$ {finalAmount.toFixed(2)}</span>
-                            {hasDiscount && <span className="text-xs text-muted-foreground line-through opacity-70 mt-1 italic font-medium">R$ {totalSelectedAmount.toFixed(2)} sem desconto</span>}
+                            <span className="text-3xl font-black text-foreground tracking-tight">R$ {totalSelectedAmount.toFixed(2)}</span>
                         </div>
 
                         <div className="space-y-4">
@@ -143,7 +139,6 @@ export function FinancialStudentView({ studentId }: Props) {
                                         </button>
                                     </div>
                                 </div>
-                                <p className="text-[10px] text-green-700/70 font-medium italic">* O desconto de 5% já está aplicado no valor total acima para 2+ meses.</p>
                             </div>
 
                             {/* Option 2: Boleto */}
@@ -156,7 +151,10 @@ export function FinancialStudentView({ studentId }: Props) {
                                     <p className="text-xs text-amber-800 font-medium mb-2">Para pagar via boleto, solicite ao suporte ou aguarde o envio mensal.</p>
                                     <Button
                                         variant="outline"
-                                        onClick={() => window.open(`https://wa.me/5521974796365?text=Olá, gostaria de solicitar um boleto para minha mensalidade.`, "_blank")}
+                                        onClick={() => {
+                                            const wapp = settings?.whatsappNumber || "5571987483103"
+                                            window.open(`https://wa.me/${wapp}?text=Olá, gostaria de solicitar um boleto para minha mensalidade.`, "_blank")
+                                        }}
                                         className="w-full border-amber-300 text-amber-700 hover:bg-amber-50 font-bold h-9 text-[11px]"
                                     >
                                         Solicitar Boleto via WhatsApp
@@ -198,16 +196,6 @@ export function FinancialStudentView({ studentId }: Props) {
             )}
 
 
-
-            {hasPendingOrLate && (
-                <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-4 flex gap-3 text-sm shadow-sm group hover:scale-[1.01] transition-transform">
-                    <AlertCircle className="h-5 w-5 shrink-0 text-blue-500" />
-                    <div>
-                        <p className="font-bold mb-1">PROMOÇÃO: Pagamento em Lote</p>
-                        <p className="text-blue-700/80">Selecione <strong>2 ou mais mensalidades</strong> e ganhe <strong>5% de desconto</strong> automático no Pix ou Cartão!</p>
-                    </div>
-                </div>
-            )}
 
             {sortedCharges.length === 0 ? (
                 <div className="bg-card border border-border border-dashed rounded-xl p-12 text-center flex flex-col items-center">
@@ -298,12 +286,7 @@ export function FinancialStudentView({ studentId }: Props) {
                         <div>
                             <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">Total a Pagar</p>
                             <div className="flex items-baseline gap-2">
-                                <p className="text-2xl font-black text-foreground leading-none">R$ {finalAmount.toFixed(2)}</p>
-                                {hasDiscount && (
-                                    <p className="text-[11px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full animate-bounce">
-                                        Economize R$ {(totalSelectedAmount - finalAmount).toFixed(2)}!
-                                    </p>
-                                )}
+                                <p className="text-2xl font-black text-foreground leading-none">R$ {totalSelectedAmount.toFixed(2)}</p>
                             </div>
                         </div>
                     </div>

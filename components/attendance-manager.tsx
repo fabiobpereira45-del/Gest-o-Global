@@ -21,6 +21,7 @@ export function AttendanceManager() {
     const [selectedDisciplineId, setSelectedDisciplineId] = useState<string>("none")
     const [selectedClassId, setSelectedClassId] = useState<string>("all")
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0])
+    const [lessonType, setLessonType] = useState<"presencial" | "ead">("presencial")
     const [searchTerm, setSearchTerm] = useState("")
 
     const [classes, setClasses] = useState<ClassRoom[]>([])
@@ -81,7 +82,7 @@ export function AttendanceManager() {
             // For each student currently visible or in state, save their attendance
             const promises = filteredStudents.map(student => {
                 const isPresent = attendances[student.id] === true
-                return saveAttendance(student.id, selectedDisciplineId, selectedDate, isPresent)
+                return saveAttendance(student.id, selectedDisciplineId, selectedDate, isPresent, lessonType)
             })
             await Promise.all(promises)
             alert("Frequência salva com sucesso!")
