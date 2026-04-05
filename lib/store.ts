@@ -8,9 +8,9 @@ export type QuestionType = "multiple-choice" | "true-false" | "discursive" | "in
 export interface Choice { id: string; text: string }
 export interface MatchingPair { id: string; left: string; right: string }
 export interface Semester { id: string; name: string; order: number; shift?: string; is_completed?: boolean; createdAt: string }
-export interface Discipline { id: string; name: string; description?: string | null; semesterId?: string | null; professorName?: string | null; dayOfWeek?: string | null; shift?: string | null; order: number; is_realized?: boolean; createdAt: string }
+export interface Discipline { id: string; name: string; description?: string | null; semesterId?: string | null; professorName?: string | null; dayOfWeek?: string | null; shift?: string | null; order: number; is_realized?: boolean; executionDate?: string | null; createdAt: string }
 export interface StudyMaterial { id: string; disciplineId: string; title: string; description?: string; fileUrl: string; createdAt: string }
-export interface FinancialSettings { id: string; enrollmentFee: number; monthlyFee: number; secondCallFee: number; finalExamFee: number; totalMonths: number; creditCardUrl?: string; pixKey?: string; updatedAt: string; }
+export interface FinancialSettings { id: string; enrollmentFee: number; monthlyFee: number; secondCallFee: number; finalExamFee: number; totalMonths: number; creditCardUrl?: string; pixKey?: string; installmentDates?: string[]; updatedAt: string; }
 export interface FinancialCharge { id: string; studentId: string; type: "enrollment" | "monthly" | "second_call" | "final_exam" | "other"; description: string; amount: number; dueDate: string; status: "pending" | "paid" | "cancelled" | "late" | "bolsa100" | "bolsa50"; paymentDate?: string; pixQrcode?: string; pixCopyPaste?: string; createdAt: string; }
 export interface Question { id: string; disciplineId: string; type: QuestionType; text: string; choices: Choice[]; pairs?: MatchingPair[]; correctAnswer: string; points: number; createdAt: string }
 export interface Assessment { id: string; title: string; disciplineId: string; professor: string; institution: string; questionIds: string[]; pointsPerQuestion: number; totalPoints: number; openAt: string | null; closeAt: string | null; isPublished: boolean; archived: boolean; shuffleVariants?: boolean; timeLimitMinutes?: number | null; logoBase64?: string; rules?: string; releaseResults?: boolean; modality?: "public" | "private"; createdAt: string }
@@ -273,6 +273,7 @@ function mapDiscipline(row: any): Discipline {
     shift: row.shift || undefined, 
     order: Number(row.order || 0), 
     is_realized: !!row.is_realized,
+    executionDate: row.execution_date || undefined,
     createdAt: row.created_at 
   } 
 }
@@ -335,7 +336,20 @@ function mapProfessor(p: any): ProfessorAccount {
     active: p.active !== false // Default to true if null/undefined
   }
 }
-function mapFinancialSettings(row: any): FinancialSettings { return { id: row.id, enrollmentFee: Number(row.enrollment_fee), monthlyFee: Number(row.monthly_fee), secondCallFee: Number(row.second_call_fee), finalExamFee: Number(row.final_exam_fee), total_months: Number(row.total_months), creditCardUrl: row.credit_card_url || undefined, pixKey: row.pix_key || undefined, updatedAt: row.updated_at } }
+function mapFinancialSettings(row: any): FinancialSettings { 
+  return { 
+    id: row.id, 
+    enrollmentFee: Number(row.enrollment_fee), 
+    monthlyFee: Number(row.monthly_fee), 
+    secondCallFee: Number(row.second_call_fee), 
+    finalExamFee: Number(row.final_exam_fee), 
+    totalMonths: Number(row.total_months), 
+    creditCardUrl: row.credit_card_url || undefined, 
+    pixKey: row.pix_key || undefined, 
+    installmentDates: row.installment_dates || [],
+    updatedAt: row.updated_at 
+  } 
+}
 function mapFinancialCharge(row: any): FinancialCharge { return { id: row.id, studentId: row.student_id, type: row.type, description: row.description, amount: Number(row.amount), dueDate: row.due_date, status: row.status, paymentDate: row.payment_date || undefined, pixQrcode: row.pix_qrcode || undefined, pixCopyPaste: row.pix_copy_paste || undefined, createdAt: row.created_at } }
 function mapExpense(row: any): Expense { return { id: row.id, category: row.category as ExpenseCategory, description: row.description || "", amount: Number(row.amount), date: row.date, createdAt: row.created_at } }
 function mapStudentProfile(row: any): StudentProfile { return { id: row.id, auth_user_id: row.auth_user_id, name: row.name, cpf: row.cpf, enrollment_number: row.enrollment_number, phone: row.phone || undefined, church: row.church || undefined, pastor_name: row.pastor_name || undefined, class_id: row.class_id || undefined, payment_status: row.payment_status || undefined, avatar_url: row.avatar_url || null, bio: row.bio || null, status: row.status || 'pending', created_at: row.created_at } }
@@ -373,6 +387,7 @@ export async function updateFinancialSettings(settings: Omit<FinancialSettings, 
     total_months: settings.totalMonths,
     credit_card_url: settings.creditCardUrl || null,
     pix_key: settings.pixKey || null,
+    installment_dates: settings.installmentDates || [],
     updated_at: new Date().toISOString()
   }
   const { data: existing } = await supabase.from('financial_settings').select('id').limit(1).maybeSingle()
@@ -642,13 +657,13 @@ export async function getBoardMembers(): Promise<BoardMember[]> {
   const { data } = await supabase.from('board_members').select('*').order('category', { ascending: false })
   return (data || []).map(mapBoardMember)
 }
-export async function addDiscipline(name: string, description?: string | null, semesterId?: string | null, professorName?: string | null, dayOfWeek?: string | null, shift?: string | null, order?: number): Promise<Discipline> {
-  const d = { id: uid(), name, description: description || null, semester_id: semesterId || null, professor_name: professorName || null, day_of_week: dayOfWeek || null, shift: shift || null, "order": order || 0, created_at: new Date().toISOString() }
+export async function addDiscipline(name: string, description?: string | null, semesterId?: string | null, professorName?: string | null, dayOfWeek?: string | null, shift?: string | null, order?: number, executionDate?: string | null): Promise<Discipline> {
+  const d = { id: uid(), name, description: description || null, semester_id: semesterId || null, professor_name: professorName || null, day_of_week: dayOfWeek || null, shift: shift || null, "order": order || 0, execution_date: executionDate || null, created_at: new Date().toISOString() }
   const supabase = createClient()
   await supabase.from('disciplines').insert(d)
   return mapDiscipline(d)
 }
-export async function updateDiscipline(id: string, data: Partial<Pick<Discipline, "name" | "description" | "semesterId" | "professorName" | "dayOfWeek" | "shift" | "order" | "is_realized">>): Promise<void> {
+export async function updateDiscipline(id: string, data: Partial<Pick<Discipline, "name" | "description" | "semesterId" | "professorName" | "dayOfWeek" | "shift" | "order" | "is_realized" | "executionDate">>): Promise<void> {
   const updateData: any = {}
   if (data.name !== undefined) updateData.name = data.name
   if (data.description !== undefined) updateData.description = data.description || null
@@ -658,6 +673,7 @@ export async function updateDiscipline(id: string, data: Partial<Pick<Discipline
   if (data.shift !== undefined) updateData.shift = data.shift || null
   if (data.order !== undefined) updateData.order = data.order
   if (data.is_realized !== undefined) updateData.is_realized = data.is_realized
+  if (data.executionDate !== undefined) updateData.execution_date = data.executionDate || null
 
   const supabase = createClient()
   await supabase.from('disciplines').update(updateData).eq('id', id)
@@ -1831,7 +1847,8 @@ export async function resetAndGenerateStudentMonthlyCharges(studentId: string, s
   const { error } = await supabase.rpc('reset_single_student_financials', {
     p_student_id: studentId,
     p_total_months: settings.totalMonths,
-    p_monthly_fee: settings.monthlyFee
+    p_monthly_fee: settings.monthlyFee,
+    p_custom_dates: settings.installmentDates || []
   })
   
   if (error) throw new Error("Erro definitivo ao limpar registros: " + error.message)
@@ -1844,7 +1861,8 @@ export async function resetAllStudentsMonthlyChargesBatch(settings: FinancialSet
   const supabase = createClient()
   const { error } = await supabase.rpc('reset_all_active_students_financials', {
     p_total_months: settings.totalMonths,
-    p_monthly_fee: settings.monthlyFee
+    p_monthly_fee: settings.monthlyFee,
+    p_custom_dates: settings.installmentDates || []
   })
 
   if (error) throw new Error("Erro Crítico no Reset Global: " + error.message)

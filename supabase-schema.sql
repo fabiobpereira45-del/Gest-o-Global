@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS public.disciplines (
   shift          TEXT,
   "order"        INTEGER NOT NULL DEFAULT 0,
   is_realized     BOOLEAN DEFAULT FALSE,
+  execution_date DATE,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
