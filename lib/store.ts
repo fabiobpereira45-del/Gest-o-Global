@@ -1719,15 +1719,15 @@ export async function deleteExpense(id: string): Promise<void> {
 
 export async function insertIBADDisciplines(): Promise<void> {
   const disciplines = [
-    "Cristologia", "EpÃ­stolas Paulinas", "Escatologia", "Escola Dominical",
-    "Evangelhos e Atos", "Evangelismo", "EvidÃªncia CristÃ£",
-    "Fundamentos da Psicologia e do Aconselhamento", "Geografia BÃ­blica",
-    "Hebreus e EpÃ­stolas Gerais", "HermenÃªutica", "HistÃ³ria da Igreja",
-    "HomilÃ©tica", "IntroduÃ§Ã£o ao Novo Testamento", "IntroduÃ§Ã£o BÃ­blica",
-    "Livros HistÃ³ricos", "Livros PoÃ©ticos", "Maneiras e Costumes BÃ­blicos",
+    "Cristologia", "Epístolas Paulinas", "Escatologia", "Escola Dominical",
+    "Evangelhos e Atos", "Evangelismo", "Evidência Cristã",
+    "Fundamentos da Psicologia e do Aconselhamento", "Geografia Bíblica",
+    "Hebreus e Epístolas Gerais", "Hermenêutica", "História da Igreja",
+    "Homilética", "Introdução ao Novo Testamento", "Introdução Bíblica",
+    "Livros Históricos", "Livros Poéticos", "Maneiras e Costumes Bíblicos",
     "Missiologia", "Pentateuco", "Profetas Maiores e Menores",
-    "ReligiÃµes Comparadas", "Teologia Pastoral", "Teologia SistemÃ¡tica",
-    "AdministraÃ§Ã£o EclesiÃ¡stica"
+    "Religiões Comparadas", "Teologia Pastoral", "Teologia Sistemática",
+    "Administração Eclesiástica"
   ]
   const supabase = createClient()
   const { data: existing } = await supabase.from('disciplines').select('name')
