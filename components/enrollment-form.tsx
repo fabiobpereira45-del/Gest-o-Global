@@ -20,12 +20,13 @@ interface FormData {
     name: string
     cpf: string
     phone: string
+    address: string
     church: string
     pastor: string
     classId: string
 }
 
-const EMPTY_FORM: FormData = { name: "", cpf: "", phone: "", church: "", pastor: "", classId: "" }
+const EMPTY_FORM: FormData = { name: "", cpf: "", phone: "", address: "", church: "", pastor: "", classId: "" }
 
 function formatCPF(v: string) {
     return v.replace(/\D/g, "").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2").slice(0, 14)
@@ -69,7 +70,7 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
         load()
     }, [])
 
-    const isPersonalValid = form.name.trim() && form.cpf.length >= 14 && form.phone.length >= 14 && form.church.trim() && form.pastor.trim()
+    const isPersonalValid = form.name.trim() && form.cpf.length >= 14 && form.phone.length >= 14 && form.address.trim() && form.church.trim() && form.pastor.trim()
     const isClassValid = !!form.classId
 
     async function handleCreateEnrollment() {
@@ -238,6 +239,7 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
                                 { label: "Nome Completo *", key: "name", icon: User, placeholder: "Seu nome completo", type: "text" },
                                 { label: "CPF *", key: "cpf", icon: User, placeholder: "000.000.000-00", type: "text" },
                                 { label: "Telefone/WhatsApp *", key: "phone", icon: Phone, placeholder: "(00) 00000-0000", type: "tel" },
+                                { label: "Endereço Residencial *", key: "address", icon: MapPin, placeholder: "Rua, número, bairro e cidade", type: "text" },
                                 { label: "Nome da Igreja *", key: "church", icon: Church, placeholder: "Nome da sua congregação", type: "text" },
                                 { label: "Nome do Pastor *", key: "pastor", icon: User, placeholder: "Nome do pastor responsável", type: "text" },
                             ].map(({ label, key, icon: Icon, placeholder, type }) => (
