@@ -1726,7 +1726,8 @@ export async function insertIBADDisciplines(): Promise<void> {
     "HomilÃ©tica", "IntroduÃ§Ã£o ao Novo Testamento", "IntroduÃ§Ã£o BÃ­blica",
     "Livros HistÃ³ricos", "Livros PoÃ©ticos", "Maneiras e Costumes BÃ­blicos",
     "Missiologia", "Pentateuco", "Profetas Maiores e Menores",
-    "ReligiÃµes Comparadas", "Teologia Pastoral", "Teologia SistemÃ¡tica"
+    "ReligiÃµes Comparadas", "Teologia Pastoral", "Teologia SistemÃ¡tica",
+    "AdministraÃ§Ã£o EclesiÃ¡stica"
   ]
   const supabase = createClient()
   const { data: existing } = await supabase.from('disciplines').select('name')
@@ -1754,7 +1755,6 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
   const { data: disciplinesRaw, error: discError } = await supabase
     .from('disciplines')
     .select('*')
-    .not('semester_id', 'is', null)
     .order('order', { ascending: true })
 
   if (discError) throw new Error(discError.message)
@@ -1797,19 +1797,25 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
 
     if (disc.execution_date) {
       const [yr, mo] = disc.execution_date.split('-')
-      expectedDesc = `${disc.name} - ${mo}/${yr}`
+      expectedDesc = `MENSALIDADE: ${disc.name} - ${mo}/${yr}`
       dueDate = `${yr}-${mo}-10`
     } else {
-      // Fallback: use semester info for the key
+      // Fallback: use semester info for the key, or just the discipline name
       const semInfo = disc.semester_id ? semesterMap.get(disc.semester_id) : null
       const semLabel = semInfo ? semInfo.name : 'Grade Curricular'
-      expectedDesc = `${disc.name} - ${semLabel}`
+      expectedDesc = `MENSALIDADE: ${disc.name}`
       
-      // Default due date: 10th of current month as placeholder
-      const now = new Date()
-      const yr = now.getFullYear()
-      const mo = String(now.getMonth() + 1).padStart(2, '0')
-      dueDate = `${yr}-${mo}-10`
+      // Default due date: use discipline order to stagger them
+      // Starting April 2026 (Month 3)
+      const startMonth = 3 
+      const startYear = 2026
+      const monthOffset = disc.order ? (disc.order >= 100 ? disc.order - 100 : disc.order) : 0
+      
+      const targetMonth = (startMonth + monthOffset) % 12
+      const targetYear = startYear + Math.floor((startMonth + monthOffset) / 12)
+      
+      const mo = String(targetMonth + 1).padStart(2, '0')
+      dueDate = `${targetYear}-${mo}-10`
     }
 
     // AVOID DUPLICATES IN THE SAME SYNC RUN
