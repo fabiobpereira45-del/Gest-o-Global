@@ -1800,19 +1800,32 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
       expectedDesc = `MENSALIDADE: ${disc.name} - ${mo}/${yr}`
       dueDate = `${yr}-${mo}-10`
     } else {
-      // Fallback: use semester info for the key, or just the discipline name
-      const semInfo = disc.semester_id ? semesterMap.get(disc.semester_id) : null
-      const semLabel = semInfo ? semInfo.name : 'Grade Curricular'
       expectedDesc = `MENSALIDADE: ${disc.name}`
       
-      // Default due date: use discipline order to stagger them
-      // Starting April 2026 (Month 3)
-      const startMonth = 3 
-      const startYear = 2026
-      const monthOffset = disc.order ? (disc.order >= 100 ? disc.order - 100 : disc.order) : 0
+      // NEW DATE LOGIC:
+      // - First discipline (index 0) starts in Aug 2025 (Month 7, 0-indexed)
+      // - Month increments monthly based on order index
+      // - If targetMonth = 11 (December), skip to next January and increment year
       
-      const targetMonth = (startMonth + monthOffset) % 12
-      const targetYear = startYear + Math.floor((startMonth + monthOffset) / 12)
+      const startMonth = 7 // August
+      const startYear = 2025
+      const indexOffset = disc.order ? (disc.order >= 100 ? disc.order - 100 : disc.order) : 0
+      
+      let targetMonth = startMonth
+      let targetYear = startYear
+      
+      // Calculate staggered months, skipping December (month 11)
+      for (let i = 0; i < indexOffset; i++) {
+        targetMonth++
+        if (targetMonth === 11) { // Skip December
+          targetMonth = 0
+          targetYear++
+        }
+        if (targetMonth === 12) { // Logic safety
+          targetMonth = 0
+          targetYear++
+        }
+      }
       
       const mo = String(targetMonth + 1).padStart(2, '0')
       dueDate = `${targetYear}-${mo}-10`
