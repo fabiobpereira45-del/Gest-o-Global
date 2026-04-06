@@ -1751,6 +1751,9 @@ export async function insertIBADDisciplines(): Promise<void> {
 export async function syncStudentFinancialCharges(studentId: string, settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
   
+  // AUTO-HEAL CURRICULUM: Ensure all 25 disciplines exist before syncing
+  await insertIBADDisciplines()
+  
   // Fetch ALL curriculum disciplines linked to a semester (entire grade curricular)
   const { data: disciplinesRaw, error: discError } = await supabase
     .from('disciplines')
@@ -1891,6 +1894,9 @@ export async function syncAllStudentsFinancialChargesBatch(settings: FinancialSe
     
     if (!students) return
 
+    // AUTO-HEAL CURRICULUM: Ensure all 25 disciplines exist
+    await insertIBADDisciplines()
+    
     for (const student of students) {
         try {
             await syncStudentFinancialCharges(student.id, settings)
@@ -1953,6 +1959,10 @@ export async function resetAndGenerateStudentMonthlyCharges(studentId: string, s
  */
 export async function resetAllStudentsMonthlyChargesBatch(settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
+  
+  // AUTO-HEAL CURRICULUM: Ensure all 25 disciplines exist
+  await insertIBADDisciplines()
+
   // 1. Delete all monthly charges of the system
   const { error: delError } = await supabase.from('financial_charges').delete().eq('type', 'monthly')
   if (delError) throw new Error("Erro ao limpar a base financeira: " + delError.message)
