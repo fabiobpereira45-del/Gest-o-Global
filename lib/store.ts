@@ -1750,11 +1750,30 @@ export async function insertIBADDisciplines(): Promise<void> {
 export async function syncStudentFinancialCharges(studentId: string, settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
   
-  // Fetch all curriculum disciplines that belong to a semester and have an executionDate
-  const { data: disciplines } = await supabase.from('disciplines').select('*').not('semester_id', 'is', null)
-  const validDisciplines = (disciplines || []).filter(d => d.execution_date)
+  // Fetch ALL curriculum disciplines linked to a semester (entire grade curricular)
+  const { data: disciplinesRaw, error: discError } = await supabase
+    .from('disciplines')
+    .select('*')
+    .not('semester_id', 'is', null)
+    .order('order', { ascending: true })
 
-  // Fetch current charges
+  if (discError) throw new Error(discError.message)
+
+  // Also fetch semesters to use their names as fallback
+  const { data: semestersRaw } = await supabase
+    .from('semesters')
+    .select('id, name, order')
+    .order('order', { ascending: true })
+
+  const semesterMap = new Map<string, { name: string; order: number }>()
+  for (const sem of semestersRaw || []) {
+    semesterMap.set(sem.id, { name: sem.name, order: sem.order })
+  }
+
+  // ALL disciplines linked to a semester are valid — no filtering by execution_date
+  const allDisciplines = disciplinesRaw || []
+
+  // Fetch current monthly charges for this student
   const { data: existing, error: fetchError } = await supabase
     .from('financial_charges')
     .select('*')
@@ -1767,26 +1786,45 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
   const updates: any[] = []
   const toInsert: any[] = []
 
-  // Map existing monthly charges by discipline ID (stored implicitly or we match by description, but we can't easily match if description changes).
-  // Easiest is to match by exact description since it's "Discipline Name - Mês/Ano"
-  // Wait, if discipline name changes? Best is we just check if a charge for that discipline description exists.
-  const existingDescSet = new Set(charges.map(c => c.description))
+  // Build a unique description key per discipline:
+  // - If execution_date exists: "Discipline Name - MM/YYYY"
+  // - Fallback: "Discipline Name - Sem. X" (using semester order)
+  const seenDescriptionsInBatch = new Set<string>()
 
-  // 1. Ensure all disciplines have a corresponding charge
-  for (const disc of validDisciplines) {
-    const [yr, mo] = disc.execution_date.split('-')
-    const expectedDesc = `${disc.name} - ${mo}/${yr}`
-    
-    // If it exists, skip. If we need to update amount, we could do it only if pending.
+  for (const disc of allDisciplines) {
+    let expectedDesc: string
+    let dueDate: string
+
+    if (disc.execution_date) {
+      const [yr, mo] = disc.execution_date.split('-')
+      expectedDesc = `${disc.name} - ${mo}/${yr}`
+      dueDate = `${yr}-${mo}-10`
+    } else {
+      // Fallback: use semester info for the key
+      const semInfo = disc.semester_id ? semesterMap.get(disc.semester_id) : null
+      const semLabel = semInfo ? semInfo.name : 'Grade Curricular'
+      expectedDesc = `${disc.name} - ${semLabel}`
+      
+      // Default due date: 10th of current month as placeholder
+      const now = new Date()
+      const yr = now.getFullYear()
+      const mo = String(now.getMonth() + 1).padStart(2, '0')
+      dueDate = `${yr}-${mo}-10`
+    }
+
+    // AVOID DUPLICATES IN THE SAME SYNC RUN
+    if (seenDescriptionsInBatch.has(expectedDesc)) continue
+    seenDescriptionsInBatch.add(expectedDesc)
+
     const existingCharge = charges.find(c => c.description === expectedDesc)
     if (existingCharge) {
+      // Update amount if it changed (only for non-paid charges)
       if (!['paid', 'bolsa100', 'bolsa50'].includes(existingCharge.status)) {
-         if (existingCharge.amount !== settings.monthlyFee) {
-           updates.push(supabase.from('financial_charges').update({ amount: settings.monthlyFee }).eq('id', existingCharge.id))
-         }
+        if (existingCharge.amount !== settings.monthlyFee) {
+          updates.push(supabase.from('financial_charges').update({ amount: settings.monthlyFee }).eq('id', existingCharge.id))
+        }
       }
     } else {
-      let dueDate = `${yr}-${mo}-10` // Default dia 10
       toInsert.push({
         student_id: studentId,
         type: 'monthly',
@@ -1799,16 +1837,27 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
     }
   }
 
-  // Execute Batch Operations
+  // Execute batch updates
   if (updates.length > 0) {
     const results = await Promise.all(updates)
     const err = results.find(r => r.error)
-    if (err) throw new Error(err.error?.message)
+    if (err) console.error("Error updating charge amounts:", err.error?.message)
   }
 
+  // Insert new charges in batches to avoid payload limits
   if (toInsert.length > 0) {
-    const { error: insError } = await supabase.from('financial_charges').insert(toInsert)
-    if (insError) throw new Error(insError.message)
+    const BATCH_SIZE = 50
+    for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
+      const batch = toInsert.slice(i, i + BATCH_SIZE)
+      const { error: insError } = await supabase.from('financial_charges').insert(batch)
+      if (insError) {
+        console.error("Error inserting financial charges batch:", insError.message)
+        // If one batch fails, we try to insert individual items to not lose everything
+        for (const item of batch) {
+          await supabase.from('financial_charges').insert(item).catch(e => console.error("Failed individual insert:", e))
+        }
+      }
+    }
   }
 }
 
@@ -1820,7 +1869,11 @@ export async function syncAllStudentsFinancialChargesBatch(settings: FinancialSe
     if (!students) return
 
     for (const student of students) {
-        await syncStudentFinancialCharges(student.id, settings)
+        try {
+            await syncStudentFinancialCharges(student.id, settings)
+        } catch (err) {
+            console.error(`Failed to sync student ${student.id}:`, err)
+        }
     }
 }
 
@@ -1865,6 +1918,7 @@ export async function repairAssessmentsData(): Promise<void> {
  */
 export async function resetAndGenerateStudentMonthlyCharges(studentId: string, settings: FinancialSettings): Promise<void> {
   const supabase = createClient()
+  // BE MORE AGGRESSIVE: delete even if description doesn't match current pattern
   const { error: delError } = await supabase.from('financial_charges').delete().eq('student_id', studentId).eq('type', 'monthly')
   if (delError) throw new Error("Erro ao limpar registros anteriores do aluno: " + delError.message)
   
