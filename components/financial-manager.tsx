@@ -168,18 +168,28 @@ export function FinancialManager() {
         return pendingDisciplines.length * 300
     }, [disciplines])
 
+    // --- YEARLY BREAKDOWN ---
+    const receipts2025 = useMemo(() => charges.filter(c => c.status === 'paid' && c.dueDate.startsWith('2025')).reduce((acc, curr) => acc + curr.amount, 0), [charges])
+    const receipts2026 = useMemo(() => charges.filter(c => c.status === 'paid' && c.dueDate.startsWith('2026')).reduce((acc, curr) => acc + curr.amount, 0), [charges])
+    
     const chartData = [
         {
-            name: 'Atual (Realizado)',
-            Receitas: totalReceipts,
-            Despesas: totalExpenses,
+            name: 'Realizado 2025',
+            Receitas: receipts2025,
+            Despesas: expenses.filter(e => e.date.startsWith('2025')).reduce((acc, curr) => acc + curr.amount, 0),
         },
         {
-            name: 'Projetado (Pendente)',
+            name: 'Realizado 2026',
+            Receitas: receipts2026,
+            Despesas: expenses.filter(e => e.date.startsWith('2026')).reduce((acc, curr) => acc + curr.amount, 0),
+        },
+        {
+            name: 'Projetado (Futuro)',
             Receitas: projectedReceipts,
             Despesas: projectedTeacherExpenses,
         }
     ]
+    // ---------------------------------------
     // ---------------------------------------
 
     // Auto-fill amount based on type and settings
@@ -552,19 +562,19 @@ export function FinancialManager() {
                     {/* Resumo Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-card border border-border p-5 rounded-xl shadow-sm hover:border-primary/40 transition-colors">
-                            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2"><DollarSign className="h-4 w-4 text-green-500"/> Saldo Realizado</h3>
-                            <p className={`text-3xl font-black mt-3 ${(totalReceipts - totalExpenses) >= 0 ? 'text-green-600' : 'text-red-600'}`}>R$ {(totalReceipts - totalExpenses).toFixed(2)}</p>
-                            <p className="text-xs text-muted-foreground mt-2 border-t border-border/50 pt-2 flex items-center gap-2"><span className="font-bold text-green-500">+{totalReceipts.toFixed(0)} rec.</span> |  <span className="font-bold text-red-500">-{totalExpenses.toFixed(0)} desp.</span></p>
+                            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2"><TrendingUp className="h-4 w-4 text-emerald-600"/> Histórico 2025</h3>
+                            <p className="text-3xl font-black mt-3 text-emerald-600">R$ {receipts2025.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground mt-2 border-t border-border/50 pt-2">Total de mensalidades concluídas em 2025</p>
                         </div>
                         <div className="bg-card border border-border p-5 rounded-xl shadow-sm hover:border-primary/40 transition-colors">
-                            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2"><Eye className="h-4 w-4 text-blue-500"/> Projeção (Saldo Futuro)</h3>
+                            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2"><DollarSign className="h-4 w-4 text-green-500"/> Saldo Atual (Realizado)</h3>
+                            <p className={`text-3xl font-black mt-3 ${(totalReceipts - totalExpenses) >= 0 ? 'text-green-600' : 'text-red-600'}`}>R$ {(totalReceipts - totalExpenses).toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground mt-2 border-t border-border/50 pt-2 flex items-center gap-2"><span className="font-bold text-green-500">+{totalReceipts.toFixed(0)} rec. total</span> |  <span className="font-bold text-red-500">-{totalExpenses.toFixed(0)} desp.</span></p>
+                        </div>
+                        <div className="bg-card border border-border p-5 rounded-xl shadow-sm hover:border-primary/40 transition-colors">
+                            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2"><Eye className="h-4 w-4 text-blue-500"/> Projeção Total</h3>
                             <p className={`text-3xl font-black mt-3 ${(projectedReceipts - projectedTeacherExpenses) >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>R$ {(projectedReceipts - projectedTeacherExpenses).toFixed(2)}</p>
                             <p className="text-xs text-muted-foreground mt-2 border-t border-border/50 pt-2 flex items-center gap-2"><span className="font-bold text-blue-500">+{projectedReceipts.toFixed(0)} cobr. pend.</span> | <span className="font-bold text-orange-500">-{projectedTeacherExpenses.toFixed(0)} aula pend.</span></p>
-                        </div>
-                        <div className="bg-card border border-orange-200 bg-orange-50/30 p-5 rounded-xl shadow-sm">
-                            <h3 className="text-xs font-bold text-orange-700 uppercase tracking-wider flex items-center gap-2"><Clock className="h-4 w-4 text-orange-500"/> Provisão (Professores)</h3>
-                            <p className="text-3xl font-black mt-3 text-destructive cursor-help" title="Despesa calculada sobre o total de disciplinas não realizadas">R$ {projectedTeacherExpenses.toFixed(2)}</p>
-                            <p className="text-xs text-orange-800/80 mt-2 border-t border-orange-200 pt-2">{disciplines.filter(d => !d.is_realized).length} disciplinas pendentes na grade x R$ 300,00</p>
                         </div>
                     </div>
 

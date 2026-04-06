@@ -38,15 +38,18 @@ export function StudentGradesView({ studentId, studentEmail }: Props) {
                 setGradingSettings(setts)
                 setAssessments(asses)
 
-                // Filter official grades by student identifier (email or session id)
+                // Filter official grades by student identifier and release status
                 const myGrades = allGrades.filter(g =>
-                    g.studentIdentifier === studentEmail ||
-                    g.studentIdentifier === studentId
+                    (g.studentIdentifier === studentEmail || g.studentIdentifier === studentId) &&
+                    g.isReleased === true
                 )
                 setOfficialGrades(myGrades)
 
-                // Submissions still useful for historical view
-                const mySubs = sub.filter(s => s.studentEmail === studentEmail)
+                // Submissions only shown if exam results were released
+                const mySubs = sub.filter(s => {
+                    const assessment = asses.find(a => a.id === s.assessmentId)
+                    return s.studentEmail === studentEmail && assessment?.releaseResults === true
+                })
                 setSubmissions(mySubs)
 
                 // Attendances
@@ -141,7 +144,8 @@ export function StudentGradesView({ studentId, studentEmail }: Props) {
                 {officialGrades.length === 0 ? (
                     <div className="bg-card border border-border border-dashed rounded-xl p-10 text-center text-muted-foreground">
                         <FileText className="h-10 w-10 mx-auto opacity-20 mb-3" />
-                        <p className="text-sm">Nenhuma nota oficial lançada até o momento.</p>
+                        <p className="text-sm">Nenhuma nota oficial lançada ou liberada até o momento.</p>
+                        <p className="text-[10px] mt-2 italic opacity-60">Se você realizou uma avaliação recentemente, aguarde a correção e liberação do professor.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4">

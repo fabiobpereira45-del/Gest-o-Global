@@ -41,6 +41,7 @@ export interface StudentGrade {
   participationBonus: number;
   attendanceScore: number;
   customDivisor: number;
+  isReleased: boolean;
   createdAt: string;
 }
 
@@ -188,35 +189,75 @@ export async function registerStudentByAdmin(data: any): Promise<void> {
 export async function loginStudentAuth(identifier: string, password: string) {
   const supabase = createClient()
   let email = ''
+  const cleanPass = password.trim()
 
-  // Se for um e-mail, usa diretamente (agora também procura no banco para verificar se existe)
+  console.log('[loginStudentAuth] Starting login for:', identifier)
+
+  // Se for um e-mail, usa diretamente
   if (identifier.includes('@')) {
     email = identifier.trim().toLowerCase()
     
-    // Verifica se existe aluno com este e-mail
+    // Verifica se existe aluno com este e-mail para garantir o case correto salvo no banco
     const { data: studentByEmail } = await supabase.from('students').select('email').eq('email', email).maybeSingle()
-    if (!studentByEmail) {
-      console.log('[loginStudentAuth] No student found with email:', email)
-      // Allow anyway - will fail at auth if not registered
+    if (studentByEmail) {
+      email = studentByEmail.email
     }
   } else {
+    // Limpa o ID (CPF ou Matrícula)
     const cleanId = identifier.replace(/\D/g, '')
+    
     if (cleanId.length === 11) {
-      const { data: studentData } = await supabase.from('students').select('email').eq('cpf', cleanId).maybeSingle()
+      // Busca por CPF
+      const { data: studentData, error: dbError } = await supabase
+        .from('students')
+        .select('email')
+        .eq('cpf', cleanId)
+        .maybeSingle()
+      
+      if (dbError) console.error('[loginStudentAuth] DB Error searching CPF:', dbError)
+      
+      // Se achou no banco, usa o e-mail vinculado. 
+      // Se não achou, gera o e-mail padrão (sempre em minúsculo agora)
       email = studentData?.email || `${cleanId}@student.ibad.com`
     } else {
-      const { data } = await supabase.from('students').select('email').eq('enrollment_number', cleanId).maybeSingle()
-      if (!data) throw new Error("Identificador não encontrado (CPF, Matrícula ou E-mail).")
+      // Busca por Matrícula
+      const { data, error: dbError } = await supabase
+        .from('students')
+        .select('email')
+        .eq('enrollment_number', cleanId)
+        .maybeSingle()
+      
+      if (dbError) console.error('[loginStudentAuth] DB Error searching Enrollment:', dbError)
+      
+      if (!data) {
+        console.error('[loginStudentAuth] Identifier not found:', cleanId)
+        throw new Error("Identificador não encontrado (CPF, Matrícula ou E-mail).")
+      }
       email = data.email
     }
   }
 
-  console.log('[loginStudentAuth] Trying to login with email:', email)
+  // Normaliza o e-mail final para garantir consistência (Supabase Auth costuma ser case-insensitive no domínio, mas melhor prevenir)
+  const finalEmail = email.trim().toLowerCase()
+  console.log('[loginStudentAuth] Resolving to email:', finalEmail)
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  const { data, error } = await supabase.auth.signInWithPassword({ email: finalEmail, password: cleanPass })
+  
   if (error) {
-    console.error('[loginStudentAuth] Auth error:', error.message)
-    throw new Error("Credenciais inválidas.")
+    console.error('[loginStudentAuth] Auth error for email:', finalEmail, 'Message:', error.message)
+    
+    // Fallback: se o e-mail foi registrado com IBAD.com (maiúsculo) em versões anteriores, tenta novamente
+    if (finalEmail.endsWith('@student.ibad.com')) {
+      const legacyEmail = finalEmail.replace('@student.ibad.com', '@student.IBAD.com')
+      console.log('[loginStudentAuth] Retrying with legacy domain case:', legacyEmail)
+      const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({ 
+        email: legacyEmail, 
+        password: cleanPass 
+      })
+      if (!retryError) return retryData
+    }
+    
+    throw new Error("Credenciais inválidas. Verifique seu CPF e senha.")
   }
 
   // Auto-healing: se logou mas o vínculo no DB está quebrado, conserta agora
@@ -373,11 +414,27 @@ function mapChatMessage(row: any): ChatMessage { return { id: row.id, studentId:
 function mapAttendance(row: any): Attendance { return { id: row.id, studentId: row.student_id, disciplineId: row.discipline_id, date: row.date, isPresent: row.is_present, type: row.type || "presencial", createdAt: row.created_at } }
 function mapClassRoom(row: any): ClassRoom { return { id: row.id, name: row.name, shift: row.shift as ClassRoom['shift'], dayOfWeek: row.day_of_week || undefined, maxStudents: Number(row.max_students), studentCount: row.student_count !== undefined ? Number(row.student_count) : undefined, createdAt: row.created_at } }
 function mapClassSchedule(row: any): ClassSchedule { return { id: row.id, classId: row.class_id, disciplineId: row.discipline_id, professorName: row.professor_name, dayOfWeek: row.day_of_week, timeStart: row.time_start, timeEnd: row.time_end, lessonsCount: Number(row.lessons_count || 1), workload: Number(row.workload || 0), startDate: row.start_date || undefined, endDate: row.end_date || undefined, createdAt: row.created_at } }
-function mapStudentGrade(row: any): StudentGrade { return { id: row.id, studentIdentifier: row.student_identifier, studentName: row.student_name, disciplineId: row.discipline_id || undefined, isPublic: row.is_public, examGrade: Number(row.exam_grade), worksGrade: Number(row.works_grade), seminarGrade: Number(row.seminar_grade), participationBonus: Number(row.participation_bonus), attendanceScore: Number(row.attendance_score), customDivisor: Number(row.custom_divisor), createdAt: row.created_at } }
+function mapStudentGrade(row: any): StudentGrade { 
+  return { 
+    id: row.id, 
+    studentIdentifier: row.student_identifier, 
+    studentName: row.student_name, 
+    disciplineId: row.discipline_id || undefined, 
+    isPublic: row.is_public, 
+    examGrade: Number(row.exam_grade), 
+    worksGrade: Number(row.works_grade), 
+    seminarGrade: Number(row.seminar_grade), 
+    participationBonus: Number(row.participation_bonus), 
+    attendanceScore: Number(row.attendance_score),
+    customDivisor: Number(row.custom_divisor),
+    isReleased: !!row.is_released,
+    createdAt: row.created_at 
+  } 
+}
 function mapBoardMember(row: any): BoardMember { return { id: row.id, name: row.name, role: row.role, category: row.category, avatar_url: row.avatar_url, createdAt: row.created_at } }
 function mapProfessorDiscipline(row: any): ProfessorDiscipline { return { id: row.id, professorId: row.professor_id, disciplineId: row.discipline_id, createdAt: row.created_at } }
 
-// â”€â”€â”€ Async Supabase Operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ——————————————————————————————————————————————————————————————————————————————
 
 export async function getFinancialSettings(): Promise<FinancialSettings | null> {
   try {
@@ -960,6 +1017,52 @@ export async function saveSubmission(sub: StudentSubmission): Promise<StudentSub
     console.error("Erro ao disparar WhatsApp n8n de conclusÃ£o de prova:", err);
   }
 
+  // --- AUTOMATION: Sync Grade with Master ---
+  try {
+    const { data: student } = await supabase
+      .from('students')
+      .select('*')
+      .or(`email.eq.${sub.studentEmail},cpf.eq.${sub.studentEmail}`)
+      .maybeSingle();
+
+    if (student) {
+      const assessment = await getAssessmentById(sub.assessmentId);
+      if (assessment) {
+        const { data: existingGrade } = await supabase
+          .from('student_grades')
+          .select('id')
+          .match({ student_identifier: student.cpf || student.enrollment_number, discipline_id: assessment.disciplineId })
+          .maybeSingle();
+
+        const gradeData: any = {
+          student_identifier: student.cpf || student.enrollment_number,
+          student_name: student.name,
+          discipline_id: assessment.disciplineId,
+          is_public: false,
+          exam_grade: sub.score,
+          is_released: false,
+        };
+
+        if (existingGrade) {
+          await supabase.from('student_grades').update(gradeData).eq('id', existingGrade.id);
+        } else {
+          const settings = await getGradingSettings();
+          await supabase.from('student_grades').insert({
+            ...gradeData,
+            works_grade: 0,
+            seminar_grade: 0,
+            participation_bonus: 0,
+            attendance_score: 0,
+            custom_divisor: settings.totalDivisor || 4,
+            created_at: new Date().toISOString()
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Erro ao sincronizar nota com o Master:", err);
+  }
+
   return result
 }
 export async function updateSubmissionScore(id: string, score: number, totalPoints: number): Promise<void> {
@@ -1389,6 +1492,52 @@ export async function saveAttendance(studentId: string, disciplineId: string, da
       });
     }
   }
+
+  // --- AUTOMATION: Sync Attendance Score with Master ---
+  try {
+    const { data: allPresences } = await supabase
+      .from('attendances')
+      .select('id')
+      .match({ student_id: studentId, discipline_id: disciplineId, is_present: true });
+
+    const presenceCount = allPresences?.length || 0;
+    const settings = await getGradingSettings();
+    const newScore = presenceCount * (settings.pointsPerPresence || 0);
+
+    const { data: student } = await supabase.from('students').select('*').eq('id', studentId).single();
+    if (student) {
+      const { data: existingGrade } = await supabase
+        .from('student_grades')
+        .select('id')
+        .match({ student_identifier: student.cpf || student.enrollment_number, discipline_id: disciplineId })
+        .maybeSingle();
+
+      const gradeData: any = {
+        student_identifier: student.cpf || student.enrollment_number,
+        student_name: student.name,
+        discipline_id: disciplineId,
+        is_public: false,
+        attendance_score: newScore,
+        is_released: true, // Attendance is usually public
+      };
+
+      if (existingGrade) {
+        await supabase.from('student_grades').update({ attendance_score: newScore }).eq('id', existingGrade.id);
+      } else {
+        await supabase.from('student_grades').insert({
+          ...gradeData,
+          exam_grade: 0,
+          works_grade: 0,
+          seminar_grade: 0,
+          participation_bonus: 0,
+          custom_divisor: settings.totalDivisor || 4,
+          created_at: new Date().toISOString()
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Erro ao sincronizar pontos de presença:", err);
+  }
 }
 
 // â”€â”€â”€ n8n WhatsApp Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1415,6 +1564,7 @@ export async function saveStudentGrade(grade: Omit<StudentGrade, 'id' | 'created
     participation_bonus: grade.participationBonus,
     attendance_score: grade.attendanceScore,
     custom_divisor: grade.customDivisor,
+    is_released: grade.isReleased,
   }
 
   if (id) {
@@ -1847,8 +1997,9 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
         }
       }
     } else {
-      // Auto-mark as paid if due date is before April 2026 (YYYY-MM-DD format)
-      const isPast = dueDate < '2026-04-01'
+      // Auto-mark as paid if due date is before CURRENT DATE or specifically in 2025
+      const is2025 = dueDate.startsWith('2025')
+      const isPast = is2025 || (dueDate < new Date().toISOString().split('T')[0])
       
       toInsert.push({
         student_id: studentId,

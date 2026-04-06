@@ -57,7 +57,8 @@ export function StudentAuth({ onSuccess }: Props) {
                 onSuccess()
             }
         } catch (err: any) {
-            setError(err.message || "Ocorreu um erro.")
+            console.error('[StudentAuth] Login critical error:', err)
+            setError(err.message || "Erro ao entrar no sistema.")
         } finally {
             setLoading(false)
         }
@@ -75,7 +76,7 @@ export function StudentAuth({ onSuccess }: Props) {
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground text-balance">
                         {mode === "login"
-                            ? "Entre com seu CPF ou Matrícula para acessar o Portal do Aluno."
+                            ? "Entre com seu CPF, Matrícula ou E-mail para acessar o Portal do Aluno."
                             : mode === "register"
                                 ? "Preencha seus dados para criar sua conta no Portal Acadêmico."
                                 : "Esqueceu sua senha? Veja como recuperar seu acesso ao Portal."}
@@ -129,8 +130,11 @@ export function StudentAuth({ onSuccess }: Props) {
                                 value={identifier}
                                 onChange={(e) => {
                                     const val = e.target.value
-                                    if (mode === "login" && val.includes('@')) {
-                                        setIdentifier(val) // Let them type email freely
+                                    
+                                    // Se estiver no login e contiver letras ou @, trata como e-mail/identificador livre
+                                    const hasLetters = /[a-zA-Z]/.test(val)
+                                    if (mode === "login" && (val.includes('@') || hasLetters)) {
+                                        setIdentifier(val)
                                         return
                                     }
 
@@ -138,11 +142,11 @@ export function StudentAuth({ onSuccess }: Props) {
                                     if (mode === "register") {
                                         setIdentifier(formatCpf(val))
                                     } else {
-                                        // In login for digits
-                                        if (clean.length <= 11 && !val.startsWith('2026')) {
+                                        // No login, se for puramente numérico
+                                        if (clean.length > 0 && clean.length <= 11 && !val.startsWith('2026')) {
                                             setIdentifier(formatCpf(val))
                                         } else {
-                                            setIdentifier(clean)
+                                            setIdentifier(val) // Mantém original (pode ser matrícula ou e-mail em progresso)
                                         }
                                     }
                                 }}
@@ -182,8 +186,8 @@ export function StudentAuth({ onSuccess }: Props) {
                             </button>
                         </div>
                         {mode === "login" && (
-                            <p className="text-[10px] text-muted-foreground bg-muted/30 p-2 rounded-lg border border-border/50">
-                                💡 Dica: Sua senha inicial é seu **CPF (apenas números)** ou **123456**.
+                            <p className="text-xs text-muted-foreground mt-4 text-center leading-relaxed">
+                                💡 <b>Dica:</b> Sua senha inicial é seu <b>CPF (apenas números)</b> ou <b>123456</b>.
                             </p>
                         )}
                     </div>

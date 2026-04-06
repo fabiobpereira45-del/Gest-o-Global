@@ -48,7 +48,7 @@ export async function POST(req: Request) {
         // Generate enrollment number
         const enrollmentNumber = `IBAD-${Date.now().toString().slice(-8)}`
         const cleanCpf = cpf.replace(/\D/g, '')
-        const email = `${cleanCpf}@student.IBAD.com`
+        const email = `${cleanCpf}@student.ibad.com`
 
         // Create Auth User
         let authUserId: string | undefined

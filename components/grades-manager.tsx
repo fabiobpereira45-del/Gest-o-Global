@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import {
-    Plus, Pencil, Trash2, GraduationCap, Calculator, Loader2, Save, X, Download
+    Plus, Pencil, Trash2, GraduationCap, Calculator, Loader2, Save, X, Download, Eye, EyeOff
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,7 +40,8 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
         seminarGrade: "",
         participationBonus: "",
         attendanceScore: "",
-        customDivisor: "4"
+        customDivisor: "4",
+        isReleased: true
     })
 
     const loadData = async () => {
@@ -267,6 +268,17 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                 <Input type="number" step="1" min="1" value={formData.customDivisor} onChange={(e) => setFormData({ ...formData, customDivisor: e.target.value })} />
                             </div>
 
+                            <div className="space-y-2 flex items-center justify-between border rounded-md p-3 bg-blue-50/30 border-blue-100">
+                                <div>
+                                    <Label className="text-blue-700">Liberar para o Aluno?</Label>
+                                    <p className="text-xs text-blue-600/70">Se marcado, o aluno poderá ver esta nota em seu boletim.</p>
+                                </div>
+                                <Switch
+                                    checked={formData.isReleased}
+                                    onCheckedChange={(c) => setFormData({ ...formData, isReleased: c })}
+                                />
+                            </div>
+
                         </div>
 
                         <div className="flex justify-end gap-3 mt-6">
@@ -314,6 +326,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                                     </span>
                                                     <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-secondary text-secondary-foreground border border-border">
                                                         Presença: {grade.attendanceScore}
+                                                    </span>
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold border ${grade.isReleased ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                                                        {grade.isReleased ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                                                        {grade.isReleased ? 'Liberada' : 'Oculta'}
                                                     </span>
                                                 </div>
                                             </div>
