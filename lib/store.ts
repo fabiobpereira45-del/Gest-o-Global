@@ -1844,13 +1844,17 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
         }
       }
     } else {
+      // Auto-mark as paid if due date is before April 2026 (YYYY-MM-DD format)
+      const isPast = dueDate < '2026-04-01'
+      
       toInsert.push({
         student_id: studentId,
         type: 'monthly',
         description: expectedDesc,
         amount: settings.monthlyFee,
         due_date: dueDate,
-        status: 'pending',
+        status: isPast ? 'paid' : 'pending',
+        payment_date: isPast ? new Date().toISOString() : null, // Set payment date for past charges
         created_at: new Date().toISOString()
       })
     }
