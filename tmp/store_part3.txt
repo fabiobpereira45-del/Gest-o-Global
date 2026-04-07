@@ -1,0 +1,247 @@
+export async function getExpenses(): Promise<Expense[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('expenses').select('*').order('date', { ascending: false })
+  return (data || []).map(mapExpense)
+}
+
+export async function addExpense(expense: Omit<Expense, "id" | "createdAt">): Promise<Expense> {
+  const supabase = createClient()
+  const id = uid()
+  const dbData = {
+    id,
+    category: expense.category,
+    description: expense.description,
+    amount: expense.amount,
+    date: expense.date,
+    created_at: new Date().toISOString()
+  }
+  const { error } = await supabase.from('expenses').insert(dbData)
+  if (error) throw new Error(error.message)
+  return { ...expense, id, createdAt: dbData.created_at }
+}
+
+export async function updateExpense(id: string, data: Partial<Omit<Expense, "id" | "createdAt">>): Promise<void> {
+  const supabase = createClient();
+  const dbData: any = {};
+  if (data.category !== undefined) dbData.category = data.category;
+  if (data.description !== undefined) dbData.description = data.description;
+  if (data.amount !== undefined) dbData.amount = data.amount;
+  if (data.date !== undefined) dbData.date = data.date;
+
+  const { error } = await supabase.from('expenses').update(dbData).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+
+export async function deleteExpense(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('expenses').delete().eq('id', id)
+}
+
+// ─── Bulk Disciplines ───────────────────────────────────────────────────────
+
+export async function insertIBADDisciplines(): Promise<void> {
+  const disciplines = [
+    "Cristologia", "Epístolas Paulinas", "Escatologia", "Escola Dominical",
+    "Evangelhos e Atos", "Evangelismo", "Evidência Cristã",
+    "Fundamentos da Psicologia e do Aconselhamento", "Geografia Bíblica",
+    "Hebreus e Epístolas Gerais", "Hermenêutica", "História da Igreja",
+    "Homilética", "Introdução ao Novo Testamento", "Introdução Bíblica",
+    "Livros Históricos", "Livros Poéticos", "Maneiras e Costumes Bíblicos",
+    "Missiologia", "Pentateuco", "Profetas Maiores e Menores",
+    "Religiões Comparadas", "Teologia Pastoral", "Teologia Sistemática"
+  ]
+  const supabase = createClient()
+  const { data: existing } = await supabase.from('disciplines').select('name')
+  const existingNames = new Set(existing?.map(d => d.name) || [])
+
+    const toInsert = disciplines
+      .filter(name => !existingNames.has(name))
+      .map((name, index) => ({
+        id: uid(),
+        name,
+        order: 100 + index,
+        created_at: new Date().toISOString()
+      }))
+
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from('disciplines').insert(toInsert)
+      if (error) throw new Error(error.message)
+    }
+}
+
+export async function syncStudentFinancialCharges(studentId: string, settings: FinancialSettings): Promise<void> {
+  const supabase = createClient()
+  const { data: existing, error: fetchError } = await supabase
+    .from('financial_charges')
+    .select('*')
+    .eq('student_id', studentId)
+    .eq('type', 'monthly')
+
+  if (fetchError) throw new Error(fetchError.message)
+  
+  const charges = existing || []
+  const updates: any[] = []
+  const deletions: any[] = []
+  const toInsert: any[] = []
+
+  // Helper to extract installment number from description like "Mensalidade 5/25"
+  const getInstallmentNum = (desc: string) => {
+    const match = desc.match(/Mensalidade (\d+)\//i)
+    return match ? parseInt(match[1]) : null
+  }
+
+  // Map existing monthly charges by their installment number
+  const chargeMap = new Map<number, any>()
+  charges.forEach(c => {
+    const num = getInstallmentNum(c.description)
+    if (num) chargeMap.set(num, c)
+  })
+
+  // 1. Ensure all installments from 1 to totalMonths exist
+  for (let i = 1; i <= settings.total_months; i++) {
+    const existingCharge = chargeMap.get(i)
+    const newDescription = `Mensalidade ${i}/${settings.total_months}`
+
+    if (existingCharge) {
+      // Update existing
+      const updateObj: any = { description: newDescription }
+      if (!['paid', 'bolsa100', 'bolsa50'].includes(existingCharge.status)) {
+        updateObj.amount = settings.monthlyFee
+      }
+
+      if (updateObj.amount !== existingCharge.amount || updateObj.description !== existingCharge.description) {
+        updates.push(supabase.from('financial_charges').update(updateObj).eq('id', existingCharge.id))
+      }
+    } else {
+      // Create missing installment
+      let dueDate: string
+      const prev = chargeMap.get(i - 1)
+      if (prev) {
+        const d = new Date(prev.due_date)
+        d.setMonth(d.getMonth() + 1)
+        dueDate = d.toISOString().split('T')[0]
+      } else {
+        dueDate = new Date().toISOString().split('T')[0]
+      }
+
+      toInsert.push({
+        student_id: studentId,
+        type: 'monthly',
+        description: newDescription,
+        amount: settings.monthlyFee,
+        due_date: dueDate,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
+    }
+  }
+
+  // 2. Identify extra installments (indices > totalMonths) to delete if not paid
+  charges.forEach(c => {
+    const num = getInstallmentNum(c.description)
+    if (num && num > settings.total_months) {
+       if (!['paid', 'bolsa100', 'bolsa50'].includes(c.status)) {
+         deletions.push(supabase.from('financial_charges').delete().eq('id', c.id))
+       } else {
+         const extraDesc = `Mensalidade Extra ${num} (Adicional)`
+         if (c.description !== extraDesc) {
+           updates.push(supabase.from('financial_charges').update({ description: extraDesc }).eq('id', c.id))
+         }
+       }
+    }
+  })
+
+  // Execute Batch Operations
+  if (updates.length > 0) {
+    const results = await Promise.all(updates)
+    const err = results.find(r => r.error)
+    if (err) throw new Error(err.error?.message)
+  }
+
+  if (deletions.length > 0) {
+    const results = await Promise.all(deletions)
+    const err = results.find(r => r.error)
+    if (err) throw new Error(err.error?.message)
+  }
+
+  if (toInsert.length > 0) {
+    const { error: insError } = await supabase.from('financial_charges').insert(toInsert)
+    if (insError) throw new Error(insError.message)
+  }
+}
+
+export async function syncAllStudentsFinancialChargesBatch(settings: FinancialSettings): Promise<void> {
+    const supabase = createClient()
+    const { data: students, error: sErr } = await supabase.from('students').select('id').eq('status', 'active')
+    if (sErr) throw new Error(sErr.message)
+    
+    if (!students) return
+
+    for (const student of students) {
+        await syncStudentFinancialCharges(student.id, settings)
+    }
+}
+
+export async function repairAssessmentsData(): Promise<void> {
+  const supabase = createClient()
+  const { data: assessments, error: fetchError } = await supabase.from('assessments').select('*')
+  if (fetchError || !assessments) return
+
+  const { data: disciplines } = await supabase.from('disciplines').select('id, name, professor_name')
+  const discMap = new Map(disciplines?.map(d => [d.id, d]) || [])
+
+    for (const ass of assessments) {
+    let needsUpdate = false
+    const updateData: any = {}
+
+    // Fix Institution
+    if (!ass.institution || ass.institution.includes("ENSINO TEOLÓGICO")) {
+      updateData.institution = "Instituto Bíblico das Assembléias de Deus"
+      needsUpdate = true
+    }
+
+    // Fix Professor fallback
+    if (!ass.professor || ass.professor.includes("Fábio Barreto") || ass.professor === "" || ass.professor === "Professor") {
+      const disc = discMap.get(ass.discipline_id)
+      if (disc?.professor_name) {
+        updateData.professor = disc.professor_name
+        needsUpdate = true
+      } else {
+        updateData.professor = "Corpo Docente"
+        needsUpdate = true
+      }
+    }
+
+    if (needsUpdate) {
+      await supabase.from('assessments').update(updateData).eq('id', ass.id)
+    }
+  }
+}
+
+/**
+ * DEFINITIVE: Calls RPC to reset and generate student monthly charges.
+ */
+export async function resetAndGenerateStudentMonthlyCharges(studentId: string, settings: FinancialSettings): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.rpc('reset_single_student_financials', {
+    p_student_id: studentId,
+    p_total_months: settings.total_months,
+    p_monthly_fee: settings.monthlyFee
+  })
+  
+  if (error) throw new Error("Erro definitivo ao limpar registros: " + error.message)
+}
+
+/**
+ * DEFINITIVE: Calls RPC to reset ALL active students' monthly charges.
+ */
+export async function resetAllStudentsMonthlyChargesBatch(settings: FinancialSettings): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.rpc('reset_all_active_students_financials', {
+    p_total_months: settings.total_months,
+    p_monthly_fee: settings.monthlyFee
+  })
+
+  if (error) throw new Error("Erro Crítico no Reset Global: " + error.message)
+}

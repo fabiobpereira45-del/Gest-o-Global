@@ -1,0 +1,789 @@
+  const { error } = await supabase.from('assessments').update(dbData).eq('id', id)
+  if (error) throw new Error(error.message)
+
+  // Trigger n8n if published
+  if (data.isPublished === true) {
+    try {
+      const { data: assessment } = await supabase.from('assessments').select('title, discipline_id').eq('id', id).maybeSingle()
+      if (assessment) {
+        const { data: discipline } = await supabase.from('disciplines').select('name').eq('id', assessment.discipline_id).maybeSingle()
+        await triggerN8nWebhook('prova_publicada', {
+          type: 'assessment',
+          assessmentTitle: assessment.title,
+          disciplineName: discipline?.name || 'Disciplina',
+          assessmentId: id
+        });
+      }
+    } catch (err) {
+      console.error("Erro ao disparar WhatsApp n8n de prova:", err);
+    }
+  }
+}
+export async function deleteAssessment(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('assessments').delete().eq('id', id)
+}
+
+export async function getSubmissions(): Promise<StudentSubmission[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('student_submissions').select('*')
+  return (data || []).map(mapSubmission)
+}
+export async function getSubmissionsByAssessment(assessmentId: string): Promise<StudentSubmission[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('student_submissions').select('*').eq('assessment_id', assessmentId)
+  return (data || []).map(mapSubmission)
+}
+export async function saveSubmission(sub: StudentSubmission): Promise<StudentSubmission> {
+  const supabase = createClient()
+
+  const record = {
+    id: sub.id,
+    assessment_id: sub.assessmentId,
+    student_name: sub.studentName,
+    student_email: sub.studentEmail,
+    answers: sub.answers,
+    score: sub.score,
+    total_points: sub.totalPoints,
+    percentage: sub.percentage,
+    submitted_at: sub.submittedAt,
+    time_elapsed_seconds: sub.timeElapsedSeconds,
+    focus_lost_count: sub.focusLostCount || 0
+  }
+
+  const { data, error } = await supabase.from('student_submissions').insert(record).select().single()
+  if (error) throw new Error(error.message)
+  const result = mapSubmission(data)
+
+  // Trigger n8n WhatsApp (Exam Completed)
+  try {
+    const assessment = await getAssessmentById(sub.assessmentId);
+    if (assessment) {
+      await triggerN8nWebhook('prova_concluida', {
+        type: 'exam_completion',
+        name: sub.studentName,
+        phone: sub.studentEmail.split('@')[0], // Fallback/Identifier
+        title: assessment.title,
+        score: sub.score,
+        totalPoints: sub.totalPoints
+      });
+    }
+  } catch (err) {
+    console.error("Erro ao disparar WhatsApp n8n de conclusão de prova:", err);
+  }
+
+  return result
+}
+export async function updateSubmissionScore(id: string, score: number, totalPoints: number): Promise<void> {
+  const supabase = createClient()
+  const percentage = totalPoints > 0 ? (score / totalPoints) * 100 : 0
+  const { error } = await supabase.from('student_submissions').update({ score, percentage }).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+export async function deleteSubmission(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('student_submissions').delete().eq('id', id)
+}
+export async function hasStudentSubmitted(email: string, assessmentId: string): Promise<boolean> {
+  if (!email || !assessmentId) return false
+  const supabase = createClient()
+  const cleanEmail = email.trim().toLowerCase()
+  const { count } = await supabase.from('student_submissions')
+    .select('*', { count: 'exact', head: true })
+    .match({ assessment_id: assessmentId, student_email: cleanEmail })
+  return (count || 0) > 0
+}
+export async function getSubmissionByEmailAndAssessment(email: string, assessmentId: string): Promise<StudentSubmission | null> {
+  if (!email || !assessmentId) return null
+  const supabase = createClient()
+  const cleanEmail = email.trim().toLowerCase()
+  const { data } = await supabase.from('student_submissions')
+    .select('*')
+    .match({ assessment_id: assessmentId, student_email: cleanEmail })
+    .maybeSingle()
+  return data ? mapSubmission(data) : null
+}
+
+export async function getProfessorAccounts(): Promise<ProfessorAccount[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('professor_accounts').select('*')
+  return (data || []).map(mapProfessor)
+}
+export async function addProfessorAccount(data: Omit<ProfessorAccount, "id" | "createdAt" | "passwordHash"> & { password: string; id?: string }): Promise<ProfessorAccount> {
+  const nameUC = (data.name || "").toUpperCase().trim()
+  const account = { id: data.id || uid(), name: nameUC, email: data.email.toLowerCase().trim(), password_hash: hashPassword(data.password), role: data.role, created_at: new Date().toISOString() }
+  const supabase = createClient()
+  await supabase.from('professor_accounts').insert(account)
+  return mapProfessor(account)
+}
+/**
+ * Fetches a professor profile by email.
+ */
+export async function getProfessorByEmail(email: string): Promise<ProfessorAccount | null> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('professor_accounts')
+    .select('*')
+    .eq('email', email.toLowerCase().trim())
+    .maybeSingle()
+  
+  if (error) {
+    console.error("Erro ao buscar professor por e-mail:", error)
+    return null
+  }
+  
+  if (!data && email === MASTER_CREDENTIALS.email) {
+    return {
+        id: 'master',
+        name: 'Administrador Master',
+        email: MASTER_CREDENTIALS.email,
+        role: 'master',
+        active: true,
+        avatar_url: null,
+        passwordHash: '',
+        createdAt: new Date().toISOString()
+    }
+  }
+
+  return data ? mapProfessor(data) : null
+}
+
+export async function updateProfessorAccount(id: string, data: Partial<Pick<ProfessorAccount, "name" | "email" | "role" | "active" | "bio">> & { password?: string }): Promise<ProfessorAccount> {
+  const supabase = createClient()
+  
+  if (id === "master") {
+    // For master account, we use upsert to ensure the record exists
+    const { data: dbData, error: dbError } = await supabase
+      .from('professor_accounts')
+      .upsert({
+        name: data.name,
+        email: MASTER_CREDENTIALS.email,
+        password_hash: data.password ? hashPassword(data.password) : undefined,
+        role: "master",
+        active: true
+      }, { onConflict: 'email' })
+      .select()
+      .single()
+    
+    if (dbError) throw new Error("Erro no Banco (Master): " + dbError.message)
+
+    const res = await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: MASTER_CREDENTIALS.email,
+        password: data.password,
+        name: data.name,
+        role: "master"
+      })
+    })
+
+    if (!res.ok) {
+        const err = await res.json()
+        console.warn("Sincronização Auth Master falhou:", err)
+    }
+    
+    // Fetch newly updated/created master record
+    const updatedMaster = await getProfessorByEmail(MASTER_CREDENTIALS.email)
+    if (!updatedMaster) throw new Error("Falha ao recuperar conta Master após salvamento")
+    return updatedMaster
+  }
+
+  // Get current email if not provided, to find user in Auth
+  let syncEmail = data.email
+  if (!syncEmail) {
+    const { data: current } = await supabase.from('professor_accounts').select('email').eq('id', id).single()
+    if (current) syncEmail = current.email
+  }
+
+  // Sync with Supabase Auth if password, name, or role is updated
+  if (syncEmail && (data.password || data.name || data.role)) {
+    const res = await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: syncEmail,
+        password: data.password,
+        name: data.name,
+        role: data.role
+      })
+    })
+    if (!res.ok) {
+        const err = await res.json()
+        throw new Error("Erro de sincronização S-Auth: " + (err.error || res.statusText))
+    }
+  }
+
+  const updateData: any = {}
+  if (data.name !== undefined) updateData.name = data.name.toUpperCase().trim()
+  if (data.email !== undefined) updateData.email = data.email.toLowerCase().trim()
+  if (data.role !== undefined) updateData.role = data.role
+  if (data.active !== undefined) updateData.active = data.active
+  if (data.bio !== undefined) updateData.bio = data.bio
+  if (data.password !== undefined) updateData.password_hash = hashPassword(data.password)
+  
+  // Try updating by ID first
+  let { data: updated, error } = await supabase.from('professor_accounts').update(updateData).eq('id', id).select().maybeSingle()
+  
+  if (!updated) {
+    // If ID update fails, try by email (to handle ID mismatch cases)
+    const fallbackEmail = data.email || syncEmail
+    if (fallbackEmail) {
+      const { data: updated2, error: error2 } = await supabase.from('professor_accounts').update(updateData).eq('email', fallbackEmail.toLowerCase().trim()).select().maybeSingle()
+      if (error2) throw new Error("Erro ao atualizar por E-mail: " + error2.message)
+      if (!updated2) throw new Error("Nenhum professor encontrado com ID " + id + " ou E-mail " + fallbackEmail)
+      updated = updated2
+    } else {
+        throw new Error("Erro ao atualizar: Professor não encontrado e e-mail não disponível.")
+    }
+  }
+  return mapProfessor(updated)
+}
+
+/**
+ * Ensures a professor's database ID matches their Supabase Auth ID.
+ * This solves the mismatch between random uid() and Auth ID.
+ */
+export async function ensureProfessorSync(email: string, authId: string): Promise<void> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('professor_accounts')
+    .update({ id: authId })
+    .eq('email', email.toLowerCase().trim())
+    .neq('id', authId) // Only update if they differ
+  
+  if (error) console.error("Falha ao sincronizar ID de professor:", error)
+}
+export async function deleteProfessorAccount(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('professor_accounts').delete().eq('id', id)
+}
+
+export async function authenticateProfessor(email: string, password: string): Promise<ProfessorAccount | "master" | null> {
+  if (email.trim().toLowerCase() === MASTER_CREDENTIALS.email && password === MASTER_CREDENTIALS.password) {
+    return "master"
+  }
+  const supabase = createClient()
+  const { data } = await supabase.from('professor_accounts').select('*').eq('email', email.trim().toLowerCase()).maybeSingle()
+  if (data) {
+    const acc = mapProfessor(data)
+    if (checkPassword(password, acc.passwordHash)) return acc
+  }
+  return null
+}
+
+export function calculateScore(answers: StudentAnswer[], questions: Question[], pointsPerQuestion: number) {
+  let score = 0
+  questions.forEach((q) => {
+    const ans = answers.find((a) => a.questionId === q.id)
+    if (!ans) return
+
+    if (q.type === "multiple-choice" || q.type === "true-false" || q.type === "incorrect-alternative") {
+      const isDirectMatch = ans.answer === q.correctAnswer
+      const studentText = (q.choices?.find(c => c.id === ans.answer)?.text || "").trim()
+      const correctText = (q.choices?.find(c => c.id === q.correctAnswer)?.text || "").trim()
+      const isTextMatch = studentText && correctText && studentText === correctText
+      
+      if (isDirectMatch || isTextMatch) score += pointsPerQuestion
+    } else if (q.type === "fill-in-the-blank") {
+      const matches = q.text.match(/\[\[(.*?)\]\]/g)
+      if (matches) {
+        const correctWords = matches.map(m => m.slice(2, -2).trim().toLowerCase())
+        try {
+          const studentData = JSON.parse(ans.answer)
+          let correctBlanks = 0
+          correctWords.forEach((word, idx) => {
+            const studentWord = (studentData[`blank_${idx}`] || "").trim().toLowerCase()
+            if (studentWord === word) correctBlanks++
+          })
+          score += (correctBlanks / correctWords.length) * pointsPerQuestion
+        } catch { }
+      }
+    } else if (q.type === "matching" && q.pairs) {
+      try {
+        const studentData = JSON.parse(ans.answer)
+        let correctPairs = 0
+        q.pairs.forEach(p => {
+          if (studentData[p.id] === p.right) correctPairs++
+        })
+        score += (correctPairs / q.pairs.length) * pointsPerQuestion
+      } catch { }
+    }
+  })
+  const totalPoints = questions.length * pointsPerQuestion
+  const percentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0
+  return { score, totalPoints, percentage }
+}
+
+export async function getClassSchedules(): Promise<ClassSchedule[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('class_schedules').select('*').order('day_of_week', { ascending: true })
+  return (data || []).map(mapClassSchedule)
+}
+
+export async function addClassSchedule(data: Omit<ClassSchedule, "id" | "createdAt">): Promise<void> {
+  const supabase = createClient()
+  const dbData = {
+    class_id: data.classId,
+    discipline_id: data.disciplineId,
+    professor_name: data.professorName,
+    day_of_week: data.dayOfWeek,
+    time_start: data.timeStart,
+    time_end: data.timeEnd,
+    lessons_count: data.lessonsCount,
+    workload: data.workload,
+    start_date: data.startDate || null,
+    end_date: data.endDate || null,
+    created_at: new Date().toISOString()
+  }
+  const { error } = await supabase.from('class_schedules').insert(dbData)
+  if (error) throw new Error(error.message)
+}
+
+export async function updateClassSchedule(id: string, data: Partial<Omit<ClassSchedule, "id" | "createdAt">>): Promise<void> {
+  const supabase = createClient()
+  const updateData: any = {}
+  if (data.classId !== undefined) updateData.class_id = data.classId
+  if (data.disciplineId !== undefined) updateData.discipline_id = data.disciplineId
+  if (data.professorName !== undefined) updateData.professor_name = data.professorName
+  if (data.dayOfWeek !== undefined) updateData.day_of_week = data.dayOfWeek
+  if (data.timeStart !== undefined) updateData.time_start = data.timeStart
+  if (data.timeEnd !== undefined) updateData.time_end = data.timeEnd
+  if (data.lessonsCount !== undefined) updateData.lessons_count = data.lessonsCount
+  if (data.workload !== undefined) updateData.workload = data.workload
+  if (data.startDate !== undefined) updateData.start_date = data.startDate || null
+  if (data.endDate !== undefined) updateData.end_date = data.endDate || null
+
+  const { error } = await supabase.from('class_schedules').update(updateData).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+
+export async function deleteClassSchedule(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('class_schedules').delete().eq('id', id)
+}
+
+export async function getStudents(): Promise<StudentProfile[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('students')
+    .select('*')
+    .order('name', { ascending: true })
+  return (data || []).map(mapStudentProfile)
+}
+
+
+export async function updateStudent(id: string, data: {
+  name?: string
+  cpf?: string
+  phone?: string
+  address?: string
+  church?: string
+  pastor_name?: string
+  class_id?: string | null
+  payment_status?: string
+  status?: "pending" | "active" | "inactive"
+  password?: string
+}): Promise<void> {
+  const supabase = createClient()
+
+  // Sync with Supabase Auth if password is provided
+  if (data.password || data.name) {
+    try {
+      const { data: stu } = await supabase.from('students').select('auth_user_id').eq('id', id).single()
+      if (stu?.auth_user_id) {
+        await fetch("/api/admin/users", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: stu.auth_user_id,
+            password: data.password,
+            name: data.name
+          })
+        })
+      }
+    } catch (err) {
+      console.error("Error syncing student with Auth:", err)
+    }
+  }
+
+  const updateData: any = {}
+  if (data.name !== undefined) updateData.name = data.name.toUpperCase().trim()
+  if (data.cpf !== undefined) updateData.cpf = data.cpf.replace(/\D/g, '')
+  if (data.phone !== undefined) updateData.phone = data.phone || null
+  if (data.church !== undefined) updateData.church = data.church || null
+  if (data.pastor_name !== undefined) updateData.pastor_name = data.pastor_name || null
+  if (data.class_id !== undefined) updateData.class_id = data.class_id || null
+  if (data.payment_status !== undefined) updateData.payment_status = data.payment_status || null
+  if (data.status !== undefined) updateData.status = data.status
+
+  const { error } = await supabase.from('students').update(updateData).eq('id', id)
+  if (error) throw new Error(error.message)
+
+  // Trigger activation if payment_status changed to paid
+  if (data.payment_status === 'paid') {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : 'https://IBAD-dashboard.vercel.app')
+    fetch(`${baseUrl}/api/student/activate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ studentId: id })
+    }).catch(e => console.error("Manual Activation trigger error:", e))
+  }
+}
+
+export async function deleteStudent(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('students').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function getChatMessages(disciplineId: string, studentId: string): Promise<ChatMessage[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('chats').select('*').match({ discipline_id: disciplineId, student_id: studentId }).order('created_at', { ascending: true })
+  return (data || []).map(mapChatMessage)
+}
+
+export async function sendChatMessage(studentId: string, disciplineId: string, message: string, isFromStudent: boolean): Promise<ChatMessage> {
+  const supabase = createClient()
+  const dbData = { student_id: studentId, discipline_id: disciplineId, message, is_from_student: isFromStudent, read: false, created_at: new Date().toISOString() }
+  const { data, error } = await supabase.from('chats').insert(dbData).select().single()
+  if (error) throw new Error(error.message)
+
+  // Trigger n8n if message is from professor to student
+  if (!isFromStudent) {
+    const { data: student } = await supabase.from('students').select('name, phone').eq('id', studentId).single();
+    if (student) {
+      await triggerN8nWebhook('nova_mensagem_chat', {
+        type: 'chat',
+        studentName: student.name,
+        phone: student.phone,
+        message: message
+      });
+    }
+  }
+
+  return mapChatMessage(data)
+}
+
+export async function markChatAsRead(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('chats').update({ read: true }).eq('id', id)
+}
+
+export async function getAttendances(disciplineId: string): Promise<Attendance[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('attendances').select('*').eq('discipline_id', disciplineId).order('date', { ascending: false })
+  return (data || []).map(mapAttendance)
+}
+
+export async function saveAttendance(studentId: string, disciplineId: string, date: string, isPresent: boolean): Promise<void> {
+  const supabase = createClient()
+  const { data: existing } = await supabase.from('attendances').select('id').match({ student_id: studentId, discipline_id: disciplineId, date }).maybeSingle()
+  if (existing) {
+    await supabase.from('attendances').update({ is_present: isPresent }).eq('id', existing.id)
+  } else {
+    const dbData = { student_id: studentId, discipline_id: disciplineId, date, is_present: isPresent, created_at: new Date().toISOString() }
+    await supabase.from('attendances').insert(dbData)
+  }
+
+  // Trigger n8n if absent
+  if (!isPresent) {
+    const { data: student } = await supabase.from('students').select('name, phone').eq('id', studentId).single();
+    const { data: discipline } = await supabase.from('disciplines').select('name').eq('id', disciplineId).single();
+    if (student) {
+      await triggerN8nWebhook('falta_registrada', {
+        type: 'attendance',
+        studentName: student.name,
+        phone: student.phone,
+        disciplineName: discipline?.name || "Disciplina",
+        date: date
+      });
+    }
+  }
+}
+
+// ─── n8n WhatsApp Integration ──────────────────────────────────────────────
+
+// ─── Notas (Student Grades) ───────────────────────────────────────────────────
+
+export async function getStudentGrades(): Promise<StudentGrade[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from('student_grades').select('*').order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data || []).map(mapStudentGrade)
+}
+
+export async function saveStudentGrade(grade: Omit<StudentGrade, 'id' | 'createdAt'>, id?: string): Promise<void> {
+  const supabase = createClient()
+  const dbData = {
+    student_identifier: grade.studentIdentifier,
+    student_name: grade.studentName,
+    discipline_id: grade.disciplineId || null,
+    is_public: grade.isPublic,
+    exam_grade: grade.examGrade,
+    works_grade: grade.worksGrade,
+    seminar_grade: grade.seminarGrade,
+    participation_bonus: grade.participationBonus,
+    attendance_score: grade.attendanceScore,
+    custom_divisor: grade.customDivisor,
+  }
+
+  if (id) {
+    const { error } = await supabase.from('student_grades').update(dbData).eq('id', id)
+    if (error) throw new Error(error.message)
+  } else {
+    const { error } = await supabase.from('student_grades').insert({ ...dbData, created_at: new Date().toISOString() })
+    if (error) throw new Error(error.message)
+  }
+}
+
+export async function getAvailableSlots(): Promise<number> {
+  const supabase = createClient()
+
+  // Get total capacity from classes
+  const { data: classesData, error: classesError } = await supabase
+    .from('classes')
+    .select('max_students')
+
+  if (classesError) {
+    console.error("Error fetching classes capacity:", classesError)
+    return 0
+  }
+
+  const totalCapacity = classesData.reduce((acc, curr) => acc + (curr.max_students || 0), 0)
+
+  // Get current student count
+  const { count, error: studentsError } = await supabase
+    .from('students')
+    .select('*', { count: 'exact', head: true })
+
+  if (studentsError) {
+    console.error("Error fetching student count:", studentsError)
+    return 0
+  }
+
+  const currentStudents = count || 0
+  const available = totalCapacity - currentStudents
+
+  return available > 0 ? available : 0
+}
+
+
+export async function deleteStudentGrade(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('student_grades').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ─── Profile / Avatar Management ──────────────────────────────────────────
+
+export async function uploadAvatar(file: File, userId: string, folder: 'students' | 'professors' | 'board'): Promise<string> {
+  const supabase = createClient()
+  const fileExt = file.name.split('.').pop()
+  const fileName = `${userId}-${Math.random().toString(36).slice(2)}.${fileExt}`
+  const filePath = `${folder}/${fileName}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(filePath, file)
+
+  if (uploadError) throw new Error(uploadError.message)
+
+  const { data } = supabase.storage
+    .from('avatars')
+    .getPublicUrl(filePath)
+
+  return data.publicUrl
+}
+
+export async function updateProfileAvatar(
+  userId: string, 
+  avatarUrl: string, 
+  type: 'student' | 'professor' | 'board'
+): Promise<void> {
+  const supabase = createClient()
+  
+  // 1. Special Case: Master Professor Account
+  if (type === 'professor' && (userId === 'master' || userId === MASTER_CREDENTIALS.email)) {
+    console.log("DEBUG-V1.2.2: Atualizando Avatar do Master...");
+    const { error: masterError } = await supabase
+      .from('professor_accounts')
+      .upsert({ 
+        email: MASTER_CREDENTIALS.email,
+        avatar_url: avatarUrl,
+        name: MASTER_CREDENTIALS.name,
+        role: 'master',
+        active: true
+      }, { onConflict: 'email' })
+    
+    if (masterError) {
+      console.error("DEBUG-V1.2.2: Erro ao dar upsert no Master:", masterError.message);
+      throw new Error("Erro ao atualizar foto do Master: " + masterError.message);
+    }
+    return;
+  }
+
+  // 2. Normal Case: Other Users
+  let table = ''
+  if (type === 'student') table = 'students'
+  else if (type === 'professor') table = 'professor_accounts'
+  else if (type === 'board') table = 'board_members'
+
+  if (!table) throw new Error("Tipo de perfil inválido para atualização de avatar.");
+
+  let success = false;
+  let lastError = "";
+
+  // Attempt 1: Update by ID
+  console.log(`DEBUG-V1.2.2: Tentando atualizar avatar na tabela ${table} por ID: ${userId}`);
+  const { data: idUpdate, error: idError } = await supabase
+    .from(table)
+    .update({ avatar_url: avatarUrl })
+    .eq('id', userId)
+    .select()
+    .maybeSingle()
+
+  if (idUpdate && !idError) {
+    success = true;
+    console.log("DEBUG-V1.2.2: Atualização por ID concluída com sucesso.");
+  } else {
+    lastError = idError?.message || "Nenhum registro encontrado por ID.";
+    console.warn("DEBUG-V1.2.2: Atualização por ID falhou ou não encontrou registro:", lastError);
+  }
+
+  // Attempt 2: Fallback to Email (for professors or students where we might have email)
+  if (!success && (type === 'professor' || type === 'student')) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const emailToTry = user?.email;
+
+      if (emailToTry) {
+        console.log(`DEBUG-V1.2.2: Tentando fallback por Email: ${emailToTry}`);
+        const { data: emailUpdate, error: emailError } = await supabase
+          .from(table)
+          .update({ avatar_url: avatarUrl })
+          .eq('email', emailToTry.toLowerCase().trim())
+          .select()
+          .maybeSingle();
+
+        if (emailUpdate && !emailError) {
+            success = true;
+            console.log("DEBUG-V1.2.2: Atualização por Email concluída com sucesso.");
+        } else {
+            lastError = emailError?.message || "Nenhum registro encontrado por Email.";
+            console.warn("DEBUG-V1.2.2: Fallback por email falhou:", lastError);
+        }
+      }
+    } catch (e: any) {
+      console.error("DEBUG-V1.2.2: Erro durante tentativa de fallback por email:", e);
+    }
+  }
+
+  if (!success) {
+    throw new Error(`Falha ao atualizar avatar em ${table}: ${lastError}`);
+  }
+}
+
+export async function getStudentProfile(id: string): Promise<StudentProfile | null> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('students')
+    .select('*')
+    .eq('id', id)
+    .single()
+  
+  if (error) return null
+  return data as StudentProfile
+}
+
+export async function getClassmates(classId: string): Promise<StudentProfile[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('students')
+    .select('*')
+    .eq('class_id', classId)
+    .eq('status', 'active')
+    .order('name')
+  
+  if (error) return []
+  return data as StudentProfile[]
+}
+
+export async function getProfessorAccount(id: string): Promise<ProfessorAccount | null> {
+  const supabase = createClient()
+  
+  if (id === 'master') {
+    const { data, error } = await supabase
+      .from('professor_accounts')
+      .select('*')
+      .eq('email', MASTER_CREDENTIALS.email)
+      .maybeSingle()
+    
+    if (data) return mapProfessor(data)
+    // Fallback to hardcoded credentials if DB record doesn't exist yet
+    return { ...MASTER_CREDENTIALS, id: 'master', passwordHash: '', createdAt: new Date().toISOString() }
+  }
+
+  const { data, error } = await supabase
+    .from('professor_accounts')
+    .select('*')
+    .eq('id', id)
+    .single()
+  
+  if (error) return null
+  return mapProfessor(data)
+}
+export async function generateMonthlyCharges(studentId: string, monthlyFee: number): Promise<void> {
+  const supabase = createClient()
+  const charges = []
+  
+  // Starting April 10th, 2026
+  let currentMonth = 3 // April (0-indexed)
+  let currentYear = 2026
+
+  for (let i = 1; i <= 24; i++) {
+    const dueDate = new Date(currentYear, currentMonth, 10)
+    const dateStr = dueDate.toISOString().split('T')[0]
+    
+    charges.push({
+      student_id: studentId,
+      type: 'monthly',
+      description: `Mensalidade ${i}/24`,
+      amount: monthlyFee,
+      due_date: dateStr,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    })
+
+    currentMonth++
+    if (currentMonth > 11) {
+      currentMonth = 0
+      currentYear++
+    }
+  }
+
+  const { error } = await supabase.from('financial_charges').insert(charges)
+  if (error) throw new Error(error.message)
+}
+
+export async function updateFinancialCharge(id: string, data: {
+  amount?: number
+  description?: string
+  dueDate?: string
+  status?: FinancialCharge["status"]
+}): Promise<void> {
+  const supabase = createClient()
+  const dbData: any = {}
+  if (data.amount !== undefined) dbData.amount = data.amount
+  if (data.description !== undefined) dbData.description = data.description
+  if (data.dueDate !== undefined) dbData.due_date = data.dueDate
+  if (data.status !== undefined) dbData.status = data.status
+
+  const { error } = await supabase.from('financial_charges').update(dbData).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// Build timestamp: 2026-03-13 10:59
+
+// ─── Expenses ───────────────────────────────────────────────────────────────
