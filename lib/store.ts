@@ -794,12 +794,31 @@ export async function updateDiscipline(id: string, data: Partial<Pick<Discipline
 }
 export async function deleteDiscipline(id: string): Promise<void> {
   const supabase = createClient()
-  // First, delete related entries to avoid foreign key constraints
+  
+  // 1. Delete Student Submissions (linked via Assessments)
+  const { data: assessments } = await supabase.from('assessments').select('id').eq('discipline_id', id)
+  if (assessments && assessments.length > 0) {
+    const assessmentIds = assessments.map(a => a.id)
+    await supabase.from('student_submissions').delete().in('assessment_id', assessmentIds)
+  }
+
+  // 2. Delete direct relations
   await supabase.from('questions').delete().eq('discipline_id', id)
   await supabase.from('study_materials').delete().eq('discipline_id', id)
+  await supabase.from('chats').delete().eq('discipline_id', id)
+  await supabase.from('attendances').delete().eq('discipline_id', id)
+  await supabase.from('student_grades').delete().eq('discipline_id', id)
+  await supabase.from('class_schedules').delete().eq('discipline_id', id)
+  await supabase.from('professor_disciplines').delete().eq('discipline_id', id)
+  
+  // 3. Delete Assessments themselves
+  await supabase.from('assessments').delete().eq('discipline_id', id)
+
+  // 4. Finally delete the discipline
   const { error } = await supabase.from('disciplines').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }
+
 
 export async function getStudyMaterials(disciplineId?: string): Promise<StudyMaterial[]> {
   const supabase = createClient()
