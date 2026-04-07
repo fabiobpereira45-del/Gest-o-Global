@@ -1869,15 +1869,18 @@ export async function deleteExpense(id: string): Promise<void> {
 
 export async function insertIBADDisciplines(): Promise<void> {
   const disciplines = [
-    "Cristologia", "Epístolas Paulinas", "Escatologia", "Escola Dominical",
-    "Evangelhos e Atos", "Evangelismo", "Evidência Cristã",
-    "Fundamentos da Psicologia e do Aconselhamento", "Geografia Bíblica",
-    "Hebreus e Epístolas Gerais", "Hermenêutica", "História da Igreja",
-    "Homilética", "Introdução ao Novo Testamento", "Introdução Bíblica",
-    "Livros Históricos", "Livros Poéticos", "Maneiras e Costumes Bíblicos",
-    "Missiologia", "Pentateuco", "Profetas Maiores e Menores",
-    "Religiões Comparadas", "Teologia Pastoral", "Teologia Sistemática",
-    "Administração Eclesiástica"
+    // 1º Semestre 2026 (Iniciado em 08/2025)
+    "Hermenêutica", "Introdução Bíblica", "Teologia Sistemática", "Pentateuco",
+    "Livros Históricos", "Livros Poéticos", "Profetas Maiores e Menores",
+    // 2º Semestre 2026
+    "Cristologia", "Evangelhos e Atos", "Epístolas Paulinas", "Hebreus e Epístolas Gerais",
+    "Introdução ao Novo Testamento", "História da Igreja",
+    // 3º Semestre 2027
+    "Homilética", "Missiologia", "Evangelismo", "Evidência Cristã",
+    "Geografia Bíblica", "Maneiras e Costumes Bíblicos",
+    // 4º Semestre 2027
+    "Escola Dominical", "Fundamentos da Psicologia e do Aconselhamento", "Religiões Comparadas",
+    "Teologia Pastoral", "Administração Eclesiástica", "Escatologia"
   ]
   const supabase = createClient()
   const { data: existing } = await supabase.from('disciplines').select('name')
@@ -1962,7 +1965,7 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
       
       const startMonth = 7 // August
       const startYear = 2025
-      const indexOffset = disc.order ? (disc.order >= 100 ? disc.order - 100 : disc.order) : 0
+      const indexOffset = typeof disc.order === 'number' ? (disc.order >= 100 ? disc.order - 100 : disc.order) : 0
       
       let targetMonth = startMonth
       let targetYear = startYear
@@ -1982,6 +1985,7 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
       
       const mo = String(targetMonth + 1).padStart(2, '0')
       dueDate = `${targetYear}-${mo}-10`
+      expectedDesc = `MENSALIDADE: ${disc.name} - ${mo}/${targetYear}`
     }
 
     // AVOID DUPLICATES IN THE SAME SYNC RUN
