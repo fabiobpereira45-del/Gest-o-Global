@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS public.student_grades (
   student_name TEXT NOT NULL,
   discipline_id TEXT,
   is_public BOOLEAN DEFAULT false,
+  is_released BOOLEAN DEFAULT false,
   custom_divisor NUMERIC DEFAULT 4,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -57,6 +58,7 @@ ALTER TABLE public.student_grades ADD COLUMN IF NOT EXISTS works_grade NUMERIC D
 ALTER TABLE public.student_grades ADD COLUMN IF NOT EXISTS seminar_grade NUMERIC DEFAULT 0;
 ALTER TABLE public.student_grades ADD COLUMN IF NOT EXISTS participation_bonus NUMERIC DEFAULT 0;
 ALTER TABLE public.student_grades ADD COLUMN IF NOT EXISTS attendance_score NUMERIC DEFAULT 0;
+ALTER TABLE public.student_grades ADD COLUMN IF NOT EXISTS is_released BOOLEAN DEFAULT false;
 
 -- ===========================================================================
 -- PARTE 4: LIMPEZA DO MODELO ANTIGO DE MENSALIDADES

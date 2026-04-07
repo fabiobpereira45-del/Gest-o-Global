@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import {
-    Plus, Pencil, Trash2, GraduationCap, Calculator, Loader2, Save, X, Download, Eye, EyeOff
+    Plus, Pencil, Trash2, GraduationCap, Calculator, Loader2, Save, X, Download, Eye, EyeOff, CheckCheck
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
     StudentGrade, getStudentGrades, saveStudentGrade, deleteStudentGrade,
-    StudentProfile, getStudents, Discipline, getDisciplines
+    StudentProfile, getStudents, Discipline, getDisciplines, releaseAllGrades
 } from "@/lib/store"
 import { printGradesReportPDF } from "@/lib/pdf"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -28,6 +28,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
     const [isEditing, setIsEditing] = useState<string | null>(null)
     const [isCreating, setIsCreating] = useState(false)
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+    const [bulkReleaseConfirm, setBulkReleaseConfirm] = useState(false)
 
     // Form State
     const [formData, setFormData] = useState<any>({
@@ -72,6 +73,16 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
             if (!formData.studentName || !formData.studentIdentifier) {
                 throw new Error("O nome e identificador do aluno são obrigatórios.")
             }
+            
+            if (!isEditing) {
+                const alreadyExists = grades.find(g => 
+                    g.studentIdentifier === formData.studentIdentifier && 
+                    g.disciplineId === (formData.disciplineId || null)
+                )
+                if (alreadyExists && !confirm(`Atenção: Já existe um registro de notas para este aluno nesta disciplina (${disciplines.find(d => d.id === formData.disciplineId)?.name || "Geral"}). Deseja criar um novo registro duplicado?`)) {
+                    return
+                }
+            }
 
             const gradeToSave = {
                 studentIdentifier: formData.studentIdentifier,
@@ -107,6 +118,20 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
             loadData()
         } catch (err: any) {
             alert("Erro ao deletar: " + err.message)
+        }
+    }
+
+    const handleBulkRelease = async () => {
+        try {
+            setLoading(true)
+            await releaseAllGrades(true)
+            setBulkReleaseConfirm(false)
+            await loadData()
+            alert("Todas as notas foram liberadas para os alunos!")
+        } catch (err: any) {
+            alert("Erro ao liberar notas: " + err.message)
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -160,6 +185,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                 Exportar PDF
                             </Button>
                         )}
+                        <Button variant="outline" onClick={() => setBulkReleaseConfirm(true)} className="border-green-600 text-green-600 hover:bg-green-50">
+                            <CheckCheck className="h-4 w-4 mr-2" />
+                            Liberar para Todos
+                        </Button>
                         <Button onClick={() => {
                             setFormData({
                                 studentIdentifier: "", studentName: "", disciplineId: "", isPublic: false,
@@ -310,7 +339,14 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                     {list.map((grade) => (
                                         <div key={grade.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                             <div>
-                                                <h4 className="font-bold text-foreground text-lg">{grade.studentName}</h4>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <h4 className="font-bold text-foreground text-lg">{grade.studentName}</h4>
+                                                    {grade.disciplineId && (
+                                                        <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border border-primary/20">
+                                                            {disciplines.find(d => d.id === grade.disciplineId)?.name}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-sm text-muted-foreground font-mono mb-2">ID: {grade.studentIdentifier}</p>
                                                 <div className="flex flex-wrap gap-2 mt-2">
                                                     <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-secondary text-secondary-foreground border border-border">
@@ -386,6 +422,26 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                             <AlertDialogAction onClick={() => deleteConfirm && handleDelete(deleteConfirm)} className="bg-red-600 hover:bg-red-700">
                                 Confirmar Exclusão
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog open={bulkReleaseConfirm} onOpenChange={setBulkReleaseConfirm}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="flex items-center gap-2">
+                                <CheckCheck className="h-5 w-5 text-green-600" />
+                                Liberar Todas as Notas?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Esta ação tornará **todas as notas lançadas** (matriculados e públicos) visíveis nos boletins dos alunos imediatamente.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleBulkRelease} className="bg-green-600 hover:bg-green-700">
+                                Sim, Liberar Tudo
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>

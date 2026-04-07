@@ -1592,6 +1592,16 @@ export async function saveStudentGrade(grade: Omit<StudentGrade, 'id' | 'created
   }
 }
 
+export async function releaseAllGrades(isReleased: boolean): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('student_grades')
+    .update({ is_released: isReleased })
+    .neq('id', 'placeholder') // Dummy filter to allow update if no other filters
+  
+  if (error) throw new Error(error.message)
+}
+
 export async function getAvailableSlots(): Promise<number> {
   const supabase = createClient()
 

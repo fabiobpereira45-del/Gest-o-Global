@@ -40,10 +40,21 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                 setAssessments(asses)
 
                 // Filter official grades by student identifier and release status
-                const myGrades = allGrades.filter(g =>
-                    (g.studentIdentifier === studentEmail || g.studentIdentifier === studentId || (studentDoc && g.studentIdentifier === studentDoc)) &&
-                    g.isReleased === true
-                )
+                const myGrades = allGrades.filter(g => {
+                    if (!g.isReleased) return false;
+                    
+                    const gId = String(g.studentIdentifier || "").trim().toLowerCase();
+                    const sEmail = String(studentEmail || "").trim().toLowerCase();
+                    const sId = String(studentId || "").trim().toLowerCase();
+                    const sDoc = String(studentDoc || "").replace(/\D/g, "");
+                    const gIdClean = gId.replace(/\D/g, "");
+
+                    return (
+                        gId === sEmail || 
+                        gId === sId || 
+                        (sDoc && (gId === sDoc || gIdClean === sDoc))
+                    );
+                });
                 setOfficialGrades(myGrades)
 
                 // Submissions only shown if exam results were released

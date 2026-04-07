@@ -798,7 +798,7 @@ export function FinancialManager() {
                                 <tbody className="divide-y divide-border">
                                     {disciplines.length === 0 ? (
                                         <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">Nenhuma disciplina cadastrada na Grade Curricular.</td></tr>
-                                    ) : [...disciplines].sort((a,b) => (a.is_realized === b.is_realized) ? 0 : a.is_realized ? 1 : -1).map(d => (
+                                    ) : disciplines.map(d => (
                                         <tr key={d.id} className={`hover:bg-muted/30 transition-colors ${d.is_realized ? 'bg-emerald-50/40' : ''}`}>
                                             <td className="px-4 py-3 font-semibold text-primary">{d.name}</td>
                                             <td className="px-4 py-3 text-muted-foreground">{d.professorName ? <span className="flex items-center gap-1.5"><FileText className="h-3 w-3 opacity-50"/> {d.professorName}</span> : <span className="italic opacity-50">Não definido</span>}</td>
