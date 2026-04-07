@@ -1916,7 +1916,7 @@ export async function insertIBADDisciplines(): Promise<void> {
   const disciplines = [
     // 1º Semestre 2026 (Iniciado em 08/2025)
     "Hermenêutica", "Introdução Bíblica", "Teologia Sistemática", "Pentateuco",
-    "Livros Historicos", "Livros Poéticos", "Profetas Maiores e Menores",
+    "Livros Históricos", "Livros Poéticos", "Profetas Maiores e Menores",
     // 2º Semestre 2026
     "Cristologia", "Evangelhos e Atos", "Epístolas Paulinas", "Hebreus e Epístolas Gerais",
     "Introdução ao Novo Testamento", "História da Igreja",
@@ -2017,14 +2017,13 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
   for (const disc of allDisciplines) {
     let expectedDesc: string
     let dueDate: string
+    const cleanName = (disc.name || "").trim()
 
     if (disc.execution_date) {
       const [yr, mo] = disc.execution_date.split('-')
-      expectedDesc = `MENSALIDADE: ${disc.name} - ${mo}/${yr}`
+      expectedDesc = `MENSALIDADE: ${cleanName} - ${mo}/${yr}`
       dueDate = `${yr}-${mo}-10`
     } else {
-      expectedDesc = `MENSALIDADE: ${disc.name}`
-      
       // NEW DATE LOGIC:
       // - First discipline (index 0) starts in Aug 2025 (Month 7, 0-indexed)
       // - Month increments monthly based on order index
@@ -2040,6 +2039,9 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
       // Calculate staggered months, skipping December (month 11)
       for (let i = 0; i < indexOffset; i++) {
         targetMonth++
+        if (targetMonth === 0) { // Safety for year wrap
+          targetYear++
+        }
         if (targetMonth === 11) { // Skip December
           targetMonth = 0
           targetYear++
@@ -2052,7 +2054,7 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
       
       const mo = String(targetMonth + 1).padStart(2, '0')
       dueDate = `${targetYear}-${mo}-10`
-      expectedDesc = `MENSALIDADE: ${disc.name} - ${mo}/${targetYear}`
+      expectedDesc = `MENSALIDADE: ${cleanName} - ${mo}/${targetYear}`
     }
 
     // AVOID DUPLICATES IN THE SAME SYNC RUN
@@ -2068,9 +2070,9 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
         }
       }
     } else {
-      // Auto-mark as paid if due date is before CURRENT DATE or specifically in 2025
-      const is2025 = dueDate.startsWith('2025')
-      const isPast = is2025 || (dueDate < new Date().toISOString().split('T')[0])
+      // Auto-mark as paid ONLY for historical data (2025)
+      // For 2026 onwards, default to 'pending' even if date is past, so admins can manage it.
+      const isHistorical = dueDate.startsWith('2025')
       
       toInsert.push({
         student_id: studentId,
@@ -2078,8 +2080,8 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
         description: expectedDesc,
         amount: settings.monthlyFee,
         due_date: dueDate,
-        status: isPast ? 'paid' : 'pending',
-        payment_date: isPast ? new Date().toISOString() : null, // Set payment date for past charges
+        status: isHistorical ? 'paid' : 'pending',
+        payment_date: isHistorical ? new Date().toISOString() : null,
         created_at: new Date().toISOString()
       })
     }
