@@ -324,7 +324,7 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
                             {tab === "curriculum" && <CurriculumTab semesters={semesters} disciplines={disciplines} />}
                             {tab === "materials" && <MaterialsTab filteredMaterials={filteredMaterials} disciplines={disciplines} />}
                             {tab === "exams" && <StudentAssessmentView studentId={profile.id} studentName={profile.name} studentEmail={session?.email || ""} studentDoc={profile.cpf} />}
-                            {tab === "grades" && <StudentGradesView studentId={profile.id} studentEmail={session?.email || ""} />}
+                            {tab === "grades" && <StudentGradesView studentId={profile.id} studentEmail={session?.email || ""} studentDoc={profile.cpf} />}
                             {tab === "financial" && <FinancialStudentView studentId={profile.id} />}
                             {tab === "chat" && <StudentChatView studentId={profile.id} studentName={profile.name} />}
                             {tab === "perfil" && <ProfileTab profile={profile} onUpdateSuccess={checkAuth} />}

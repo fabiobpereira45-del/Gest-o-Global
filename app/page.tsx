@@ -55,21 +55,32 @@ export default function HomePage() {
 
     // Restore student session (only if not an admin intent)
     async function checkStudentSession() {
-      const studentSession = getStudentSession()
-      if (studentSession) {
-        const existing = await getSubmissionByEmailAndAssessment(studentSession.email, studentSession.assessmentId)
-        if (existing) {
-          setSession(studentSession)
-          setSubmission(existing)
-        } else {
-          setSession(studentSession)
+      try {
+        const studentSession = getStudentSession()
+        if (studentSession) {
+          const existing = await getSubmissionByEmailAndAssessment(studentSession.email, studentSession.assessmentId)
+          if (existing) {
+            setSession(studentSession)
+            setSubmission(existing)
+          } else {
+            setSession(studentSession)
+          }
         }
+      } catch (error) {
+        console.error("Erro ao restaurar sessão do aluno:", error)
+        // Limpa possíveis dados corrompidos
+        setSession(null)
+        setSubmission(null)
       }
     }
 
     async function fetchSlots() {
-      const slots = await getAvailableSlots()
-      setAvailableSlots(slots)
+      try {
+        const slots = await getAvailableSlots()
+        setAvailableSlots(slots)
+      } catch (error) {
+        console.error("Erro ao buscar vagas:", error)
+      }
     }
 
     checkStudentSession()

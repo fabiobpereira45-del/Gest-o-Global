@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { CheckCircle2, AlertTriangle, Clock, BookOpenCheck, RotateCcw, ChevronLeft, ChevronRight, LayoutGrid, Flag, Check, ArrowRight, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -44,6 +45,7 @@ interface Props {
 }
 
 export function AssessmentForm({ session, onSubmit, onBack }: Props) {
+  const router = useRouter()
   const [assessment, setAssessment] = useState<Assessment | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [disc, setDisc] = useState<Discipline | null>(null)
@@ -248,7 +250,7 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
           O link pode ter expirado ou o ID informado está incorreto. 
           <span className="block mt-2 text-xs opacity-50 font-mono bg-slate-100 py-1.5 rounded-md">ID: {session.assessmentId}</span>
         </p>
-        <Button className="mt-8 px-8 py-6 text-lg rounded-xl premium-shadow font-bold bg-primary hover:bg-primary/90" onClick={() => window.location.href = "/"}>
+        <Button className="mt-8 px-8 py-6 text-lg rounded-xl premium-shadow font-bold bg-primary hover:bg-primary/90" onClick={() => router.push("/")}>
           Sair e Voltar
         </Button>
       </div>

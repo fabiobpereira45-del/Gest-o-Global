@@ -8,9 +8,10 @@ import {
 interface Props {
     studentId: string
     studentEmail: string
+    studentDoc?: string
 }
 
-export function StudentGradesView({ studentId, studentEmail }: Props) {
+export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props) {
     const [disciplines, setDisciplines] = useState<Discipline[]>([])
     const [semesters, setSemesters] = useState<Semester[]>([])
     const [officialGrades, setOfficialGrades] = useState<StudentGrade[]>([])
@@ -40,7 +41,7 @@ export function StudentGradesView({ studentId, studentEmail }: Props) {
 
                 // Filter official grades by student identifier and release status
                 const myGrades = allGrades.filter(g =>
-                    (g.studentIdentifier === studentEmail || g.studentIdentifier === studentId) &&
+                    (g.studentIdentifier === studentEmail || g.studentIdentifier === studentId || (studentDoc && g.studentIdentifier === studentDoc)) &&
                     g.isReleased === true
                 )
                 setOfficialGrades(myGrades)

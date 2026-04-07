@@ -1044,11 +1044,19 @@ export async function saveSubmission(sub: StudentSubmission): Promise<StudentSub
         };
 
         if (existingGrade) {
-          await supabase.from('student_grades').update(gradeData).eq('id', existingGrade.id);
+          await supabase.from('student_grades').update({ 
+            exam_grade: sub.score,
+            student_name: student.name // Keep name updated
+          }).eq('id', existingGrade.id);
         } else {
           const settings = await getGradingSettings();
           await supabase.from('student_grades').insert({
-            ...gradeData,
+            student_identifier: student.cpf || student.enrollment_number,
+            student_name: student.name,
+            discipline_id: assessment.disciplineId,
+            is_public: false,
+            exam_grade: sub.score,
+            is_released: false, // Default for new records
             works_grade: 0,
             seminar_grade: 0,
             participation_bonus: 0,
@@ -1522,10 +1530,18 @@ export async function saveAttendance(studentId: string, disciplineId: string, da
       };
 
       if (existingGrade) {
-        await supabase.from('student_grades').update({ attendance_score: newScore }).eq('id', existingGrade.id);
+        await supabase.from('student_grades').update({ 
+          attendance_score: newScore,
+          student_name: student.name
+        }).eq('id', existingGrade.id);
       } else {
         await supabase.from('student_grades').insert({
-          ...gradeData,
+          student_identifier: student.cpf || student.enrollment_number,
+          student_name: student.name,
+          discipline_id: disciplineId,
+          is_public: false,
+          attendance_score: newScore,
+          is_released: true, // Attendance usually public
           exam_grade: 0,
           works_grade: 0,
           seminar_grade: 0,
@@ -1871,7 +1887,7 @@ export async function insertIBADDisciplines(): Promise<void> {
   const disciplines = [
     // 1º Semestre 2026 (Iniciado em 08/2025)
     "Hermenêutica", "Introdução Bíblica", "Teologia Sistemática", "Pentateuco",
-    "Livros Históricos", "Livros Poéticos", "Profetas Maiores e Menores",
+    "Livros Historicos", "Livros Poéticos", "Profetas Maiores e Menores",
     // 2º Semestre 2026
     "Cristologia", "Evangelhos e Atos", "Epístolas Paulinas", "Hebreus e Epístolas Gerais",
     "Introdução ao Novo Testamento", "História da Igreja",
@@ -1883,22 +1899,44 @@ export async function insertIBADDisciplines(): Promise<void> {
     "Teologia Pastoral", "Administração Eclesiástica", "Escatologia"
   ]
   const supabase = createClient()
-  const { data: existing } = await supabase.from('disciplines').select('name')
-  const existingNames = new Set(existing?.map((d: { name: string }) => d.name) || [])
+  const { data: existing } = await supabase.from('disciplines').select('name, id, order')
+  const existingMap = new Map<string, { id: string, order: number }>()
+  for (const d of existing || []) {
+    existingMap.set(d.name, d)
+  }
 
-    const toInsert = disciplines
-      .filter(name => !existingNames.has(name))
-      .map((name, index) => ({
+  const toInsert: any[] = []
+  const updates: any[] = []
+
+  disciplines.forEach((name, index) => {
+    const canonicalOrder = 100 + index
+    const existing = existingMap.get(name)
+
+    if (!existing) {
+      toInsert.push({
         id: uid(),
         name,
-        order: 100 + index,
+        order: canonicalOrder,
         created_at: new Date().toISOString()
-      }))
-
-    if (toInsert.length > 0) {
-      const { error } = await supabase.from('disciplines').insert(toInsert)
-      if (error) throw new Error(error.message)
+      })
+    } else if (existing.order !== canonicalOrder) {
+      updates.push({
+        id: existing.id,
+        order: canonicalOrder
+      })
     }
+  })
+
+  // Insert missing
+  if (toInsert.length > 0) {
+    const { error } = await supabase.from('disciplines').insert(toInsert)
+    if (error) throw new Error(error.message)
+  }
+
+  // Repair existing orders (Bulk update is not native in JS client for different values, doing one by one or small batches)
+  for (const up of updates) {
+    await supabase.from('disciplines').update({ order: up.order }).eq('id', up.id)
+  }
 }
 
 export async function syncStudentFinancialCharges(studentId: string, settings: FinancialSettings): Promise<void> {

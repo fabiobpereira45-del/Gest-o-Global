@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { GraduationCap, Users, Calendar, Clock, CheckCircle2, AlertCircle, Loader2, ArrowRight, ShieldCheck, MessageCircle, QrCode, CreditCard } from "lucide-react"
 import { getPublicClasses, getFinancialSettings, type ClassRoom, type FinancialSettings } from "@/lib/store"
 
@@ -23,6 +23,7 @@ const DAY_LABEL: Record<string, string> = {
 
 function EnrollmentContent() {
     const searchParams = useSearchParams()
+    const router = useRouter()
     const classIdParam = searchParams.get("classId")
 
     const [step, setStep] = useState<"personal" | "class" | "payment">("personal")
@@ -159,7 +160,7 @@ function EnrollmentContent() {
                         <MessageCircle className="h-5 w-5" /> Confirmar no WhatsApp
                     </button>
                     <button
-                        onClick={() => window.location.href = "/"}
+                        onClick={() => router.push("/")}
                         className="w-full bg-accent text-accent-foreground font-bold py-4 rounded-2xl hover:bg-accent/90 transition-all shadow-lg"
                     >
                         Voltar para o Início

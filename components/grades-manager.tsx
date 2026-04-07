@@ -83,7 +83,8 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                 seminarGrade: parseFloat(formData.seminarGrade) || 0,
                 participationBonus: parseFloat(formData.participationBonus) || 0,
                 attendanceScore: parseFloat(formData.attendanceScore) || 0,
-                customDivisor: parseFloat(formData.customDivisor) || 4
+                customDivisor: parseFloat(formData.customDivisor) || 4,
+                isReleased: formData.isReleased
             }
 
             await saveStudentGrade(
