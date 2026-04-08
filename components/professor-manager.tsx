@@ -195,12 +195,14 @@ export function ProfessorManager() {
 
       const { user } = responseData
 
+      // Step 2: Save metadata in professor_accounts table
       await addProfessorAccount({
+        id: user.id, // Pass ID inside the object
         name: data.name,
         email: data.email,
         password: data.password,
         role: data.role,
-      }, user.id)
+      })
 
       await refresh()
       setAdding(false)
