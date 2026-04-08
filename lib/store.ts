@@ -1974,10 +1974,11 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
   // AUTO-HEAL CURRICULUM: Ensure all 25 disciplines exist before syncing
   await insertIBADDisciplines()
   
-  // Fetch ALL curriculum disciplines linked to a semester (entire grade curricular)
+  // Fetch ONLY curriculum disciplines linked to a semester (entire grade curricular)
   const { data: disciplinesRaw, error: discError } = await supabase
     .from('disciplines')
     .select('*')
+    .not('semester_id', 'is', null) // Only linked disciplines generate charges
     .order('order', { ascending: true })
 
   if (discError) throw new Error(discError.message)
@@ -1993,7 +1994,6 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
     semesterMap.set(sem.id, { name: sem.name, order: sem.order })
   }
 
-  // ALL disciplines linked to a semester are valid — no filtering by execution_date
   const allDisciplines = disciplinesRaw || []
 
   // Fetch current monthly charges for this student
@@ -2009,9 +2009,10 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
   const updates: any[] = []
   const toInsert: any[] = []
 
+  // Helper for robust matching (ignores accents and case)
+  const normalize = (s: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+
   // Build a unique description key per discipline:
-  // - If execution_date exists: "Discipline Name - MM/YYYY"
-  // - Fallback: "Discipline Name - Sem. X" (using semester order)
   const seenDescriptionsInBatch = new Set<string>()
 
   for (const disc of allDisciplines) {
@@ -2024,11 +2025,7 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
       expectedDesc = `MENSALIDADE: ${cleanName} - ${mo}/${yr}`
       dueDate = `${yr}-${mo}-10`
     } else {
-      // NEW DATE LOGIC:
-      // - First discipline (index 0) starts in Aug 2025 (Month 7, 0-indexed)
-      // - Month increments monthly based on order index
-      // - If targetMonth = 11 (December), skip to next January and increment year
-      
+      // Logic for auto-calculating date based on order if execution_date is missing
       const startMonth = 7 // August
       const startYear = 2025
       const indexOffset = typeof disc.order === 'number' ? (disc.order >= 100 ? disc.order - 100 : disc.order) : 0
@@ -2036,20 +2033,10 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
       let targetMonth = startMonth
       let targetYear = startYear
       
-      // Calculate staggered months, skipping December (month 11)
       for (let i = 0; i < indexOffset; i++) {
         targetMonth++
-        if (targetMonth === 0) { // Safety for year wrap
-          targetYear++
-        }
-        if (targetMonth === 11) { // Skip December
-          targetMonth = 0
-          targetYear++
-        }
-        if (targetMonth === 12) { // Logic safety
-          targetMonth = 0
-          targetYear++
-        }
+        if (targetMonth === 11) { targetMonth = 0; targetYear++ }
+        if (targetMonth === 12) { targetMonth = 0; targetYear++ }
       }
       
       const mo = String(targetMonth + 1).padStart(2, '0')
@@ -2058,10 +2045,13 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
     }
 
     // AVOID DUPLICATES IN THE SAME SYNC RUN
-    if (seenDescriptionsInBatch.has(expectedDesc)) continue
-    seenDescriptionsInBatch.add(expectedDesc)
+    const normExpected = normalize(expectedDesc)
+    if (seenDescriptionsInBatch.has(normExpected)) continue
+    seenDescriptionsInBatch.add(normExpected)
 
-    const existingCharge = charges.find(c => c.description === expectedDesc)
+    // FIND EXISTING using normalized comparison
+    const existingCharge = charges.find(c => normalize(c.description) === normExpected)
+    
     if (existingCharge) {
       // Update amount if it changed (only for non-paid charges)
       if (!['paid', 'bolsa100', 'bolsa50'].includes(existingCharge.status)) {
@@ -2071,7 +2061,6 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
       }
     } else {
       // Auto-mark as paid ONLY for historical data (2025)
-      // For 2026 onwards, default to 'pending' even if date is past, so admins can manage it.
       const isHistorical = dueDate.startsWith('2025')
       
       toInsert.push({
@@ -2086,6 +2075,7 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
       })
     }
   }
+
 
   // Execute batch updates
   if (updates.length > 0) {
