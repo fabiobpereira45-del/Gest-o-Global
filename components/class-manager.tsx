@@ -152,6 +152,8 @@ export function ClassManager() {
         try {
             await addClass({ name: form.name.trim(), shift: form.shift, dayOfWeek: form.dayOfWeek || undefined, maxStudents: form.maxStudents })
             setForm(EMPTY_FORM); setShowNew(false); await load()
+        } catch (err: any) {
+            alert("Erro ao salvar núcleo: " + err.message)
         } finally { setSaving(false) }
     }
 
@@ -160,6 +162,8 @@ export function ClassManager() {
         try {
             await updateClass(id, { name: editForm.name.trim(), shift: editForm.shift, dayOfWeek: editForm.dayOfWeek || undefined, maxStudents: editForm.maxStudents })
             setEditingId(null); await load()
+        } catch (err: any) {
+            alert("Erro ao atualizar núcleo: " + err.message)
         } finally { setSaving(false) }
     }
 
