@@ -38,7 +38,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { printFinancialDRE_PDF, printTuitionReportPDF } from "@/lib/pdf"
+// import { printFinancialDRE_PDF, printTuitionReportPDF } from "@/lib/pdf"
 
 // --- Constants ---
 const CATEGORIES = [
@@ -146,9 +146,9 @@ export function FinancialManager() {
           <Button onClick={loadData} variant="outline" size="icon">
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
           </Button>
-          <Button variant="outline" onClick={() => printFinancialDRE_PDF(transactions, competencia)}>
+          {/* <Button variant="outline" onClick={() => printFinancialDRE_PDF(transactions, competencia)}>
             <Download className="h-4 w-4 mr-2" /> PDF DRE
-          </Button>
+          </Button> */}
         </div>
       </div>
 
