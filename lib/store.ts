@@ -1914,18 +1914,31 @@ export async function deleteExpense(id: string): Promise<void> {
 
 export async function insertIBADDisciplines(): Promise<void> {
   const disciplines = [
-    // 1º Semestre 2026 (Iniciado em 08/2025)
-    "Hermenêutica", "Introdução Bíblica", "Teologia Sistemática", "Pentateuco",
-    "Livros Históricos", "Livros Poéticos", "Profetas Maiores e Menores",
-    // 2º Semestre 2026
-    "Cristologia", "Evangelhos e Atos", "Epístolas Paulinas", "Hebreus e Epístolas Gerais",
-    "Introdução ao Novo Testamento", "História da Igreja",
-    // 3º Semestre 2027
-    "Homilética", "Missiologia", "Evangelismo", "Evidência Cristã",
-    "Geografia Bíblica", "Maneiras e Costumes Bíblicos",
-    // 4º Semestre 2027
-    "Escola Dominical", "Fundamentos da Psicologia e do Aconselhamento", "Religiões Comparadas",
-    "Teologia Pastoral", "Administração Eclesiástica", "Escatologia"
+    "Hermenêutica",
+    "Introdução Bíblica",
+    "Teologia Sistemática",
+    "Pentateuco",
+    "Livros Históricos",
+    "Livros Poéticos",
+    "Profetas",
+    "História da Igreja",
+    "Maneiras e Costumes",
+    "Cristologia",
+    "Geografia Bíblica",
+    "Introdução ao Novo Testamento",
+    "Evangelhos e Atos",
+    "Epístolas Paulíneas",
+    "Hebreus e Epístolas Gerais",
+    "Escatologia",
+    "Religiões Comparadas",
+    "Missiologia",
+    "Evangelismo",
+    "Fundamentos da Psicologia e do Aconselhamento",
+    "Teologia Pastoral",
+    "Homilética",
+    "Escola Bíblica Dominical",
+    "Evidência Cristã",
+    "Português"
   ]
   const supabase = createClient()
   const { data: existing } = await supabase.from('disciplines').select('name, id, order')
@@ -1974,11 +1987,10 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
   // AUTO-HEAL CURRICULUM: Ensure all 25 disciplines exist before syncing
   await insertIBADDisciplines()
   
-  // Fetch ONLY curriculum disciplines linked to a semester (entire grade curricular)
+  // Fetch ALL curriculum disciplines (entire grade curricular - all 25)
   const { data: disciplinesRaw, error: discError } = await supabase
     .from('disciplines')
     .select('*')
-    .not('semester_id', 'is', null) // Only linked disciplines generate charges
     .order('order', { ascending: true })
 
   if (discError) throw new Error(discError.message)

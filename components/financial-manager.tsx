@@ -98,6 +98,12 @@ export function FinancialManager() {
     // Teacher Receipt Modal
     const [receiptModal, setReceiptModal] = useState(false)
     const [professors, setProfessors] = useState<ProfessorAccount[]>([])
+
+    // Edit Discipline State (Aulas Planejadas)
+    const [editingDisc, setEditingDisc] = useState<Discipline | null>(null)
+    const [editDiscDate, setEditDiscDate] = useState("")
+    const [editDiscProf, setEditDiscProf] = useState("")
+
     const [receiptProfessorId, setReceiptProfessorId] = useState<string>("manual")
     const [receiptManualName, setReceiptManualName] = useState("")
     const [receiptAmount, setReceiptAmount] = useState("")
@@ -788,70 +794,79 @@ export function FinancialManager() {
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-muted/50 text-muted-foreground text-[11px] uppercase tracking-wider font-bold">
                                     <tr>
+                                        <th className="px-4 py-3 w-[60px] text-center">Nº</th>
                                         <th className="px-4 py-3">DISCIPLINA</th>
+                                        <th className="px-4 py-3 w-[120px] text-center">MÊS/ANO</th>
                                         <th className="px-4 py-3">PROFESSOR ALOCADO</th>
                                         <th className="px-4 py-3 text-right">CUSTO FIXO</th>
-                                        <th className="px-4 py-3 text-center">STATUS DE PAGAMENTO</th>
+                                        <th className="px-4 py-3 text-center">STATUS</th>
                                         <th className="px-4 py-3 text-right">AÇÃO</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {disciplines.length === 0 ? (
                                         <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">Nenhuma disciplina cadastrada na Grade Curricular.</td></tr>
-                                    ) : disciplines.map(d => (
+                                    ) : disciplines.sort((a,b) => a.order - b.order).map((d, idx) => (
                                         <tr key={d.id} className={`hover:bg-muted/30 transition-colors ${d.is_realized ? 'bg-emerald-50/40' : ''}`}>
+                                            <td className="px-4 py-3 text-center text-muted-foreground font-mono text-[10px]">{idx + 1}</td>
                                             <td className="px-4 py-3 font-semibold text-primary">{d.name}</td>
-                                            <td className="px-4 py-3 text-muted-foreground">{d.professorName ? <span className="flex items-center gap-1.5"><FileText className="h-3 w-3 opacity-50"/> {d.professorName}</span> : <span className="italic opacity-50">Não definido</span>}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <div className="bg-muted px-2 py-1 rounded text-[10px] font-bold text-muted-foreground border">
+                                                    {d.executionDate || "N/A"}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {d.professorName ? <span className="flex items-center gap-1.5"><FileText className="h-3 w-3 opacity-50"/> {d.professorName}</span> : <span className="italic opacity-50">Não definido</span>}
+                                            </td>
                                             <td className="px-4 py-3 text-right font-bold text-destructive">R$ 300,00</td>
                                             <td className="px-4 py-3 text-center">
                                                 {d.is_realized ? 
-                                                    <span className="bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-full border border-emerald-200 font-bold flex items-center gap-1.5 justify-center w-max mx-auto shadow-sm"><CheckCircle2 className="h-3.5 w-3.5" /> Pagamento Realizado</span> :
-                                                    <span className="bg-orange-100 text-orange-700 text-xs px-2.5 py-1 rounded-full border border-orange-200 font-bold flex items-center gap-1.5 justify-center w-max mx-auto shadow-sm"><Clock className="h-3.5 w-3.5" /> Pagamento Pendente</span>
+                                                    <span className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full border border-emerald-200 font-bold flex items-center gap-1 justify-center w-max mx-auto">PAGO</span> :
+                                                    <span className="bg-orange-100 text-orange-700 text-[10px] px-2 py-0.5 rounded-full border border-orange-200 font-bold flex items-center gap-1 justify-center w-max mx-auto">PROVISÃO</span>
                                                 }
                                             </td>
                                             <td className="px-4 py-3 text-right">
-                                                {d.is_realized ? (
-                                                    <Button size="sm" variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 font-bold px-4 transition-all" onClick={async () => {
-                                                        if(confirm(`Deseja ESTORNAR a baixa de "${d.name}"? O status voltará para Pendente, mas a despesa gerada anteriormente não será excluída automaticamente.`)) {
-                                                            setSaving(true)
-                                                            try {
-                                                                await updateDiscipline(d.id, { is_realized: false })
-                                                                alert(`Estorno realizado com sucesso. Lembre-se de verificar a aba "Despesas" se desejar remover o lançamento oficial de R$ 300,00.`)
-                                                                load()
-                                                            } catch(e:any) {
-                                                                alert('Erro ao estornar: ' + e.message)
-                                                            } finally {
-                                                                setSaving(false)
-                                                            }
-                                                        }
+                                                <div className="flex justify-end items-center gap-1">
+                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600 hover:bg-blue-50" title="Editar Data/Professor" onClick={() => {
+                                                        setEditingDisc(d)
+                                                        setEditDiscDate(d.executionDate || "")
+                                                        setEditDiscProf(d.professorName || "")
                                                     }}>
-                                                        <AlertCircle className="h-3.5 w-3.5 mr-1.5" /> Estornar Baixa
+                                                        <Pencil className="h-3.5 w-3.5" />
                                                     </Button>
-                                                ) : (
-                                                    <Button size="sm" variant="default" className="font-bold px-4 bg-primary hover:bg-primary/90 shadow-md transition-all" onClick={async () => {
-                                                        if(confirm(`Confirmar BAIXA FINANCEIRA para a disciplina "${d.name}"? Isso registrará uma despesa de R$ 300,00 no sistema.`)) {
-                                                            setSaving(true)
-                                                            try {
-                                                                const profSuffix = d.professorName ? ` (Prof. ${d.professorName})` : ''
-                                                                await addExpense({ 
-                                                                    category: "Pagamento ao Professor", 
-                                                                    description: `Baixa Fiscal: Aula - ${d.name}${profSuffix}`, 
-                                                                    amount: 300, 
-                                                                    date: new Date().toISOString().split('T')[0] 
-                                                                })
-                                                                await updateDiscipline(d.id, { is_realized: true })
-                                                                alert(`Baixa concluída! Despesa registrada na categoria "Pagamento ao Professor".`)
-                                                                load()
-                                                            } catch(e:any) {
-                                                                alert('Erro ao dar baixa: ' + e.message)
-                                                            } finally {
-                                                                setSaving(false)
+                                                    {d.is_realized ? (
+                                                        <Button size="sm" variant="ghost" className="h-8 px-2 text-red-600 hover:bg-red-50 text-[11px] font-bold" onClick={async () => {
+                                                            if(confirm(`Deseja ESTORNAR a baixa de "${d.name}"? O status voltará para Pendente.`)) {
+                                                                setSaving(true)
+                                                                try {
+                                                                    await updateDiscipline(d.id, { is_realized: false })
+                                                                    load()
+                                                                } catch(e:any) { alert('Erro: ' + e.message) } finally { setSaving(false) }
                                                             }
-                                                        }
-                                                    }}>
-                                                        <DollarSign className="h-3.5 w-3.5 mr-1.5" /> Dar Baixa Financeira
-                                                    </Button>
-                                                )}
+                                                        }}>
+                                                            Estornar
+                                                        </Button>
+                                                    ) : (
+                                                        <Button size="sm" variant="outline" className="h-8 px-2 text-emerald-600 border-emerald-600 hover:bg-emerald-50 text-[11px] font-bold" onClick={async () => {
+                                                            if(confirm(`Confirmar BAIXA FINANCEIRA para "${d.name}"? Provisão de R$ 300,00.`)) {
+                                                                setSaving(true)
+                                                                try {
+                                                                    const profSuffix = d.professorName ? ` (Prof. ${d.professorName})` : ''
+                                                                    await addExpense({ 
+                                                                        category: "Pagamento ao Professor", 
+                                                                        description: `Baixa Fiscal: Aula - ${d.name}${profSuffix}`, 
+                                                                        amount: 300, 
+                                                                        date: new Date().toISOString().split('T')[0] 
+                                                                    })
+                                                                    await updateDiscipline(d.id, { is_realized: true })
+                                                                    load()
+                                                                } catch(e:any) { alert('Erro: ' + e.message) } finally { setSaving(false) }
+                                                            }
+                                                        }}>
+                                                            Dar Baixa
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -1400,6 +1415,44 @@ export function FinancialManager() {
                             }}
                         >
                             Gerar e Imprimir
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!editingDisc} onOpenChange={(open) => !open && setEditingDisc(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Editar Matéria - {editingDisc?.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4 uppercase font-bold text-xs">
+                        <div className="space-y-2">
+                            <Label>Data de Execução (Mês/Ano)</Label>
+                            <Input className="font-bold" placeholder="EX: 01/2026" value={editDiscDate} onChange={e => setEditDiscDate(e.target.value)} />
+                            <p className="text-[10px] text-muted-foreground lowercase font-normal italic">Essa data define o vencimento das mensalidades dos alunos (EX: 01/2026 {"->"} 10/01/2026)</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Professor Alocado</Label>
+                            <Input className="font-bold" placeholder="EX: Prof. Fábio Barreto" value={editDiscProf} onChange={e => setEditDiscProf(e.target.value)} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingDisc(null)}>Cancelar</Button>
+                        <Button className="bg-primary" disabled={saving} onClick={async () => {
+                            if (!editingDisc) return
+                            setSaving(true)
+                            try {
+                                await updateDiscipline(editingDisc.id, {
+                                    executionDate: editDiscDate,
+                                    professorName: editDiscProf
+                                })
+                                alert("Matéria atualizada com sucesso!")
+                                setEditingDisc(null)
+                                load()
+                            } catch (e: any) { alert("Erro ao salvar: " + e.message) }
+                            finally { setSaving(false) }
+                        }}>
+                            Salvar Alterações
                         </Button>
                     </DialogFooter>
                 </DialogContent>
