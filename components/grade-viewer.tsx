@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { X, BookOpen, Users, Clock, ChevronDown, ChevronUp, Calendar, CheckCircle2 } from "lucide-react"
-import { getClasses, getSemesters, getDisciplines, getFinancialSettings, getClassSchedules, type ClassRoom, type Semester, type Discipline, type FinancialSettings, type ClassSchedule } from "@/lib/store"
+import { getClasses, getSemesters, getDisciplines, getClassSchedules, type ClassRoom, type Semester, type Discipline, type ClassSchedule } from "@/lib/store"
 
 const SHIFT_LABEL: Record<string, string> = {
     morning: "Manhã",
@@ -28,20 +28,18 @@ export function GradeViewer({ onClose }: GradeViewerProps) {
     const [classes, setClasses] = useState<ClassRoom[]>([])
     const [semesters, setSemesters] = useState<Semester[]>([])
     const [disciplines, setDisciplines] = useState<Discipline[]>([])
-    const [financial, setFinancial] = useState<FinancialSettings | null>(null)
     const [schedules, setSchedules] = useState<ClassSchedule[]>([])
     const [loading, setLoading] = useState(true)
     const [openSem, setOpenSem] = useState<string | null>(null)
 
     useEffect(() => {
         async function load() {
-            const [cls, sems, discs, fin, scheds] = await Promise.all([
-                getClasses(), getSemesters(), getDisciplines(), getFinancialSettings(), getClassSchedules()
+            const [cls, sems, discs, scheds] = await Promise.all([
+                getClasses(), getSemesters(), getDisciplines(), getClassSchedules()
             ])
             setClasses(cls)
             setSemesters(sems)
             setDisciplines(discs)
-            setFinancial(fin)
             setSchedules(scheds)
             if (sems.length > 0) setOpenSem(sems[0].id)
             setLoading(false)

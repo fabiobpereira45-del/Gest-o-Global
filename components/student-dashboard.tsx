@@ -12,6 +12,7 @@ import {
     getSemesters, getDisciplines, getStudyMaterials, getClasses, getClassSchedules,
     getClassmates, getStudentGrades, type StudentGrade
 } from "@/lib/store"
+import { StudentFinancialView } from "@/components/student-financial-view"
 import { StudentAuth } from "@/components/student-auth"
 import { StudentChatView } from "@/components/student-chat-view"
 import { StudentGradesView } from "@/components/student-grades-view"
@@ -41,7 +42,7 @@ interface Props {
     onLogout: () => void
 }
 
-type Tab = "overview" | "class-info" | "curriculum" | "materials" | "grades" | "exams" | "chat" | "perfil"
+type Tab = "overview" | "class-info" | "curriculum" | "materials" | "grades" | "exams" | "chat" | "perfil" | "financeiro"
 
 export function StudentDashboard({ session, onBack, onLogout }: Props) {
     const [profile, setProfile] = useState<StudentProfile | null>(null)
@@ -129,6 +130,7 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
         { id: "materials", label: "Materiais EAD", icon: Library },
         { id: "exams", label: "Avaliações", icon: BookOpenCheck },
         { id: "grades", label: "Boletim e Notas", icon: FileText },
+        { id: "financeiro", label: "Financeiro", icon: DollarSign },
         { id: "chat", label: "Mensagens", icon: MessageSquare },
         { id: "perfil", label: "Meu Perfil", icon: User },
     ]
@@ -291,6 +293,7 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
                             {tab === "materials" && <MaterialsTab filteredMaterials={filteredMaterials} disciplines={disciplines} />}
                             {tab === "exams" && <StudentAssessmentView studentId={profile.id} studentName={profile.name} studentEmail={session?.email || ""} studentDoc={profile.cpf} />}
                             {tab === "grades" && <StudentGradesView studentId={profile.id} studentEmail={session?.email || ""} studentDoc={profile.cpf} />}
+                            {tab === "financeiro" && <StudentFinancialView studentId={profile.id} />}
                             {tab === "chat" && <StudentChatView studentId={profile.id} studentName={profile.name} />}
                             {tab === "perfil" && <ProfileTab profile={profile} onUpdateSuccess={checkAuth} />}
                         </div>

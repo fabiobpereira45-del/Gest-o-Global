@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
 import { type Assessment, getProfessorSession, saveProfessorSession, updateProfessorAccount } from "@/lib/store"
-import { FinancialConfig } from "@/components/financial-config"
 import { GradingConfig } from "@/components/grading-config"
 import { AvatarUpload } from "@/components/avatar-upload"
 
@@ -94,7 +93,6 @@ export function SettingsTab({ assessments, onRefresh, onLogout }: Props) {
 
       {isMaster && (
         <>
-          <FinancialConfig />
           <GradingConfig />
         </>
       )}

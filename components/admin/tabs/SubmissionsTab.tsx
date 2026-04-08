@@ -9,7 +9,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { type Assessment, type StudentSubmission, type Question, deleteSubmission, updateSubmissionScore } from "@/lib/store"
-import { printStudentPDF, printCompiledSubmissionsPDF, printSubmissionsTablePDF } from "@/lib/pdf"
+import { printStudentPDF } from "@/lib/pdf"
 import { formatDate, formatTime } from "../admin-utils"
 import { cn } from "@/lib/utils"
 
@@ -98,9 +98,7 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
             variant="outline"
             size="sm"
             onClick={() => {
-              if (selectedAssessment) {
-                printCompiledSubmissionsPDF({ submissions, assessment: selectedAssessment, questions })
-              }
+              alert("Geração de PDF Compilado em manutenção.")
             }}
             className="ml-auto"
             disabled={submissions.length === 0}
@@ -111,9 +109,7 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
             variant="outline"
             size="sm"
             onClick={() => {
-              if (selectedAssessment) {
-                printSubmissionsTablePDF({ submissions, assessment: selectedAssessment })
-              }
+              alert("Geração da Tabela em PDF em manutenção.")
             }}
             disabled={submissions.length === 0}
           >

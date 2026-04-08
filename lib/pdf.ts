@@ -223,3 +223,75 @@ export function printStudentListPDF(students: StudentProfile[], classes: any[]):
   const html = `<!DOCTYPE html><html><head><title>Relatório de Alunos</title></head><body><h1>Relatório Geral de Alunos</h1><table border="1" width="100%"><thead><tr><th>#</th><th>Nome</th><th>Matrícula</th><th>Turma</th><th>Telefone</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
   const win = window.open("", "_blank"); if (win) { win.document.write(html); win.document.close(); win.onload = () => win.print() }
 }
+
+export function printBlankAssessmentPDF(assessment: Assessment, questions: Question[]): void {
+    const orderedQuestions = assessment.questionIds.map(id => questions.find(q => q.id === id)).filter(Boolean) as Question[]
+    const rows = orderedQuestions.map((q, i) => {
+        const optionsHtml = q.type === "multiple-choice" ? 
+          q.choices.map((c, ci) => `<div style="margin:4px 0;">(${String.fromCharCode(65 + ci)}) ${c.text}</div>`).join('') :
+          (q.type === "true-false" ? "<div style=\"margin:8px 0;\">( ) Verdadeiro &nbsp;&nbsp; ( ) Falso</div>" : "<div style='height:120px;border:1px solid #ccc;margin-top:8px;border-radius:4px;'></div>")
+        
+        return `
+          <div style="margin-bottom:24px;break-inside:avoid;padding:12px;border-bottom:1px dashed #eee;">
+              <div style="font-weight:bold;margin-bottom:6px;">Questão ${i+1} (${assessment.pointsPerQuestion} pts)</div>
+              <div style="margin-bottom:10px;line-height:1.4;">${q.text}</div>
+              ${optionsHtml}
+          </div>
+        `
+    }).join('')
+    
+    const html = `<!DOCTYPE html><html><head><title>Prova: ${assessment.title}</title><style>body{font-family:'Times New Roman',serif;padding:40px;color:#333;} @media print{body{padding:0;}}</style></head>
+    <body onload="window.print()">
+      <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:15px;margin-bottom:25px;">
+          <h2 style="margin:0;">${assessment.institution || "IBAD - Instituto Bíblico das Assembléias de Deus"}</h2>
+          <h3 style="margin:5px 0 15px 0;">${assessment.title}</h3>
+          <div style="text-align:left;font-size:14px;">
+            <p><strong>ALUNO:</strong> ____________________________________________________________________</p>
+            <div style="display:flex;justify-content:space-between;">
+                <span><strong>DATA:</strong> ____/____/2026</span>
+                <span><strong>NOTA:</strong> _________ / ${assessment.totalPoints}</span>
+            </div>
+          </div>
+      </div>
+      ${rows}
+    </body></html>`
+    const win = window.open("", "_blank"); if (win) { win.document.write(html); win.document.close() }
+}
+
+export function printOverviewPDF(assessment: Assessment, submissions: StudentSubmission[], questions: Question[]): void {
+    const avg = submissions.length > 0 ? submissions.reduce((acc, s) => acc + s.score, 0) / submissions.length : 0
+    const rows = submissions.map((s, i) => `
+        <tr>
+            <td style="padding:6px;border:1px solid #ccc;">${i+1}</td>
+            <td style="padding:6px;border:1px solid #ccc;">${s.studentName}</td>
+            <td style="padding:6px;border:1px solid #ccc;">${s.score.toFixed(1)}</td>
+            <td style="padding:6px;border:1px solid #ccc;">${s.percentage}%</td>
+        </tr>
+    `).join('')
+
+    const html = `<!DOCTYPE html><html><head><title>Relatório: ${assessment.title}</title><style>body{font-family:sans-serif;padding:30px;}</style></head>
+    <body onload="window.print()">
+      <h1 style="color:#1e3a5f;border-bottom:2px solid #f97316;padding-bottom:10px;">Resumo Acadêmico: ${assessment.title}</h1>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:30px;background:#f8fafc;padding:20px;border-radius:10px;">
+          <div>
+            <strong>Disciplina:</strong> ${assessment.disciplineId}<br/>
+            <strong>Total de Inscritos:</strong> ${submissions.length}
+          </div>
+          <div>
+            <strong>Média da Turma:</strong> ${avg.toFixed(1)} / ${assessment.totalPoints} (${((avg/assessment.totalPoints)*100).toFixed(0)}%)
+          </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+            <tr style="background:#1e3a5f;color:white;">
+                <th style="padding:8px;text-align:left;">#</th>
+                <th style="padding:8px;text-align:left;">ALUNO</th>
+                <th style="padding:8px;text-align:left;">NOTA</th>
+                <th style="padding:8px;text-align:left;">%</th>
+            </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </body></html>`
+    const win = window.open("", "_blank"); if (win) { win.document.write(html); win.document.close() }
+}

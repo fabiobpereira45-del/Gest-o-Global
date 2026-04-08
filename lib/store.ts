@@ -41,6 +41,32 @@ export interface StudentGrade {
   createdAt: string;
 }
 
+export interface FinancialTransaction {
+  id: string;
+  category: string;
+  type: "income" | "expense";
+  description: string;
+  amount: number;
+  date: string;
+  status: "planned" | "realized";
+  competencia: string;
+  disciplineId?: string;
+  studentId?: string;
+  createdAt: string;
+}
+
+export interface StudentTuition {
+  id: string;
+  studentId: string;
+  disciplineId: string;
+  amount: number;
+  dueDate: string | null;
+  status: "pending" | "paid" | "overdue";
+  paidAt?: string;
+  transactionId?: string;
+  createdAt: string;
+}
+
 export function hashPassword(plain: string): string {
   if (typeof window !== "undefined") return btoa(unescape(encodeURIComponent(plain)))
   return Buffer.from(plain).toString("base64")
@@ -240,6 +266,29 @@ export function clearStudentSession(): void {
   }
 }
 
+export async function getActiveAssessment(): Promise<Assessment | null> {
+  const supabase = createClient()
+  const now = new Date().toISOString()
+  const { data } = await supabase.from('assessments')
+    .select('*')
+    .eq('is_published', true)
+    .lte('open_at', now)
+    .gte('close_at', now)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return data ? mapAssessment(data) : null
+}
+
+export async function hasStudentSubmitted(email: string, assessmentId: string): Promise<boolean> {
+  const supabase = createClient()
+  const { count } = await supabase.from('student_submissions')
+    .select('*', { count: 'exact', head: true })
+    .eq('student_email', email)
+    .eq('assessment_id', assessmentId)
+  return (count || 0) > 0
+}
+
 export function getDraftAnswers(): StudentAnswer[] { return readLocal<StudentAnswer[]>(KEYS.DRAFT_ANSWERS, []) }
 export function saveDraftAnswers(answers: StudentAnswer[]): void { writeLocal(KEYS.DRAFT_ANSWERS, answers) }
 
@@ -305,6 +354,12 @@ function mapClassSchedule(row: any): ClassSchedule { return { id: row.id, classI
 function mapStudentGrade(row: any): StudentGrade { return { id: row.id, studentIdentifier: row.student_identifier, studentName: row.student_name, disciplineId: row.discipline_id || undefined, isPublic: row.is_public, examGrade: Number(row.exam_grade), worksGrade: Number(row.works_grade), seminarGrade: Number(row.seminar_grade), participationBonus: Number(row.participation_bonus), attendanceScore: Number(row.attendance_score), customDivisor: Number(row.custom_divisor), isReleased: !!row.is_released, createdAt: row.created_at } }
 function mapBoardMember(row: any): BoardMember { return { id: row.id, name: row.name, role: row.role, category: row.category, avatar_url: row.avatar_url, createdAt: row.created_at } }
 function mapProfessorDiscipline(row: any): ProfessorDiscipline { return { id: row.id, professorId: row.professor_id, disciplineId: row.discipline_id, createdAt: row.created_at } }
+function mapFinancialTransaction(row: any): FinancialTransaction {
+  return { id: row.id, category: row.category, type: row.type, description: row.description, amount: Number(row.amount), date: row.date, status: row.status, competencia: row.competencia, disciplineId: row.discipline_id, studentId: row.student_id, createdAt: row.created_at }
+}
+function mapStudentTuition(row: any): StudentTuition {
+  return { id: row.id, studentId: row.student_id, disciplineId: row.discipline_id, amount: Number(row.amount), dueDate: row.due_date, status: row.status, paidAt: row.paid_at, transactionId: row.transaction_id, createdAt: row.created_at }
+}
 
 // ——— Core Functions ————————————————————————————————————————————————————————————
 
@@ -328,8 +383,8 @@ export async function getClasses(): Promise<ClassRoom[]> {
   const { data: classes } = await supabase.from('classes').select('*').order('created_at', { ascending: false })
   const { data: counts } = await supabase.from('students').select('class_id')
   const studentCounts: Record<string, number> = {}
-  counts?.forEach(s => { if (s.class_id) studentCounts[s.class_id] = (studentCounts[s.class_id] || 0) + 1 })
-  return (classes || []).map(c => ({ ...mapClassRoom(c), studentCount: studentCounts[c.id] || 0 }))
+  counts?.forEach((s: { class_id: string | null }) => { if (s.class_id) studentCounts[s.class_id || ''] = (studentCounts[s.class_id || ''] || 0) + 1 })
+  return (classes || []).map((c: any) => ({ ...mapClassRoom(c), studentCount: studentCounts[c.id] || 0 }))
 }
 
 export async function addClass(cls: Omit<ClassRoom, 'id' | 'createdAt' | 'studentCount'>): Promise<ClassRoom> {
@@ -386,16 +441,16 @@ export async function deleteSemester(id: string): Promise<void> {
 export async function getDisciplines(): Promise<Discipline[]> {
   const supabase = createClient()
   const { data } = await supabase.from('disciplines').select('*').order('order', { ascending: true })
-  return (data || []).map(mapDiscipline).sort((a, b) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name))
+  return (data || []).map(mapDiscipline).sort((a: Discipline, b: Discipline) => a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name))
 }
 
 export async function getDisciplinesByProfessor(professorId: string): Promise<Discipline[]> {
   const supabase = createClient()
   const { data: links } = await supabase.from('professor_disciplines').select('discipline_id').eq('professor_id', professorId)
   if (!links || links.length === 0) return []
-  const ids = links.map(l => l.discipline_id)
+  const ids = links.map((l: { discipline_id: string }) => l.discipline_id)
   const { data } = await supabase.from('disciplines').select('*').in('id', ids)
-  return (data || []).map(mapDiscipline).sort((a, b) => a.name.localeCompare(b.name))
+  return (data || []).map(mapDiscipline).sort((a: Discipline, b: Discipline) => a.name.localeCompare(b.name))
 }
 
 export async function linkProfessorToDiscipline(professorId: string, disciplineId: string): Promise<void> {
@@ -439,7 +494,7 @@ export async function deleteDiscipline(id: string): Promise<void> {
   const supabase = createClient()
   const { data: assessments } = await supabase.from('assessments').select('id').eq('discipline_id', id)
   if (assessments && assessments.length > 0) {
-    const assessmentIds = assessments.map(a => a.id)
+    const assessmentIds = assessments.map((a: { id: string }) => a.id)
     await supabase.from('student_submissions').delete().in('assessment_id', assessmentIds)
   }
   await supabase.from('questions').delete().eq('discipline_id', id)
@@ -481,15 +536,44 @@ export async function getQuestions(): Promise<Question[]> {
   return (data || []).map(mapQuestion)
 }
 
+export async function getQuestionsByDiscipline(disciplineId: string): Promise<Question[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('questions').select('*').eq('discipline_id', disciplineId)
+  return (data || []).map(mapQuestion)
+}
+
+export async function getDisciplineQuestionCounts(): Promise<Record<string, number>> {
+  const supabase = createClient()
+  const { data } = await supabase.from('questions').select('discipline_id')
+  const counts: Record<string, number> = {}
+  data?.forEach((q: { discipline_id: string | null }) => { if (q.discipline_id) counts[q.discipline_id] = (counts[q.discipline_id] || 0) + 1 })
+  return counts
+}
+
 export const getPublicClasses = getClasses
 
 export async function addQuestion(data: Omit<Question, "id" | "createdAt">): Promise<Question> {
-  const q: any = { id: uid(), discipline_id: data.disciplineId, type: data.type, text: data.text, choices: data.choices, correct_answer: data.correctAnswer, points: data.points, created_at: new Date().toISOString() }
-  if (data.pairs && data.pairs.length > 0) q.choices = { options: data.choices || [], matchingPairs: data.pairs }
   const supabase = createClient()
+  const q: any = { discipline_id: data.disciplineId, type: data.type, text: data.text, choices: data.choices, correct_answer: data.correctAnswer, points: data.points, created_at: new Date().toISOString() }
+  if (data.pairs && data.pairs.length > 0) q.choices = { options: data.choices || [], matchingPairs: data.pairs }
   const { error } = await supabase.from('questions').insert(q)
   if (error) throw new Error(`Erro ao salvar questão: ${error.message}`)
   return mapQuestion(q)
+}
+
+export async function updateQuestion(id: string, data: Partial<Omit<Question, "id" | "createdAt">>): Promise<void> {
+  const supabase = createClient()
+  const val: any = {}
+  if (data.disciplineId !== undefined) val.discipline_id = data.disciplineId
+  if (data.type !== undefined) val.type = data.type
+  if (data.text !== undefined) val.text = data.text
+  if (data.points !== undefined) val.points = data.points
+  if (data.correctAnswer !== undefined) val.correct_answer = data.correctAnswer
+  if (data.choices !== undefined || data.pairs !== undefined) {
+    if (data.pairs && data.pairs.length > 0) val.choices = { options: data.choices || [], matchingPairs: data.pairs }
+    else val.choices = data.choices
+  }
+  await supabase.from('questions').update(val).eq('id', id)
 }
 
 export async function deleteQuestion(id: string): Promise<void> {
@@ -518,6 +602,29 @@ export async function addAssessment(data: Omit<Assessment, "id" | "createdAt" | 
   return a
 }
 
+export async function updateAssessment(id: string, data: Partial<Omit<Assessment, "id" | "createdAt">>): Promise<void> {
+  const supabase = createClient()
+  const dbData: any = {}
+  if (data.title !== undefined) dbData.title = data.title
+  if (data.disciplineId !== undefined) dbData.discipline_id = data.disciplineId
+  if (data.professor !== undefined) dbData.professor = data.professor
+  if (data.institution !== undefined) dbData.institution = data.institution
+  if (data.questionIds !== undefined) dbData.question_ids = data.questionIds
+  if (data.pointsPerQuestion !== undefined) dbData.points_per_question = data.pointsPerQuestion
+  if (data.totalPoints !== undefined) dbData.total_points = data.totalPoints
+  if (data.openAt !== undefined) dbData.open_at = data.openAt
+  if (data.closeAt !== undefined) dbData.close_at = data.closeAt
+  if (data.isPublished !== undefined) dbData.is_published = data.isPublished
+  if (data.shuffleVariants !== undefined) dbData.shuffle_variants = data.shuffleVariants
+  if (data.timeLimitMinutes !== undefined) dbData.time_limit_minutes = data.timeLimitMinutes
+  if (data.logoBase64 !== undefined) dbData.logo_base64 = data.logoBase64
+  if (data.rules !== undefined) dbData.rules = data.rules
+  if (data.releaseResults !== undefined) dbData.release_results = data.releaseResults
+  if (data.modality !== undefined) dbData.modality = data.modality
+  if (data.archived !== undefined) dbData.archived = data.archived
+  await supabase.from('assessments').update(dbData).eq('id', id)
+}
+
 export async function deleteAssessment(id: string): Promise<void> {
   const supabase = createClient()
   await supabase.from('assessments').delete().eq('id', id)
@@ -537,10 +644,58 @@ export async function saveSubmission(sub: StudentSubmission): Promise<StudentSub
   return mapSubmission(data)
 }
 
+export async function getSubmissionByEmailAndAssessment(email: string, assessmentId: string): Promise<StudentSubmission | null> {
+  const supabase = createClient()
+  const { data } = await supabase.from('student_submissions').select('*').eq('student_email', email.trim().toLowerCase()).eq('assessment_id', assessmentId).maybeSingle()
+  return data ? mapSubmission(data) : null
+}
+
+export async function getSubmissionsByAssessment(assessmentId: string): Promise<StudentSubmission[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('student_submissions').select('*').eq('assessment_id', assessmentId)
+  return (data || []).map(mapSubmission)
+}
+
+export async function deleteSubmission(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('student_submissions').delete().eq('id', id)
+}
+
+export async function updateSubmissionScore(id: string, score: number, percentage: number): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('student_submissions').update({ score, percentage }).eq('id', id)
+}
+
+export function calculateScore(answers: StudentAnswer[], questions: Question[], pointsPerQuestion: number = 1): { score: number; totalPoints: number; percentage: number } {
+  const gradable = questions.filter((q) => q.type !== "discursive")
+  let totalPoints = 0
+  let score = 0
+  for (const q of gradable) {
+    const pts = (q.points !== undefined && q.points > 0) ? q.points : pointsPerQuestion
+    totalPoints += pts
+    const ans = answers.find((a) => a.questionId === q.id)
+    if (ans && ans.answer === q.correctAnswer) score += pts
+  }
+  const percentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0
+  return { score, totalPoints, percentage }
+}
+
 export async function getProfessorAccounts(): Promise<ProfessorAccount[]> {
   const supabase = createClient()
   const { data } = await supabase.from('professor_accounts').select('*')
   return (data || []).map(mapProfessor)
+}
+
+export async function getProfessorDisciplines(professorId: string): Promise<ProfessorDiscipline[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('professor_disciplines').select('*').eq('professor_id', professorId)
+  return (data || []).map(mapProfessorDiscipline)
+}
+
+export async function getAllProfessorDisciplines(): Promise<ProfessorDiscipline[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('professor_disciplines').select('*')
+  return (data || []).map(mapProfessorDiscipline)
 }
 
 export async function addProfessorAccount(data: Omit<ProfessorAccount, "id" | "createdAt" | "passwordHash"> & { password: string; id?: string }): Promise<ProfessorAccount> {
@@ -556,6 +711,36 @@ export async function getProfessorByEmail(email: string): Promise<ProfessorAccou
   const { data } = await supabase.from('professor_accounts').select('*').eq('email', email.toLowerCase().trim()).maybeSingle()
   if (!data && email === MASTER_CREDENTIALS.email) return { id: 'master', name: 'Administrador Master', email: MASTER_CREDENTIALS.email, role: 'master', active: true, avatar_url: null, passwordHash: '', createdAt: new Date().toISOString() }
   return data ? mapProfessor(data) : null
+}
+
+export async function ensureProfessorSync(email: string, authId: string): Promise<void> {
+  const supabase = createClient()
+  const { data: existing } = await supabase.from('professor_accounts').select('id').eq('email', email.toLowerCase().trim()).maybeSingle()
+  if (!existing) {
+    const name = email.split('@')[0].toUpperCase()
+    await supabase.from('professor_accounts').insert({
+      id: authId,
+      email: email.toLowerCase().trim(),
+      name,
+      role: 'professor',
+      active: true,
+      created_at: new Date().toISOString()
+    })
+  }
+}
+
+export async function updateProfessorAccount(id: string, data: Partial<Omit<ProfessorAccount, 'id' | 'createdAt'>> & { password?: string }): Promise<ProfessorAccount | null> {
+  const supabase = createClient()
+  const updateData: any = {}
+  if (data.name !== undefined) updateData.name = data.name.toUpperCase().trim()
+  if (data.email !== undefined) updateData.email = data.email.toLowerCase().trim()
+  if (data.role !== undefined) updateData.role = data.role
+  if (data.bio !== undefined) updateData.bio = data.bio || null
+  if (data.active !== undefined) updateData.active = data.active
+  if (data.password) updateData.password_hash = hashPassword(data.password)
+  
+  const { data: updated } = await supabase.from('professor_accounts').update(updateData).eq('id', id).select().maybeSingle()
+  return updated ? mapProfessor(updated) : null
 }
 
 export async function deleteProfessorAccount(id: string): Promise<void> {
@@ -602,6 +787,13 @@ export async function sendChatMessage(studentId: string, disciplineId: string, m
   return mapChatMessage(data)
 }
 
+export async function markChatAsRead(studentId: string, disciplineId: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('chats')
+    .update({ read: true })
+    .match({ student_id: studentId, discipline_id: disciplineId, is_from_student: true, read: false })
+}
+
 export async function getAttendances(disciplineId: string): Promise<Attendance[]> {
   const supabase = createClient()
   const { data } = await supabase.from('attendances').select('*').eq('discipline_id', disciplineId).order('date', { ascending: false })
@@ -615,10 +807,45 @@ export async function saveAttendance(studentId: string, disciplineId: string, da
   else await supabase.from('attendances').insert({ student_id: studentId, discipline_id: disciplineId, date, is_present: isPresent, type, created_at: new Date().toISOString() })
 }
 
+export async function saveBatchAttendances(disciplineId: string, date: string, attendancesData: Array<{studentId: string, isPresent: boolean, type: "presencial"|"ead"}>): Promise<void> {
+  for (const a of attendancesData) {
+    await saveAttendance(a.studentId, disciplineId, date, a.isPresent, a.type)
+  }
+}
+
 export async function getClassSchedules(): Promise<ClassSchedule[]> {
   const supabase = createClient()
   const { data } = await supabase.from('class_schedules').select('*')
   return (data || []).map(mapClassSchedule)
+}
+
+export async function addClassSchedule(data: Pick<ClassSchedule, 'classId' | 'disciplineId' | 'professorName' | 'dayOfWeek' | 'timeStart' | 'timeEnd' | 'lessonsCount' | 'workload' | 'startDate' | 'endDate'>): Promise<ClassSchedule> {
+  const supabase = createClient()
+  const dbData = { class_id: data.classId, discipline_id: data.disciplineId, professor_name: data.professorName, day_of_week: data.dayOfWeek, time_start: data.timeStart, time_end: data.timeEnd, lessons_count: data.lessonsCount, workload: data.workload, start_date: data.startDate || null, end_date: data.endDate || null, created_at: new Date().toISOString() }
+  const { data: result, error } = await supabase.from('class_schedules').insert(dbData).select().single()
+  if (error) throw new Error(error.message)
+  return mapClassSchedule(result)
+}
+
+export async function updateClassSchedule(id: string, data: Partial<Pick<ClassSchedule, 'classId' | 'disciplineId' | 'professorName' | 'dayOfWeek' | 'timeStart' | 'timeEnd' | 'lessonsCount' | 'workload' | 'startDate' | 'endDate'>>): Promise<void> {
+  const supabase = createClient()
+  const dbData: any = {}
+  if (data.classId !== undefined) dbData.class_id = data.classId
+  if (data.disciplineId !== undefined) dbData.discipline_id = data.disciplineId
+  if (data.professorName !== undefined) dbData.professor_name = data.professorName
+  if (data.dayOfWeek !== undefined) dbData.day_of_week = data.dayOfWeek
+  if (data.timeStart !== undefined) dbData.time_start = data.timeStart
+  if (data.timeEnd !== undefined) dbData.time_end = data.timeEnd
+  if (data.lessonsCount !== undefined) dbData.lessons_count = data.lessonsCount
+  if (data.workload !== undefined) dbData.workload = data.workload
+  if (data.startDate !== undefined) dbData.start_date = data.startDate || null
+  if (data.endDate !== undefined) dbData.end_date = data.endDate || null
+  await supabase.from('class_schedules').update(dbData).eq('id', id)
+}
+
+export async function deleteClassSchedule(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('class_schedules').delete().eq('id', id)
 }
 
 export async function getClassmates(classId: string): Promise<StudentProfile[]> {
@@ -644,6 +871,16 @@ export async function saveStudentGrade(grade: Omit<StudentGrade, 'id' | 'created
 export async function deleteStudentGrade(id: string): Promise<void> {
   const supabase = createClient()
   await supabase.from('student_grades').delete().eq('id', id)
+}
+
+export async function releaseAllGrades(isReleased: boolean = true): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('student_grades')
+    .update({ is_released: isReleased })
+    .neq('is_released', isReleased)
+
+  if (error) throw new Error(error.message)
 }
 
 export async function uploadAvatar(file: File, userId: string, folder: 'students' | 'professors' | 'board'): Promise<string> {
@@ -701,4 +938,108 @@ export async function insertIBADDisciplines(): Promise<void> {
   })
   if (toInsert.length > 0) await supabase.from('disciplines').insert(toInsert)
   for (const up of updates) await supabase.from('disciplines').update({ name: up.name, order: up.order }).eq('id', up.id)
+}
+
+// ——— Financial 2.0 Functions ————————————————————————————————————————————————————
+
+export async function getFinancialTransactions(filters?: { competencia?: string; type?: "income" | "expense"; status?: "planned" | "realized" }): Promise<FinancialTransaction[]> {
+  const supabase = createClient()
+  let query = supabase.from('financial_transactions').select('*').order('date', { ascending: false })
+  if (filters?.competencia) query = query.eq('competencia', filters.competencia)
+  if (filters?.type) query = query.eq('type', filters.type)
+  if (filters?.status) query = query.eq('status', filters.status)
+  const { data } = await query
+  return (data || []).map(mapFinancialTransaction)
+}
+
+export async function addFinancialTransaction(data: Omit<FinancialTransaction, "id" | "createdAt">): Promise<FinancialTransaction> {
+  const supabase = createClient()
+  const dbData = { category: data.category, type: data.type, description: data.description, amount: data.amount, date: data.date, status: data.status, competencia: data.competencia, discipline_id: data.disciplineId || null, student_id: data.studentId || null, created_at: new Date().toISOString() }
+  const { data: res, error } = await supabase.from('financial_transactions').insert(dbData).select().single()
+  if (error) throw error
+  return mapFinancialTransaction(res)
+}
+
+export async function updateFinancialTransaction(id: string, data: Partial<FinancialTransaction>): Promise<void> {
+  const supabase = createClient()
+  const dbData: any = {}
+  if (data.category) dbData.category = data.category
+  if (data.status) dbData.status = data.status
+  if (data.amount !== undefined) dbData.amount = data.amount
+  if (data.date) dbData.date = data.date
+  if (data.description) dbData.description = data.description
+  await supabase.from('financial_transactions').update(dbData).eq('id', id)
+}
+
+export async function deleteFinancialTransaction(id: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('financial_transactions').delete().eq('id', id)
+}
+
+export async function getStudentTuitions(studentId?: string): Promise<StudentTuition[]> {
+  const supabase = createClient()
+  let query = supabase.from('student_tuition').select('*').order('created_at', { ascending: true })
+  if (studentId) query = query.eq('student_id', studentId)
+  const { data } = await query
+  return (data || []).map(mapStudentTuition)
+}
+
+export async function syncStudentTuition(studentId: string): Promise<void> {
+  const supabase = createClient()
+  const disciplines = await getDisciplines()
+  const sorted = disciplines.sort((a, b) => a.order - b.order)
+  
+  // Get existing to avoid duplicates
+  const { data: existing } = await supabase.from('student_tuition').select('discipline_id').eq('student_id', studentId)
+  const existingIds = (existing || []).map((e: { discipline_id: string }) => e.discipline_id)
+
+  const toInsert = sorted
+    .filter(d => !existingIds.includes(d.id))
+    .map(d => ({
+      student_id: studentId,
+      discipline_id: d.id,
+      amount: 300.00,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    }))
+
+  if (toInsert.length > 0) {
+    await supabase.from('student_tuition').insert(toInsert)
+  }
+}
+
+export async function updateTuition(id: string, data: Partial<StudentTuition>): Promise<void> {
+  const supabase = createClient()
+  const dbData: any = {}
+  if (data.dueDate !== undefined) dbData.due_date = data.dueDate
+  if (data.status) dbData.status = data.status
+  if (data.amount !== undefined) dbData.amount = data.amount
+  if (data.paidAt !== undefined) dbData.paid_at = data.paidAt
+  await supabase.from('student_tuition').update(dbData).eq('id', id)
+}
+
+export async function processTuitionPayment(tuitionId: string, paymentDate: string): Promise<void> {
+  const supabase = createClient()
+  const { data: tuition } = await supabase.from('student_tuition').select('*').eq('id', tuitionId).single()
+  if (!tuition) return
+
+  // 1. Create realized income transaction
+  const transaction = await addFinancialTransaction({
+    category: 'Mensalidade',
+    type: 'income',
+    description: `Mensalidade paga - ID: ${tuitionId}`,
+    amount: Number(tuition.amount),
+    date: paymentDate,
+    status: 'realized',
+    competencia: paymentDate.substring(0, 7),
+    studentId: tuition.student_id,
+    disciplineId: tuition.discipline_id
+  })
+
+  // 2. Update tuition record
+  await supabase.from('student_tuition').update({
+    status: 'paid',
+    paid_at: new Date().toISOString(),
+    transaction_id: transaction.id
+  }).eq('id', tuitionId)
 }

@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, ChevronRight, ChevronLeft, User, Phone, MapPin, Church, BookOpen, CreditCard, QrCode, Loader2, CheckCircle2, AlertCircle, Copy, MessageCircle, Clock } from "lucide-react"
-import { getClasses, getFinancialSettings, getClassSchedules, type ClassRoom, type FinancialSettings, type ClassSchedule } from "@/lib/store"
+import { X, ChevronRight, ChevronLeft, User, Phone, MapPin, Church, BookOpen, Loader2, CheckCircle2, AlertCircle, Copy, MessageCircle } from "lucide-react"
+import { getClasses, getClassSchedules, type ClassRoom, type ClassSchedule } from "@/lib/store"
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -13,8 +13,7 @@ interface EnrollmentFormProps {
     onSuccess?: () => void
 }
 
-type Step = "personal" | "class" | "payment"
-type PayMethod = "pix" | "card" | null
+type Step = "personal" | "class"
 
 interface FormData {
     name: string
@@ -40,31 +39,25 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
     const [form, setForm] = useState<FormData>(EMPTY_FORM)
     const [classes, setClasses] = useState<ClassRoom[]>([])
     const [schedules, setSchedules] = useState<ClassSchedule[]>([])
-    const [settings, setSettings] = useState<FinancialSettings | null>(null)
 
-    const [payMethod, setPayMethod] = useState<PayMethod>(null)
     const [loading, setLoading] = useState(true)
 
-    // Pix state
-    const [pixCopied, setPixCopied] = useState(false)
+    // Enrollment state
     const [enrollmentDetails, setEnrollmentDetails] = useState<{ enrollmentNumber: string, name: string } | null>(null)
-    const [enrolledChargeId, setEnrolledChargeId] = useState<string | null>(null)
 
     // Success
     const [success, setSuccess] = useState(false)
     const [enrollError, setEnrollError] = useState("")
     const [creating, setCreating] = useState(false)
     const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
-    const [isPaidLater, setIsPaidLater] = useState(false)
 
     useEffect(() => {
         async function load() {
-            const [cls, fin, scheds] = await Promise.all([
-                getClasses(), getFinancialSettings(), getClassSchedules()
+            const [cls, scheds] = await Promise.all([
+                getClasses(), getClassSchedules()
             ])
             setClasses(cls)
             setSchedules(scheds)
-            setSettings(fin)
             setLoading(false)
         }
         load()
@@ -73,55 +66,24 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
     const isPersonalValid = form.name.trim() && form.cpf.length >= 14 && form.phone.length >= 14 && form.address.trim() && form.church.trim() && form.pastor.trim()
     const isClassValid = !!form.classId
 
-    async function handleCreateEnrollment() {
+    async function handleConfirmEnrollment() {
         if (creating) return
         setCreating(true)
         try {
             const res = await fetch("/api/enrollment/create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...form, amount: settings?.enrollmentFee || 0 })
+                body: JSON.stringify({ ...form })
             })
             const body = await res.json()
             if (!res.ok) throw new Error(body.error || "Erro ao criar matrícula")
             setEnrollmentDetails({ enrollmentNumber: body.enrollmentNumber, name: form.name })
-            setEnrolledChargeId(body.chargeId)
-            return body
+            setSuccess(true)
         } catch (e: any) {
             setEnrollError(e.message)
-            throw e
+            alert("Erro ao realizar matrícula: " + e.message)
         } finally {
             setCreating(false)
-        }
-    }
-
-    const institutionPixKey = "SEU_PIX_AQUI" // This should ideally come from a global setting
-
-    function handleWhatsAppConfirm() {
-        const message = `Olá! Acabei de realizar minha matrícula no IBAD.\n\n*Dados:* \nNome: ${form.name}\nCPF: ${form.cpf}\nMatrícula: ${enrollmentDetails?.enrollmentNumber}\n\n*Estou enviando o comprovante de pagamento em anexo.*`
-        const encoded = encodeURIComponent(message)
-        window.open(`https://wa.me/5571987483103?text=${encoded}`, "_blank") // Updated to final contact
-    }
-
-    async function handleCardPay() {
-        if (!enrolledChargeId) {
-            await handleCreateEnrollment()
-        }
-        if (settings?.creditCardUrl) {
-            window.open(settings.creditCardUrl, "_blank")
-        } else {
-            alert("Link de pagamento não configurado. Entre em contato com a secretaria.")
-        }
-    }
-
-    async function handlePayLater() {
-        if (creating) return
-        try {
-            await handleCreateEnrollment()
-            setIsPaidLater(true)
-            setSuccess(true)
-        } catch (e) {
-            // Error already handled in handleCreateEnrollment
         }
     }
 
@@ -154,16 +116,14 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
                         </div>
                     </div>
                     <h2 className="text-3xl font-serif font-bold text-foreground mb-2">
-                        {isPaidLater ? "Pré-Matrícula Realizada!" : "Matrícula Confirmada!"}
+                        Matrícula Realizada!
                     </h2>
                     <p className="text-muted-foreground mb-8">
-                        {isPaidLater 
-                            ? "Sua pré-matrícula foi registrada. Lembre-se: ela só será efetivada após a comprovação do pagamento em até 5 dias." 
-                            : "Sua matrícula foi concluída com sucesso. Assim que o pagamento for confirmado, você receberá seus dados de acesso."}
+                        Sua matrícula foi registrada com sucesso. Seja bem-vindo ao Instituto Bíblico!
                     </p>
 
                     <div className="w-full bg-muted/40 border border-border rounded-2xl p-6 text-left mb-8 shadow-sm">
-                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">Número de Pré-Matrícula</p>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">Número de Matrícula</p>
 
                         <div className="space-y-4">
                             <div>
@@ -192,12 +152,12 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
                             className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white font-bold py-3.5 rounded-xl hover:bg-[#20bd5a] transition-colors shadow-md mb-3"
                         >
                             <MessageCircle className="h-5 w-5" />
-                            Entrar no grupo de WhatsApp {selectedClass?.name}
+                            Entrar no grupo de WhatsApp
                         </a>
                     )}
 
-                    <button onClick={() => { onSuccess?.(); onClose() }} className="w-full bg-accent text-accent-foreground font-bold py-3.5 rounded-xl hover:bg-accent/90 transition-colors shadow-md">
-                        Fechar
+                    <button onClick={() => { onSuccess?.(); onClose() }} className="w-full bg-accent text-accent-foreground font-bold py-3.5 rounded-xl hover:bg-accent/90 transition-colors shadow-md mt-2">
+                        Concluir e Ir para o Portal
                     </button>
                 </div>
             </div>
@@ -220,11 +180,11 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
 
                 {/* Step Indicator */}
                 <div className="flex px-6 py-3 gap-2 border-b border-border shrink-0">
-                    {(["personal", "class", "payment"] as Step[]).map((s, i) => (
+                    {((["personal", "class"] as Step[])).map((s, i) => (
                         <div key={s} className="flex items-center gap-2">
-                            <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold ${step === s ? "bg-accent text-accent-foreground" : i < ["personal", "class", "payment"].indexOf(step) ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"}`}>{i + 1}</div>
-                            <span className={`text-xs hidden sm:block ${step === s ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{["Dados Pessoais", "Turma", "Pagamento"][i]}</span>
-                            {i < 2 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                            <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold ${step === s ? "bg-accent text-accent-foreground" : i < ["personal", "class"].indexOf(step) ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"}`}>{i + 1}</div>
+                            <span className={`text-xs hidden sm:block ${step === s ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{["Dados Pessoais", "Escolha da Turma"][i]}</span>
+                            {i < 1 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
                         </div>
                     ))}
                 </div>
@@ -263,7 +223,7 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
                                 </div>
                             ))}
                         </div>
-                    ) : step === "class" ? (
+                    ) : (
                         <div className="space-y-4">
                             <h3 className="font-semibold text-foreground flex items-center gap-2"><BookOpen className="h-4 w-4 text-accent" /> Escolha sua Turma</h3>
                             {classes.length === 0 ? (
@@ -283,27 +243,19 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
                                                     <p className="font-semibold text-sm">{c.name}</p>
                                                     <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
                                                         <p>
-                                                            {{ morning: "Manhã", afternoon: "Tarde", evening: "Noite", ead: "EAD/Online" }[c.shift]}
+                                                            {(({ morning: "Manhã", afternoon: "Tarde", evening: "Noite", ead: "EAD/Online", hibrido: "Híbrido" } as any)[c.shift]) || c.shift}
                                                         </p>
                                                         {schedules.filter(s => s.classId === c.id).length > 0 ? (
                                                             <div className="flex flex-col gap-0.5">
                                                                 {schedules.filter(s => s.classId === c.id).map(s => (
                                                                     <p key={s.id} className="text-[10px] font-medium text-primary/80 uppercase tracking-tight">
-                                                                        {{
-                                                                            segunda: "Segunda", terca: "Terça", quarta: "Quarta",
-                                                                            quinta: "Quinta", sexta: "Sexta", sabado: "Sábado"
-                                                                        }[s.dayOfWeek] || s.dayOfWeek} • {s.timeStart.substring(0, 5)} - {s.timeEnd.substring(0, 5)}
+                                                                        {s.dayOfWeek} • {s.timeStart.substring(0, 5)} - {s.timeEnd.substring(0, 5)}
                                                                     </p>
                                                                 ))}
                                                             </div>
                                                         ) : (
                                                             c.dayOfWeek && (
-                                                                <p className="text-[10px] uppercase">
-                                                                    {{
-                                                                        monday: "Segunda", tuesday: "Terça", wednesday: "Quarta",
-                                                                        thursday: "Quinta", friday: "Sexta", saturday: "Sábado"
-                                                                    }[c.dayOfWeek] || c.dayOfWeek}
-                                                                </p>
+                                                                <p className="text-[10px] uppercase">{c.dayOfWeek}</p>
                                                             )
                                                         )}
                                                     </div>
@@ -321,205 +273,6 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
                                 </div>
                             )}
                         </div>
-                    ) : (
-                        <div className="space-y-4">
-                            <h3 className="font-semibold text-foreground flex items-center gap-2"><CreditCard className="h-4 w-4 text-accent" /> Pagamento da Matrícula</h3>
-                            <div className="bg-muted/40 rounded-xl p-4 flex items-center justify-between">
-                                <span className="text-sm text-muted-foreground">Taxa de Matrícula</span>
-                                <span className="text-xl font-bold text-foreground">
-                                    R$ {(settings?.enrollmentFee || 0).toFixed(2)}
-                                </span>
-                            </div>
-
-                            {enrollError && (
-                                <div className="space-y-3">
-                                    <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
-                                        <AlertCircle className="h-4 w-4 shrink-0" />{enrollError}
-                                    </div>
-                                    <button
-                                        onClick={() => { setEnrollError(""); setPayMethod(null); }}
-                                        className="w-full flex items-center justify-center gap-2 bg-muted hover:bg-muted/80 text-foreground font-medium py-2.5 rounded-xl transition-colors text-sm"
-                                    >
-                                        <ChevronLeft className="h-4 w-4" /> Voltar e tentar novamente
-                                    </button>
-                                </div>
-                            )}
-
-                            {!payMethod && (
-                                <div className="space-y-3">
-                                    <p className="text-sm text-muted-foreground mr-1">Escolha a forma de pagamento:</p>
-
-                                    {/* Manual PIX */}
-                                    <button
-                                        onClick={() => setPayMethod("pix")}
-                                        className="w-full flex items-center gap-3 border-2 border-green-600 bg-green-50 rounded-xl p-4 hover:bg-green-100 transition-all group"
-                                    >
-                                        <div className="h-10 w-10 bg-green-600 rounded-full flex items-center justify-center text-white group-hover:scale-110 transition-transform">
-                                            <QrCode className="h-6 w-6" />
-                                        </div>
-                                        <div className="text-left flex-1">
-                                            <p className="font-bold text-green-700">Pagar com Pix</p>
-                                            <p className="text-xs text-green-600 font-medium">Chave para transferência manual</p>
-                                        </div>
-                                        <ChevronRight className="h-5 w-5 text-green-400" />
-                                    </button>
-
-                                    {/* Manual Credit Card Link */}
-                                    {settings?.creditCardUrl && (
-                                        <button
-                                            onClick={() => setPayMethod("card")}
-                                            className="w-full flex items-center gap-3 border-2 border-blue-600 bg-blue-50 rounded-xl p-4 hover:bg-blue-100 transition-all group"
-                                        >
-                                            <div className="h-10 w-10 bg-blue-600 rounded-full flex items-center justify-center text-white group-hover:scale-110 transition-transform">
-                                                <CreditCard className="h-6 w-6" />
-                                            </div>
-                                            <div className="text-left flex-1">
-                                                <p className="font-bold text-blue-700">Pagar com Cartão (Link Externo)</p>
-                                                <p className="text-xs text-blue-600 font-medium">Pagamento via Mercado Pago / PicPay</p>
-                                            </div>
-                                            <ChevronRight className="h-5 w-5 text-blue-400" />
-                                        </button>
-                                    )}
-
-                                    {/* Pay Later Option */}
-                                    <button
-                                        onClick={handlePayLater}
-                                        disabled={creating}
-                                        className="w-full flex items-center gap-3 border-2 border-amber-500 bg-amber-50 rounded-xl p-4 hover:bg-amber-100 transition-all group"
-                                    >
-                                        <div className="h-10 w-10 bg-amber-500 rounded-full flex items-center justify-center text-white group-hover:scale-110 transition-transform">
-                                            <Clock className="h-6 w-6" />
-                                        </div>
-                                        <div className="text-left flex-1">
-                                            <p className="font-bold text-amber-700">Concluir matrícula e pagar depois</p>
-                                            <p className="text-xs text-amber-600 font-medium">A matrícula só será efetivada após o pagamento (prazo: 5 dias)</p>
-                                        </div>
-                                        {creating ? <Loader2 className="h-5 w-5 animate-spin text-amber-400" /> : <ChevronRight className="h-5 w-5 text-amber-400" />}
-                                    </button>
-                                </div>
-                            )}
-
-
-                            {/* Pix Flow */}
-                            {payMethod === "pix" && (
-                                <div className="space-y-4">
-                                    <div className="border border-green-200 bg-white rounded-xl p-4 space-y-3 shadow-sm">
-                                        <div className="flex items-center gap-3">
-                                            <QrCode className="h-6 w-6 text-green-600 shrink-0" />
-                                            <div>
-                                                <p className="font-bold text-green-700">Pagamento via Pix</p>
-                                                <p className="text-xs text-muted-foreground italic">Copie a chave abaixo e realize o pagamento</p>
-                                            </div>
-                                        </div>
-                                        <div className="bg-muted/30 rounded-xl p-3 border border-border">
-                                            <p className="text-xs font-semibold text-muted-foreground mb-1">Chave Pix da Instituição:</p>
-                                            <div className="flex gap-2 items-center">
-                                                <p className="text-sm font-mono flex-1 break-all">{settings?.pixKey || "Chave PIX não configurada"}</p>
-                                                <button
-                                                    onClick={async () => {
-                                                        const key = settings?.pixKey || ""
-                                                        if (!key) {
-                                                            alert("Chave PIX não configurada!")
-                                                            return
-                                                        }
-                                                        await navigator.clipboard.writeText(key)
-                                                        setPixCopied(true)
-                                                        setTimeout(() => setPixCopied(false), 2000)
-                                                    }}
-                                                    className="shrink-0 bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1"
-                                                >
-                                                    <Copy className="h-3 w-3" />{pixCopied ? "Copiado!" : "Copiar"}
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col gap-2 pt-2">
-                                            {!enrollmentDetails ? (
-                                                <button
-                                                    onClick={handleCreateEnrollment}
-                                                    disabled={creating}
-                                                    className="w-full bg-accent text-accent-foreground font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
-                                                >
-                                                    {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-                                                    Gerar QR Code e Matrícula
-                                                </button>
-                                            ) : (
-                                                <div className="space-y-2">
-                                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700 text-center font-medium">
-                                                        Sua matrícula foi gerada! Conclua o processo abaixo após realizar o pagamento.
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setSuccess(true)}
-                                                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
-                                                    >
-                                                        <CheckCircle2 className="h-4 w-4" />
-                                                        Concluir Matrícula
-                                                    </button>
-                                                    <button
-                                                        onClick={handleWhatsAppConfirm}
-                                                        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-xs flex items-center justify-center gap-2"
-                                                    >
-                                                        <MessageCircle className="h-4 w-4" />
-                                                        Confirmar Pagamento no WhatsApp
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <button onClick={() => setPayMethod(null)} className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-2">← Voltar às opções</button>
-                                </div>
-                            )}
-
-                            {/* Card Flow */}
-                            {payMethod === "card" && (
-                                <div className="space-y-4">
-                                    <div className="border border-blue-200 bg-white rounded-xl p-4 space-y-3 shadow-sm">
-                                        <div className="flex items-center gap-3">
-                                            <CreditCard className="h-6 w-6 text-blue-600 shrink-0" />
-                                            <div>
-                                                <p className="font-bold text-blue-700">Pagamento via Cartão</p>
-                                                <p className="text-xs text-muted-foreground italic">Clique no botão para abrir o link de pagamento</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-col gap-2 pt-2">
-                                            {!enrollmentDetails ? (
-                                                <button
-                                                    onClick={handleCardPay}
-                                                    disabled={creating}
-                                                    className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
-                                                >
-                                                    {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-                                                    Abrir Link e Gerar Matrícula
-                                                </button>
-                                            ) : (
-                                                <div className="space-y-2">
-                                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700 text-center font-medium">
-                                                        Link aberto! Conclua o processo abaixo após realizar o pagamento.
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setSuccess(true)}
-                                                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
-                                                    >
-                                                        <CheckCircle2 className="h-4 w-4" />
-                                                        Concluir Matrícula
-                                                    </button>
-                                                    <button
-                                                        onClick={handleWhatsAppConfirm}
-                                                        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2.5 rounded-xl shadow-sm transition-all text-xs flex items-center justify-center gap-2"
-                                                    >
-                                                        <MessageCircle className="h-4 w-4" />
-                                                        Confirmar Pagamento no WhatsApp
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <button onClick={() => setPayMethod(null)} className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-2">← Voltar às opções</button>
-                                </div>
-                            )}
-
-
-                        </div>
                     )}
                 </div>
 
@@ -527,17 +280,26 @@ export function EnrollmentForm({ onClose, onSuccess }: EnrollmentFormProps) {
                 {!loading && (
                     <div className="px-6 py-4 border-t border-border flex gap-3 shrink-0">
                         {step !== "personal" && (
-                            <button onClick={() => setStep(step === "class" ? "personal" : "class")} className="flex-1 flex items-center justify-center gap-2 border border-border rounded-xl py-3 text-sm font-medium hover:bg-muted transition-colors">
+                            <button onClick={() => setStep("personal")} className="flex-1 flex items-center justify-center gap-2 border border-border rounded-xl py-3 text-sm font-medium hover:bg-muted transition-colors">
                                 <ChevronLeft className="h-4 w-4" /> Voltar
                             </button>
                         )}
-                        {step !== "payment" && (
-                            <button
-                                onClick={() => setStep(step === "personal" ? "class" : "payment")}
-                                disabled={(step === "personal" && !isPersonalValid) || (step === "class" && !isClassValid)}
+                        {step === "personal" ? (
+                             <button
+                                onClick={() => setStep("class")}
+                                disabled={!isPersonalValid}
                                 className="flex-1 flex items-center justify-center gap-2 bg-accent text-accent-foreground font-bold rounded-xl py-3 text-sm disabled:opacity-50 hover:bg-accent/90 transition-colors"
                             >
-                                {step === "class" ? "Ir para Pagamento" : "Próximo"} <ChevronRight className="h-4 w-4" />
+                                Próximo <ChevronRight className="h-4 w-4" />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleConfirmEnrollment}
+                                disabled={creating || !isClassValid}
+                                className="flex-1 flex items-center justify-center gap-2 bg-accent text-accent-foreground font-bold rounded-xl py-3 text-sm disabled:opacity-50 hover:bg-accent/90 transition-colors"
+                            >
+                                {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                                Finalizar Matrícula
                             </button>
                         )}
                     </div>

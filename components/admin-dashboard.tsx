@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react"
 import {
   Users, FileText, BookOpen, Settings, BarChart3, Download, LogOut,
-  Plus, Pencil, Trash2, Eye, EyeOff, Trophy, CheckCircle2, Link2, FileCheck,
-  ShieldCheck, Loader2, DollarSign, MessageSquare, CalendarCheck, GraduationCap, XCircle, ArrowLeft, Building2, UserCircle, Briefcase, Send, PlaySquare, CalendarDays, KeyRound, Save,
+  Plus, Pencil, Trash2, Eye, EyeOff, Trophy, CheckCircle2, Link2, FileCheck, DollarSign,
+  ShieldCheck, Loader2, MessageSquare, CalendarCheck, GraduationCap, XCircle, ArrowLeft, Building2, UserCircle, Briefcase, Send, PlaySquare, CalendarDays, KeyRound, Save,
   Menu, ChevronRight, Archive, ArchiveRestore
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,14 +19,14 @@ import {
 } from "@/components/ui/dialog"
 import {
   type Assessment, type StudentSubmission, type Question, type Discipline, type StudentGrade, type StudentProfile,
-  getAssessments, updateAssessment, deleteAssessment,
-  getSubmissions, deleteSubmission, updateSubmissionScore,
+  getAssessments, deleteAssessment,
+  getSubmissions,
   getQuestions, getDisciplines, clearProfessorSession, MASTER_CREDENTIALS,
-  getProfessorSession, getStudentGrades, saveStudentGrade, deleteStudentGrade, getStudents, updateProfessorAccount,
-  saveProfessorSession, repairAssessmentsData,
+  getProfessorSession, getStudentGrades, saveStudentGrade, deleteStudentGrade, getStudents,
+  saveProfessorSession,
   type Semester, type StudyMaterial, type ClassRoom, type ClassSchedule,
 } from "@/lib/store"
-import { printStudentPDF, printBlankAssessmentPDF, printCompiledSubmissionsPDF, printOverviewPDF, printAnswerKeyPDF, printSubmissionsTablePDF } from "@/lib/pdf"
+import { printStudentPDF, printAnswerKeyPDF } from "@/lib/pdf"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { QuestionBank } from "@/components/question-bank"
 import { AssessmentBuilder } from "@/components/assessment-builder"
@@ -34,13 +34,13 @@ import { ProfessorManager } from "@/components/professor-manager"
 import { SemesterManager } from "@/components/semester-manager"
 import { StudyMaterialManager } from "@/components/study-material-manager"
 import { ProfessorChatView } from "@/components/professor-chat-view"
-import { FinancialDashboard } from "@/components/financial/FinancialDashboard"
 import { AttendanceManager } from "@/components/attendance-manager"
 import { ClassManager } from "@/components/class-manager"
 import { StudentManager } from "@/components/student-manager"
 import { ClassScheduleManager } from "@/components/class-schedule-manager"
 import { createClient } from "@/lib/supabase/client"
 import { GradesManager } from "@/components/grades-manager"
+import { FinancialManager } from "@/components/financial-manager"
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
@@ -112,7 +112,7 @@ export function AdminDashboard({ onLogout }: Props) {
   }
 
   useEffect(() => {
-    repairAssessmentsData().then(() => refresh())
+    refresh()
     async function fetchUser() {
       const { data, error } = await supabase.auth.getUser()
       if (error) {
@@ -142,8 +142,8 @@ export function AdminDashboard({ onLogout }: Props) {
     {
       title: "Administração",
       items: [
-        { id: "professors", label: "Professores", icon: <ShieldCheck className="h-4 w-4" />, masterOnly: true },
         { id: "financeiro", label: "Financeiro", icon: <DollarSign className="h-4 w-4" />, masterOnly: true },
+        { id: "professors", label: "Professores", icon: <ShieldCheck className="h-4 w-4" />, masterOnly: true },
         { id: "settings", label: "Configurações", icon: <Settings className="h-4 w-4" /> },
       ]
     },
@@ -353,11 +353,7 @@ export function AdminDashboard({ onLogout }: Props) {
             </div>
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-              <ErrorBoundary fallback={<div className="p-10 bg-red-50 text-red-600 rounded-xl border border-red-200">
-                <h2 className="font-bold mb-2 text-lg">Ops! Algo deu errado nesta aba.</h2>
-                <p className="text-sm">Ocorreu um erro ao carregar os dados desta seção. Tente recarregar a página ou mudar de aba.</p>
-                <Button variant="outline" className="mt-4 border-red-300 text-red-700" onClick={() => window.location.reload()}>Recarregar Sistema</Button>
-              </div>}>
+              <ErrorBoundary>
                 {tab === "overview" && <OverviewTab assessments={assessments || []} submissions={submissions || []} questions={questions || []} disciplines={disciplines || []} />}
                 {tab === "students" && <StudentManager isMaster={isMaster} />}
                 {tab === "grades" && <GradesManager isMaster={isMaster} />}
@@ -370,9 +366,9 @@ export function AdminDashboard({ onLogout }: Props) {
                 {tab === "attendance" && <AttendanceManager />}
                 {tab === "classes" && isMaster && <ClassManager />}
                 {tab === "chat" && <ProfessorChatView />}
-                {tab === "financeiro" && isMaster && <FinancialDashboard />}
                 {tab === "professors" && isMaster && <ProfessorManager />}
                 {tab === "institutional" && <InstitutionalManager />}
+                {tab === "financeiro" && isMaster && <FinancialManager />}
                 {tab === "settings" && <SettingsTab assessments={assessments || []} onRefresh={refresh} onLogout={onLogout} />}
               </ErrorBoundary>
             </div>

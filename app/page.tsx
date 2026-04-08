@@ -17,8 +17,6 @@ import {
   getProfessorSession,
   type StudentSession,
   type StudentSubmission,
-  type FinancialSettings,
-  getAvailableSlots,
 } from "@/lib/store"
 import { BookOpen, GraduationCap, ClipboardList, User } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -32,7 +30,6 @@ export default function HomePage() {
   const [mounted, setMounted] = useState(false)
   const [showEnroll, setShowEnroll] = useState(false)
   const [showGrade, setShowGrade] = useState(false)
-  const [availableSlots, setAvailableSlots] = useState<number | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -74,17 +71,7 @@ export default function HomePage() {
       }
     }
 
-    async function fetchSlots() {
-      try {
-        const slots = await getAvailableSlots()
-        setAvailableSlots(slots)
-      } catch (error) {
-        console.error("Erro ao buscar vagas:", error)
-      }
-    }
-
     checkStudentSession()
-    fetchSlots()
   }, [])
 
   const handleStudentLogin = useCallback(async (sess: StudentSession) => {
