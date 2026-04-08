@@ -1927,21 +1927,40 @@ export async function insertIBADDisciplines(): Promise<void> {
   const norm = (s: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim()
   
   const officialNormalized = officialNames.map(norm)
-  const normToOriginal = new Map<string, string>()
-  officialNames.forEach(n => normToOriginal.set(norm(n), n))
 
   // 1. Fetch EVERYTHING
-  const { data: allDb } = await supabase.from('disciplines').select('id, name, semester_id, order')
+  const { data: allDb } = await supabase.from('disciplines').select('id, name, semester_id, order, execution_date, professor_name')
   if (!allDb) return
 
+  // 2. FORCED RENAMING OF LEGACY NAMES
+  // This bridges the "Old Name" to the "New Name" so history is kept
+  const legacyMap: Record<string, string> = {
+    "PROFETAS MAIORES E MENORES": "Profetas",
+    "MANEIRAS E COSTUMES BIBLICOS": "Maneiras e Costumes",
+    "EPISTOLAS PAULINAS": "Epístolas Paulíneas",
+    "ESCOLA DOMINICAL": "Escola Bíblica Dominical"
+  }
+
+  const renamedIds = new Set<string>()
+  for (const dbItem of allDb) {
+    const n = norm(dbItem.name)
+    if (legacyMap[n]) {
+      const canonicalName = legacyMap[n]
+      console.log(`[Sync] Forced renaming legacy subject: "${dbItem.name}" -> "${canonicalName}"`)
+      await supabase.from('disciplines').update({ name: canonicalName }).eq('id', dbItem.id)
+      dbItem.name = canonicalName // Update local copy for next steps
+      renamedIds.add(dbItem.id)
+    }
+  }
+
+  // 3. Identify Residue & Group Duplicates (After potential renaming)
   const toDelete: string[] = []
   const existingMap = new Map<string, { id: string, semester_id: string | null }[]>()
 
-  // 2. Identify Residue & Group Duplicates
   allDb.forEach(d => {
     const n = norm(d.name)
     if (!officialNormalized.includes(n)) {
-      // Residue: Not in the 25-item list
+      // Residue: Not in the official list and was not renamed
       toDelete.push(d.id)
     } else {
       const list = existingMap.get(n) || []
@@ -1950,29 +1969,33 @@ export async function insertIBADDisciplines(): Promise<void> {
     }
   })
 
-  // 3. Resolve Duplicates (Keep linked ones)
-  for (const [n, records] of existingMap.entries()) {
+  // 4. Resolve Duplicates (Keep the one with a semester or manual data)
+  for (const [normTitle, records] of existingMap.entries()) {
     if (records.length > 1) {
-      // Sort: Linked ones first, then by earliest ID/created
       records.sort((a, b) => {
+        // Linked ones first
         if (a.semester_id && !b.semester_id) return -1
         if (!a.semester_id && b.semester_id) return 1
+        // Renamed ones or those with dates should be preferred if no semester
+        const dbA = allDb.find(x => x.id === a.id)
+        const dbB = allDb.find(x => x.id === b.id)
+        if (dbA?.execution_date && !dbB?.execution_date) return -1
+        if (!dbA?.execution_date && dbB?.execution_date) return 1
         return 0
       })
-      // Keep the first, delete the others
+      // Keep the first (best), delete the leftovers
       for (let i = 1; i < records.length; i++) {
         toDelete.push(records[i].id)
       }
     }
   }
 
-  // 4. Execut Delete Residue
+  // 5. Hard Deletion of Residues
   if (toDelete.length > 0) {
-    console.log('[insertIBADDisciplines] Deleting residues:', toDelete)
     await supabase.from('disciplines').delete().in('id', toDelete)
   }
 
-  // 5. Final Upsert / Order Repair
+  // 6. Final Sync (Re-insert missing, ensure canonical names/order)
   const toInsert: any[] = []
   const updates: any[] = []
 
@@ -1980,18 +2003,15 @@ export async function insertIBADDisciplines(): Promise<void> {
     const canonicalOrder = 100 + index
     const normName = norm(name)
     const records = existingMap.get(normName)
-    const existing = records && records.length > 0 ? records[0] : null
+    const existingGroup = records ? records.filter(r => !toDelete.includes(r.id)) : []
+    const existing = existingGroup.length > 0 ? existingGroup[0] : null
 
-    if (!existing || toDelete.includes(existing.id)) {
+    if (!existing) {
       toInsert.push({
-        id: uid(),
-        name,
-        order: canonicalOrder,
+        id: uid(), name, order: canonicalOrder,
         created_at: new Date().toISOString()
       })
     } else {
-      // Matched: Ensure Name and Order are canonical
-      // Using direct fetch search vs name mismatch repair
       const dbMatch = allDb.find(x => x.id === existing.id)
       if (dbMatch && (dbMatch.order !== canonicalOrder || dbMatch.name !== name)) {
         updates.push({ id: existing.id, name, order: canonicalOrder })
@@ -1999,10 +2019,7 @@ export async function insertIBADDisciplines(): Promise<void> {
     }
   })
 
-  if (toInsert.length > 0) {
-    await supabase.from('disciplines').insert(toInsert)
-  }
-
+  if (toInsert.length > 0) await supabase.from('disciplines').insert(toInsert)
   for (const up of updates) {
     await supabase.from('disciplines').update({ name: up.name, order: up.order }).eq('id', up.id)
   }
