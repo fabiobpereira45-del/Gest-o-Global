@@ -1,4 +1,4 @@
-﻿import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 // CACHE-BUSTER: v1.2.3-purge - 2026-04-08 00:15
 import { triggerN8nWebhook } from "@/lib/n8n"
 export { triggerN8nWebhook }
@@ -663,7 +663,8 @@ export async function deleteSubmission(id: string): Promise<void> {
 
 export async function updateSubmissionScore(id: string, score: number, percentage: number): Promise<void> {
   const supabase = createClient()
-  await supabase.from('student_submissions').update({ score, percentage }).eq('id', id)
+  const { error } = await supabase.from('student_submissions').update({ score, percentage }).eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 export function calculateScore(answers: StudentAnswer[], questions: Question[], pointsPerQuestion: number = 1): { score: number; totalPoints: number; percentage: number } {
@@ -682,33 +683,51 @@ export function calculateScore(answers: StudentAnswer[], questions: Question[], 
 
 export async function getProfessorAccounts(): Promise<ProfessorAccount[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('professor_accounts').select('*')
+  const { data, error } = await supabase.from('professor_accounts').select('*')
+  if (error) throw new Error(error.message)
   return (data || []).map(mapProfessor)
 }
 
 export async function getProfessorDisciplines(professorId: string): Promise<ProfessorDiscipline[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('professor_disciplines').select('*').eq('professor_id', professorId)
+  const { data, error } = await supabase.from('professor_disciplines').select('*').eq('professor_id', professorId)
+  if (error) throw new Error(error.message)
   return (data || []).map(mapProfessorDiscipline)
 }
 
 export async function getAllProfessorDisciplines(): Promise<ProfessorDiscipline[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('professor_disciplines').select('*')
+  const { data, error } = await supabase.from('professor_disciplines').select('*')
+  if (error) throw new Error(error.message)
   return (data || []).map(mapProfessorDiscipline)
 }
 
 export async function addProfessorAccount(data: Omit<ProfessorAccount, "id" | "createdAt" | "passwordHash"> & { password: string; id?: string }): Promise<ProfessorAccount> {
   const nameUC = (data.name || "").toUpperCase().trim()
-  const account = { id: data.id || uid(), name: nameUC, email: data.email.toLowerCase().trim(), password_hash: hashPassword(data.password), role: data.role, created_at: new Date().toISOString() }
+  const account = { 
+    id: data.id || uid(), 
+    name: nameUC, 
+    email: data.email.toLowerCase().trim(), 
+    password_hash: hashPassword(data.password), 
+    role: data.role, 
+    created_at: new Date().toISOString(),
+    active: true
+  }
   const supabase = createClient()
-  await supabase.from('professor_accounts').insert(account)
+  const { error } = await supabase.from('professor_accounts').insert(account)
+  
+  if (error) {
+    console.error("DB Error adding professor:", error)
+    throw new Error(`Erro ao salvar no banco de dados: ${error.message}`)
+  }
+  
   return mapProfessor(account)
 }
 
 export async function getProfessorByEmail(email: string): Promise<ProfessorAccount | null> {
   const supabase = createClient()
-  const { data } = await supabase.from('professor_accounts').select('*').eq('email', email.toLowerCase().trim()).maybeSingle()
+  const { data, error } = await supabase.from('professor_accounts').select('*').eq('email', email.toLowerCase().trim()).maybeSingle()
+  if (error && error.code !== 'PGRST116') throw new Error(error.message)
   if (!data && email === MASTER_CREDENTIALS.email) return { id: 'master', name: 'Administrador Master', email: MASTER_CREDENTIALS.email, role: 'master', active: true, avatar_url: null, passwordHash: '', createdAt: new Date().toISOString() }
   return data ? mapProfessor(data) : null
 }

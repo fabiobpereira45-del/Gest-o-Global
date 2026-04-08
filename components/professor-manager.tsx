@@ -40,11 +40,13 @@ function ProfessorForm({
   isEdit,
   onSave,
   onCancel,
+  isSaving = false,
 }: {
   initial?: FormState
   isEdit?: boolean
   onSave: (data: FormState) => void
   onCancel: () => void
+  isSaving?: boolean
 }) {
   const [form, setForm] = useState<FormState>(initial ?? EMPTY_FORM)
   const [showPw, setShowPw] = useState(false)
@@ -74,6 +76,7 @@ function ProfessorForm({
             onChange={(e) => set("name", e.target.value)}
             placeholder="Ex: Pr. João Silva"
             autoFocus
+            disabled={isSaving}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -83,6 +86,7 @@ function ProfessorForm({
             value={form.email}
             onChange={(e) => set("email", e.target.value)}
             placeholder="professor@ibad.com"
+            disabled={isSaving}
           />
         </div>
       </div>
@@ -97,11 +101,13 @@ function ProfessorForm({
               onChange={(e) => set("password", e.target.value)}
               placeholder={isEdit ? "••••••••" : "Min. 6 caracteres"}
               className="pr-10"
+              disabled={isSaving}
             />
             <button
               type="button"
               onClick={() => setShowPw((p) => !p)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              disabled={isSaving}
             >
               {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -113,6 +119,7 @@ function ProfessorForm({
             value={form.role}
             onChange={(e) => set("role", e.target.value as "master" | "professor")}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+            disabled={isSaving}
           >
             <option value="professor">Professor</option>
             <option value="master">Administrador (Master)</option>
@@ -125,11 +132,15 @@ function ProfessorForm({
       )}
 
       <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="ghost" onClick={onCancel}>
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={isSaving}>
           <X className="h-4 w-4 mr-1.5" /> Cancelar
         </Button>
-        <Button type="submit">
-          <Check className="h-4 w-4 mr-1.5" /> {isEdit ? "Salvar alterações" : "Adicionar professor"}
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <><ShieldCheck className="h-4 w-4 mr-1.5 animate-spin" /> Salvando...</>
+          ) : (
+            <><Check className="h-4 w-4 mr-1.5" /> {isEdit ? "Salvar alterações" : "Adicionar professor"}</>
+          )}
         </Button>
       </div>
     </form>
@@ -140,10 +151,7 @@ function ProfessorForm({
 
 export function ProfessorManager() {
   const [accounts, setAccounts] = useState<ProfessorAccount[]>([])
-  const [adding, setAdding] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [linkProfId, setLinkProfId] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   async function refresh() {
     setAccounts(await getProfessorAccounts())
@@ -152,13 +160,15 @@ export function ProfessorManager() {
   useEffect(() => { refresh() }, [])
 
   async function handleAdd(data: FormState) {
-    if (data.email.toLowerCase() === MASTER_CREDENTIALS.email) {
+    if (data.email.toLowerCase().trim() === MASTER_CREDENTIALS.email.toLowerCase().trim()) {
+      alert("Erro: Este e-mail já é utilizado pela conta Master e não pode ser duplicado.")
       return
     }
 
     try {
-      setAdding(false)
-      // Call our API route to use the Service Role Key
+      setIsSaving(true)
+      
+      // Step 1: Create in Auth via Admin API
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -170,31 +180,36 @@ export function ProfessorManager() {
         })
       })
 
+      const responseData = await res.json()
+
       if (!res.ok) {
-        const err = await res.json()
-        alert("Erro ao criar professor no Supabase: " + (err.error || "Desconhecido"))
-        return
+        throw new Error(responseData.error || "Erro desconhecido na API de Autenticação")
       }
 
-      const { user } = await res.json()
+      const { user } = responseData
 
-      // We still save locally for UI rendering if needed, or rely purely on Supabase.
-      // Keeping local sync for compatibility with existing app flow:
+      // Step 2: Save metadata in professor_accounts table
       await addProfessorAccount({
         name: data.name,
         email: data.email,
         password: data.password,
         role: data.role,
       }, user.id)
+
       await refresh()
+      setAdding(false) // Only close on success
+      alert("Professor cadastrado com sucesso!")
     } catch (e: any) {
-      console.error("Falha na criação:", e)
+      console.error("Falha na criação do professor:", e)
       alert("Falha na criação: " + (e.message || "Erro desconhecido"))
+    } finally {
+      setIsSaving(false)
     }
   }
 
   async function handleEdit(id: string, data: FormState) {
     try {
+      setIsSaving(true)
       await updateProfessorAccount(id, {
         name: data.name,
         email: data.email,
@@ -206,6 +221,8 @@ export function ProfessorManager() {
     } catch (e: any) {
       console.error("Erro ao salvar professor:", e)
       alert("Erro ao salvar alterações: " + (e.message || "Verifique sua conexão e tente novamente"))
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -273,6 +290,7 @@ export function ProfessorManager() {
             <ProfessorForm
               onSave={handleAdd}
               onCancel={() => setAdding(false)}
+              isSaving={isSaving}
             />
           </div>
         )}
@@ -300,6 +318,7 @@ export function ProfessorManager() {
                       }}
                       onSave={(data) => handleEdit(account.id, data)}
                       onCancel={() => setEditingId(null)}
+                      isSaving={isSaving}
                     />
                   </div>
                 ) : (
