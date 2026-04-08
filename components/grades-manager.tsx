@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import {
-    Plus, Pencil, Trash2, GraduationCap, Calculator, Loader2, Save, X, Download, Eye, EyeOff, CheckCheck
+    Plus, Pencil, Trash2, GraduationCap, Calculator, Loader2, Save, X, Download, Eye, EyeOff, CheckCheck, RefreshCw
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
     StudentGrade, getStudentGrades, saveStudentGrade, deleteStudentGrade,
-    StudentProfile, getStudents, Discipline, getDisciplines, releaseAllGrades
+    StudentProfile, getStudents, Discipline, getDisciplines, releaseAllGrades, syncGradesForDiscipline
 } from "@/lib/store"
 import { printGradesReportPDF } from "@/lib/pdf"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -29,6 +29,8 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
     const [isCreating, setIsCreating] = useState(false)
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
     const [bulkReleaseConfirm, setBulkReleaseConfirm] = useState(false)
+    const [selectedDiscipline, setSelectedDiscipline] = useState<string>("")
+    const [isSyncing, setIsSyncing] = useState(false)
 
     // Form State
     const [formData, setFormData] = useState<any>({
@@ -135,6 +137,82 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
         }
     }
 
+    const handleSync = async () => {
+        if (!selectedDiscipline) {
+            alert("Selecione uma disciplina no filtro abaixo para sincronizar.")
+            return
+        }
+
+        try {
+            setIsSyncing(true)
+            const syncData = await syncGradesForDiscipline(selectedDiscipline)
+            
+            if ((syncData as any).reason) {
+                alert((syncData as any).reason)
+                return
+            }
+
+            // Converter os resultados em promessas de salvamento
+            const savePromises = Object.entries(syncData).map(([identifier, data]) => {
+                const existingGrade = grades.find(g => 
+                    g.studentIdentifier.toLowerCase().trim() === identifier && 
+                    g.disciplineId === selectedDiscipline
+                )
+
+                // Só atualizamos nota se for maior que a atual ou se não existir nota
+                if (existingGrade) {
+                    return saveStudentGrade({
+                        ...existingGrade,
+                        examGrade: Math.max(existingGrade.examGrade, (data as any).examGrade),
+                        attendanceScore: Math.max(existingGrade.attendanceScore, (data as any).attendanceScore)
+                    }, existingGrade.id)
+                } else {
+                    return saveStudentGrade({
+                        studentIdentifier: identifier,
+                        studentName: (data as any).name,
+                        disciplineId: selectedDiscipline,
+                        isPublic: false,
+                        examGrade: (data as any).examGrade,
+                        worksGrade: 0,
+                        seminarGrade: 0,
+                        participationBonus: 0,
+                        attendanceScore: (data as any).attendanceScore,
+                        customDivisor: 4,
+                        isReleased: true
+                    })
+                }
+            })
+
+            await Promise.all(savePromises)
+            alert("Sincronização concluída com sucesso!")
+            loadData()
+        } catch (err: any) {
+            alert("Erro na sincronização: " + err.message)
+        } finally {
+            setIsSyncing(false)
+        }
+    }
+
+    const handlePublishFiltered = async (isReleased: boolean) => {
+        if (!selectedDiscipline) {
+            alert("Selecione uma disciplina para atualizar a visibilidade em massa.")
+            return
+        }
+
+        try {
+            setLoading(true)
+            const filtered = grades.filter(g => g.disciplineId === selectedDiscipline)
+            const promises = filtered.map(g => saveStudentGrade({ ...g, isReleased }, g.id))
+            await Promise.all(promises)
+            alert(isReleased ? "Notas da disciplina liberadas!" : "Notas da disciplina ocultadas!")
+            loadData()
+        } catch (err: any) {
+            alert("Erro ao atualizar visibilidade: " + err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const calculateAverage = (grade: StudentGrade) => {
         const total =
             (parseFloat(grade.examGrade as any) || 0) +
@@ -178,21 +256,30 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                         </h2>
                         <p className="text-muted-foreground mt-1">Gere as notas de alunos matriculados e alunos de prova pública.</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         {isMaster && (
                             <Button variant="outline" onClick={() => printGradesReportPDF(grades, "Relatório Geral de Notas")} className="border-primary text-primary hover:bg-primary/10">
                                 <Download className="h-4 w-4 mr-2" />
                                 Exportar PDF
                             </Button>
                         )}
+                        <Button 
+                            variant="secondary" 
+                            onClick={handleSync} 
+                            disabled={isSyncing || !selectedDiscipline}
+                            className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200"
+                        >
+                            {isSyncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                            Sincronizar Diário
+                        </Button>
                         <Button variant="outline" onClick={() => setBulkReleaseConfirm(true)} className="border-green-600 text-green-600 hover:bg-green-50">
                             <CheckCheck className="h-4 w-4 mr-2" />
                             Liberar para Todos
                         </Button>
                         <Button onClick={() => {
                             setFormData({
-                                studentIdentifier: "", studentName: "", disciplineId: "", isPublic: false,
-                                examGrade: "", worksGrade: "", seminarGrade: "", participationBonus: "", attendanceScore: "", customDivisor: "4"
+                                studentIdentifier: "", studentName: "", disciplineId: selectedDiscipline || "", isPublic: false,
+                                examGrade: "", worksGrade: "", seminarGrade: "", participationBonus: "", attendanceScore: "", customDivisor: "4", isReleased: true
                             })
                             setIsCreating(true)
                             setIsEditing(null)
@@ -201,6 +288,32 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                             Lançar Notas
                         </Button>
                     </div>
+                </div>
+
+                {/* Filtro por Disciplina e Ações Rápidas */}
+                <div className="bg-muted/30 p-4 rounded-xl border border-border flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <Label className="whitespace-nowrap font-bold">Filtrar por Disciplina:</Label>
+                        <select
+                            className="flex h-10 w-full md:min-w-[300px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            value={selectedDiscipline}
+                            onChange={(e) => setSelectedDiscipline(e.target.value)}
+                        >
+                            <option value="">Todas as Disciplinas</option>
+                            {disciplines.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </select>
+                    </div>
+                    
+                    {selectedDiscipline && (
+                        <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => handlePublishFiltered(true)} className="text-green-600 border-green-200 hover:bg-green-50">
+                                <Eye className="h-4 w-4 mr-2" /> Liberar Disciplina
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handlePublishFiltered(false)} className="text-amber-600 border-amber-200 hover:bg-amber-50">
+                                <EyeOff className="h-4 w-4 mr-2" /> Ocultar Disciplina
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Lançamento / Edição de Notas */}
@@ -325,7 +438,9 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                 {/* Listagem de Notas */}
                 <div className="space-y-8">
                     {['matriculados', 'publicos'].map((tipo) => {
-                        const list = grades.filter(g => tipo === 'publicos' ? g.isPublic : !g.isPublic)
+                        const list = grades
+                            .filter(g => tipo === 'publicos' ? g.isPublic : !g.isPublic)
+                            .filter(g => !selectedDiscipline || g.disciplineId === selectedDiscipline)
                         if (list.length === 0) return null
 
                         return (

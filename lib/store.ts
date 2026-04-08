@@ -883,6 +883,63 @@ export async function releaseAllGrades(isReleased: boolean = true): Promise<void
   if (error) throw new Error(error.message)
 }
 
+/** Sincroniza notas de submissões e frequência para uma disciplina e aluno. */
+export async function syncGradesForDiscipline(disciplineId: string) {
+  const supabase = createClient()
+
+  // 1. Buscar Avaliações da Disciplina
+  const { data: assessments } = await supabase
+    .from('assessments')
+    .select('id, points_per_question, question_ids')
+    .eq('discipline_id', disciplineId)
+  
+  const assessmentIds = assessments?.map(a => a.id) || []
+  if (assessmentIds.length === 0) return { updated: 0, reason: "Nenhuma prova encontrada para esta disciplina." }
+
+  // 2. Buscar Submissões destas Avaliações
+  const { data: submissions } = await supabase
+    .from('student_submissions')
+    .select('student_email, student_name, score, assessment_id')
+    .in('assessment_id', assessmentIds)
+
+  // 3. Buscar Frequência da Disciplina
+  const { data: attendances } = await supabase
+    .from('attendances')
+    .select('student_id, is_present, date')
+    .eq('discipline_id', disciplineId)
+
+  // 4. Calcular Total de Aulas (Datas Únicas)
+  const totalClasses = new Set(attendances?.map(a => a.date)).size
+
+  // 5. Buscar Estudantes para vincular ID -> Email
+  const { data: studentProfiles } = await supabase.from('students').select('id, email, name, cpf')
+
+  // Agrupar Resultados por Aluno (Email é o identificador comum)
+  const syncResults: Record<string, { examGrade: number; attendanceScore: number; name: string }> = {}
+
+  // Processar Notas de Prova
+  submissions?.forEach(sub => {
+    const key = sub.student_email.toLowerCase().trim()
+    if (!syncResults[key]) syncResults[key] = { examGrade: 0, attendanceScore: 0, name: sub.student_name }
+    syncResults[key].examGrade += Number(sub.score)
+  })
+
+  // Processar Frequência
+  if (totalClasses > 0) {
+    attendances?.forEach(att => {
+      const profile = studentProfiles?.find(p => p.id === att.student_id)
+      if (profile) {
+        const key = (profile.email || "").toLowerCase().trim()
+        if (!key) return
+        if (!syncResults[key]) syncResults[key] = { examGrade: 0, attendanceScore: 0, name: profile.name }
+        if (att.is_present) syncResults[key].attendanceScore += (10 / totalClasses)
+      }
+    })
+  }
+
+  return syncResults
+}
+
 export async function uploadAvatar(file: File, userId: string, folder: 'students' | 'professors' | 'board'): Promise<string> {
   const supabase = createClient()
   const filePath = `${folder}/${userId}-${uid()}.${file.name.split('.').pop()}`
