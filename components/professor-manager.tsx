@@ -151,14 +151,18 @@ function ProfessorForm({
 
 export function ProfessorManager() {
   const [accounts, setAccounts] = useState<ProfessorAccount[]>([])
-  const [isSaving, setIsSaving] = useState(false)
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [linkProfId, setLinkProfId] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   async function refresh() {
-    setAccounts(await getProfessorAccounts())
+    try {
+      setAccounts(await getProfessorAccounts())
+    } catch (e: any) {
+      console.error("Erro ao carregar professores:", e)
+    }
   }
 
   useEffect(() => { refresh() }, [])
@@ -172,7 +176,6 @@ export function ProfessorManager() {
     try {
       setIsSaving(true)
       
-      // Step 1: Create in Auth via Admin API
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -192,7 +195,6 @@ export function ProfessorManager() {
 
       const { user } = responseData
 
-      // Step 2: Save metadata in professor_accounts table
       await addProfessorAccount({
         name: data.name,
         email: data.email,
@@ -201,7 +203,7 @@ export function ProfessorManager() {
       }, user.id)
 
       await refresh()
-      setAdding(false) // Only close on success
+      setAdding(false)
       alert("Professor cadastrado com sucesso!")
     } catch (e: any) {
       console.error("Falha na criação do professor:", e)
@@ -219,6 +221,7 @@ export function ProfessorManager() {
         email: data.email,
         role: data.role,
         ...(data.password ? { password: data.password } : {}),
+        ...(data.active !== undefined ? { active: data.active } : {}),
       })
       setEditingId(null)
       await refresh()

@@ -21,8 +21,17 @@ export async function POST(request: Request) {
                 role: role || "professor"
             }
         })
-
         if (authError) {
+            // Se o usuário já existe, vamos tentar recuperar o ID dele para completar o vínculo no banco
+            if (authError.message.toLowerCase().includes("already") || authError.status === 422) {
+                const { data: { users }, error: listError } = await supabase.auth.admin.listUsers()
+                if (!listError) {
+                    const existingUser = users.find(u => u.email?.toLowerCase() === email.toLowerCase())
+                    if (existingUser) {
+                        return NextResponse.json({ user: existingUser, note: "User already exist, returning existing" })
+                    }
+                }
+            }
             return NextResponse.json({ error: authError.message }, { status: 400 })
         }
 
