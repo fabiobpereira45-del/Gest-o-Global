@@ -205,12 +205,12 @@ export function ClassManager() {
             s.name,
             s.enrollment_number || "—",
             s.phone || "—",
-            s.payment_status === "paid" ? "Pago" : "Pendente"
+            s.status === "active" ? "Ativo" : "Inativo"
         ])
 
         autoTable(doc, {
             startY: 40,
-            head: [['#', 'Nome do Aluno', 'Matrícula', 'Telefone', 'Status Fin.']],
+            head: [['#', 'Nome do Aluno', 'Matrícula', 'Telefone', 'Status']],
             body: tableData,
             theme: 'striped',
             headStyles: { fillColor: [31, 41, 55] },

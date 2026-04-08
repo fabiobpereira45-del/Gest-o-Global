@@ -2,49 +2,20 @@
 
 import { Button } from "@/components/ui/button"
 import { AlertCircle, Clock, CheckCircle2, Library, FileText, BookOpenCheck, MessageSquare } from "lucide-react"
-import type { StudentProfile, FinancialCharge } from "@/lib/store"
+import type { StudentProfile } from "@/lib/store"
 import { cn } from "@/lib/utils"
 
-type Tab = "overview" | "class-info" | "curriculum" | "materials" | "grades" | "exams" | "financial" | "chat" | "perfil"
+type Tab = "overview" | "class-info" | "curriculum" | "materials" | "grades" | "exams" | "chat" | "perfil"
 
 interface OverviewTabProps {
   profile: StudentProfile
-  charges: FinancialCharge[]
   onTabChange: (tab: Tab) => void
 }
 
-export function OverviewTab({ profile, charges, onTabChange }: OverviewTabProps) {
+export function OverviewTab({ profile, onTabChange }: OverviewTabProps) {
   return (
     <div className="flex flex-col gap-8 animate-in fade-in duration-500">
-      {charges.some(c => c.status === 'late') && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4 flex gap-4 items-center animate-pulse">
-          <div className="bg-red-500 p-2 rounded-xl text-white">
-            <AlertCircle className="h-6 w-6" />
-          </div>
-          <div className="flex-1">
-            <p className="font-black text-red-800 text-sm">PENDÊNCIA FINANCEIRA: Regularize seu acesso!</p>
-            <p className="text-xs text-red-700 font-medium">Sua mensalidade está vencida. Regularize sua situação para manter seu acesso aos materiais e avaliações.</p>
-          </div>
-          <Button size="sm" onClick={() => onTabChange("financial")} className="bg-red-600 hover:bg-red-700 text-white font-bold h-9 shadow-lg shadow-red-200">
-            Regularizar
-          </Button>
-        </div>
-      )}
 
-      {charges.some(c => c.status === 'pending') && !charges.some(c => c.status === 'late') && (
-        <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex gap-4 items-center shadow-sm">
-          <div className="bg-emerald-500 p-2 rounded-xl text-white">
-            <CheckCircle2 className="h-6 w-6" />
-          </div>
-          <div className="flex-1">
-            <p className="font-bold text-emerald-800 text-sm">Você está em dia! Que tal antecipar sua próxima mensalidade?</p>
-            <p className="text-xs text-emerald-700">Garanta sua tranquilidade e ajude a manter nossa instituição. Clique em pagar para ver as opções.</p>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => onTabChange("financial")} className="border-emerald-400 text-emerald-700 hover:bg-emerald-100 font-bold h-9">
-            Antecipar
-          </Button>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl border border-white/10" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>

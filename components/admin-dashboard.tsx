@@ -24,7 +24,7 @@ import {
   getQuestions, getDisciplines, clearProfessorSession, MASTER_CREDENTIALS,
   getProfessorSession, getStudentGrades, saveStudentGrade, deleteStudentGrade, getStudents, updateProfessorAccount,
   saveProfessorSession, repairAssessmentsData,
-  type Semester, type StudyMaterial, type FinancialCharge, type ClassRoom, type ClassSchedule,
+  type Semester, type StudyMaterial, type ClassRoom, type ClassSchedule,
 } from "@/lib/store"
 import { printStudentPDF, printBlankAssessmentPDF, printCompiledSubmissionsPDF, printOverviewPDF, printAnswerKeyPDF, printSubmissionsTablePDF } from "@/lib/pdf"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -33,8 +33,7 @@ import { AssessmentBuilder } from "@/components/assessment-builder"
 import { ProfessorManager } from "@/components/professor-manager"
 import { SemesterManager } from "@/components/semester-manager"
 import { StudyMaterialManager } from "@/components/study-material-manager"
-import { FinancialConfig } from "@/components/financial-config"
-import { FinancialManager } from "@/components/financial-manager"
+// Financial imports removed
 import { ProfessorChatView } from "@/components/professor-chat-view"
 import { AttendanceManager } from "@/components/attendance-manager"
 import { ClassManager } from "@/components/class-manager"
@@ -67,7 +66,7 @@ function formatTime(s: number) {
   return `${m}m${sec.toString().padStart(2, "0")}s`
 }
 
-type Tab = "overview" | "students" | "grades" | "submissions" | "questions" | "assessments" | "professors" | "semesters" | "class_schedules" | "materials" | "financial" | "settings" | "chat" | "attendance" | "classes" | "institutional"
+type Tab = "overview" | "students" | "grades" | "submissions" | "questions" | "assessments" | "professors" | "semesters" | "class_schedules" | "materials" | "settings" | "chat" | "attendance" | "classes" | "institutional"
 
 interface Props {
   onLogout: () => void
@@ -143,7 +142,6 @@ export function AdminDashboard({ onLogout }: Props) {
     {
       title: "Administração",
       items: [
-        { id: "financial", label: "Financeiro", icon: <DollarSign className="h-4 w-4" />, masterOnly: true },
         { id: "professors", label: "Professores", icon: <ShieldCheck className="h-4 w-4" />, masterOnly: true },
         { id: "settings", label: "Configurações", icon: <Settings className="h-4 w-4" /> },
       ]
@@ -371,7 +369,7 @@ export function AdminDashboard({ onLogout }: Props) {
                 {tab === "attendance" && <AttendanceManager />}
                 {tab === "classes" && isMaster && <ClassManager />}
                 {tab === "chat" && <ProfessorChatView />}
-                {tab === "financial" && <FinancialManager />}
+                {/* financial tab removed */}
                 {tab === "professors" && isMaster && <ProfessorManager />}
                 {tab === "institutional" && <InstitutionalManager />}
                 {tab === "settings" && <SettingsTab assessments={assessments || []} onRefresh={refresh} onLogout={onLogout} />}

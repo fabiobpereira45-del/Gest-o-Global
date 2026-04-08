@@ -47,7 +47,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
     const [filterClass, setFilterClass] = useState("all")
-    const [filterPayment, setFilterPayment] = useState("all")
 
     // Dialogs
     const [isAddOpen, setIsAddOpen] = useState(false)
@@ -79,7 +78,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     const [church, setChurch] = useState("")
     const [pastor, setPastor] = useState("")
     const [classId, setClassId] = useState("none")
-    const [paymentStatus, setPaymentStatus] = useState("paid")
 
     // ── Edit form ─────────────────────────────────────────────────────────────
     const [editName, setEditName] = useState("")
@@ -88,7 +86,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     const [editChurch, setEditChurch] = useState("")
     const [editPastor, setEditPastor] = useState("")
     const [editClassId, setEditClassId] = useState("none")
-    const [editPaymentStatus, setEditPaymentStatus] = useState("pending")
     const [editStatus, setEditStatus] = useState<StudentProfile['status']>('pending')
 
     // ─── Data Load ────────────────────────────────────────────────────────────
@@ -134,13 +131,8 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
             list = list.filter(s => s.class_id === filterClass)
         }
 
-        // Filter by Payment
-        if (filterPayment !== "all") {
-            list = list.filter(s => s.payment_status === filterPayment)
-        }
-
         return list
-    }, [students, search, filterClass, filterPayment])
+    }, [students, search, filterClass])
 
     // ─── Create ───────────────────────────────────────────────────────────────
 
@@ -163,7 +155,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                 church: church.trim(),
                 pastor: pastor.trim(),
                 classId: classId === "none" ? undefined : classId,
-                paymentStatus,
             })
             setIsAddOpen(false)
             resetAddForm()
@@ -186,7 +177,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
         setEditChurch(stu.church || "")
         setEditPastor(stu.pastor_name || "")
         setEditClassId(stu.class_id || "none")
-        setEditPaymentStatus(stu.payment_status || "pending")
         setEditStatus(stu.status || 'pending')
         setEditPassword("")
         setIsEditOpen(true)
@@ -206,8 +196,7 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                 church: editChurch.trim(),
                 pastor_name: editPastor.trim(),
                 class_id: editClassId === "none" ? null : editClassId,
-                payment_status: editPaymentStatus,
-                status: editStatus,
+                status: 'active',
                 ...(editPassword ? { password: editPassword } : {}),
             })
             setIsEditOpen(false)
@@ -277,7 +266,7 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     }
 
     function downloadStudentsPDF() {
-        printStudentListPDF(filtered, classes, filterClass, filterPayment)
+        printStudentListPDF(filtered, classes)
     }
 
     async function handleBulkImport() {
@@ -299,9 +288,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
             try {
                 const [bulkName, bulkCpf, bulkEmail, bulkPhone, bulkClassId] = parts
                 
-                // If it's a PDF export from somewhere else, it might have noise or different order.
-                // We'll assume: Nome; CPF; Email; Telefone; ID_Turma
-                
                 await registerStudentByAdmin({
                     name: bulkName?.trim() || "",
                     email: bulkEmail?.trim() || "",
@@ -309,7 +295,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                     cpf: bulkCpf?.trim() || "",
                     phone: bulkPhone?.trim() || "",
                     class_id: bulkClassId?.trim() === "none" ? undefined : bulkClassId?.trim(),
-                    payment_status: "paid" // Default to paid for bulk import unless specified
                 })
                 successCount++
             } catch (err) {
@@ -396,24 +381,11 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                         <option value="all">Todos os Núcleos</option>
                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
-
-                    <select
-                        value={filterPayment}
-                        onChange={e => setFilterPayment(e.target.value)}
-                        className="h-12 px-4 rounded-xl border border-border/50 bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all min-w-[150px]"
-                    >
-                        <option value="all">Status Fin. (Todos)</option>
-                        <option value="paid">Pago</option>
-                        <option value="pending">Pendente</option>
-                        <option value="bolsa100">Bolsa 100%</option>
-                        <option value="bolsa50">Bolsa 50%</option>
-                    </select>
                 </div>
             </div>
 
             {/* Table */}
             <div className="bg-card border border-border/50 rounded-2xl overflow-hidden premium-shadow relative">
-                {/* Scroll Indicator (Visual only) */}
                 <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-black/5 to-transparent pointer-events-none md:hidden" />
                 
                 <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-muted-foreground/20">
@@ -423,7 +395,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                                 <th className="text-left px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Aluno</th>
                                 <th className="text-left px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Matrícula</th>
                                 <th className="text-center px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Turma</th>
-                                <th className="text-center px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status Financeiro</th>
                                 <th className="text-center px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Status Conta</th>
                                 <th className="text-right px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Ações</th>
                             </tr>
@@ -446,31 +417,8 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                                                 : <span className="text-muted-foreground">Sem turma</span>
                                             }
                                         </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {stu.payment_status === "paid" ? (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                                                    <CheckCircle2 className="h-3 w-3" /> Pago
-                                                </span>
-                                            ) : stu.payment_status === "bolsa100" ? (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                                                    Bolsa 100%
-                                                </span>
-                                            ) : stu.payment_status === "bolsa50" ? (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                                                    Bolsa 50%
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-amber-100 text-amber-700 px-2 py-0.5 rounded">
-                                                    Pendente
-                                                </span>
-                                            )}
-                                        </td>
                                         <td className="px-4 py-3 text-center hidden lg:table-cell">
-                                            {stu.status === "pending" ? (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
-                                                    Aguard. Pagto.
-                                                </span>
-                                            ) : stu.status === "inactive" ? (
+                                            {stu.status === "inactive" ? (
                                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-red-100 text-red-700 px-2 py-0.5 rounded">
                                                     Inativo
                                                 </span>
@@ -482,7 +430,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex items-center justify-end gap-1">
-                                                {/* View */}
                                                 <Button
                                                     size="sm" variant="ghost"
                                                     className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -491,7 +438,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                                                 >
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
-                                                {/* Edit */}
                                                 <Button
                                                     size="sm" variant="ghost"
                                                     className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
@@ -500,7 +446,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                                                 >
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
-                                                {/* WhatsApp */}
                                                 <Button
                                                     size="sm" variant="ghost"
                                                     className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-100"
@@ -509,7 +454,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                                                 >
                                                     <MessageCircle className="h-4 w-4 fill-green-600/10" />
                                                 </Button>
-                                                {/* Delete */}
                                                 {isMaster && (
                                                     <Button
                                                         size="sm" variant="ghost"
@@ -535,11 +479,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                         </tbody>
                     </table>
                 </div>
-                {search && filtered.length > 0 && (
-                    <div className="px-4 py-2 border-t border-border text-xs text-muted-foreground">
-                        Mostrando {filtered.length} de {students.length} alunos
-                    </div>
-                )}
             </div>
 
             {/* ── Modal: CADASTRAR ─────────────────────────────────────────────────── */}
@@ -547,17 +486,23 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                 <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Matricular Aluno (Manual)</DialogTitle>
-                        <DialogDescription>Crie a conta do aluno diretamente com status <strong className="text-green-600">Pago</strong>.</DialogDescription>
+                        <DialogDescription>Crie a conta do aluno diretamente no sistema.</DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col gap-4 py-2">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="flex flex-col gap-1.5 sm:col-span-2">
                                 <Label className="text-xs">Nome Completo *</Label>
-                                <div className="relative"><User className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><Input className="pl-8 text-sm h-9" value={name} onChange={e => setName(e.target.value)} /></div>
+                                <div className="relative">
+                                    <User className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input className="pl-8 text-sm h-9" value={name} onChange={e => setName(e.target.value)} />
+                                </div>
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <Label className="text-xs">E-mail *</Label>
-                                <div className="relative"><Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><Input type="email" className="pl-8 text-sm h-9" value={email} onChange={e => setEmail(e.target.value)} /></div>
+                                <div className="relative">
+                                    <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input type="email" className="pl-8 text-sm h-9" value={email} onChange={e => setEmail(e.target.value)} />
+                                </div>
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <Label className="text-xs">Senha Inicial *</Label>
@@ -577,51 +522,36 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <Label className="text-xs">Celular / WhatsApp</Label>
-                                <div className="relative"><Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><Input className="pl-8 text-sm h-9" value={phone} onChange={e => setPhone(e.target.value)} /></div>
+                                <div className="relative">
+                                    <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input className="pl-8 text-sm h-9" value={phone} onChange={e => setPhone(e.target.value)} />
+                                </div>
                             </div>
                         </div>
-
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="flex flex-col gap-1.5">
                                 <Label className="text-xs">Igreja que congrega</Label>
-                                <div className="relative"><Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><Input className="pl-8 text-sm h-9" value={church} onChange={e => setChurch(e.target.value)} /></div>
+                                <div className="relative">
+                                    <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input className="pl-8 text-sm h-9" value={church} onChange={e => setChurch(e.target.value)} />
+                                </div>
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <Label className="text-xs">Pastor Dirigente</Label>
-                                <div className="relative"><UserCircle2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><Input className="pl-8 text-sm h-9" value={pastor} onChange={e => setPastor(e.target.value)} /></div>
+                                <div className="relative">
+                                    <UserCircle2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input className="pl-8 text-sm h-9" value={pastor} onChange={e => setPastor(e.target.value)} />
+                                </div>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-1.5">
-                                <Label className="text-xs">Turma Inicial (Opcional)</Label>
-                                <select value={classId} onChange={e => setClassId(e.target.value)} className="w-full text-sm h-9 border border-input rounded-md px-3 bg-background">
-                                    <option value="none">Sem turma inicial</option>
-                                    {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({SHIFT_LABELS[c.shift] || c.shift})</option>)}
-                                </select>
-                                {classId !== "none" && (
-                                    <div className="mt-1 flex flex-wrap gap-1">
-                                        {schedules.filter(s => s.classId === classId).map(s => (
-                                            <span key={s.id} className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium uppercase">
-                                                {{
-                                                    segunda: "Seg", terca: "Ter", quarta: "Qua",
-                                                    quinta: "Qui", sexta: "Sex", sabado: "Sab"
-                                                }[s.dayOfWeek] || s.dayOfWeek}: {s.timeStart.substring(0, 5)}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label className="text-xs">Status Financeiro</Label>
-                                <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="w-full text-sm h-9 border border-input rounded-md px-3 bg-background">
-                                    <option value="paid">Pago</option>
-                                    <option value="pending">Pendente</option>
-                                    <option value="bolsa100">Bolsa 100%</option>
-                                    <option value="bolsa50">Bolsa 50%</option>
-                                </select>
-                            </div>
+                        <div className="flex flex-col gap-1.5">
+                            <Label className="text-xs">Turma Inicial (Opcional)</Label>
+                            <select value={classId} onChange={e => setClassId(e.target.value)} className="w-full text-sm h-9 border border-input rounded-md px-3 bg-background">
+                                <option value="none">Sem turma inicial</option>
+                                {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({SHIFT_LABELS[c.shift] || c.shift})</option>)}
+                            </select>
                         </div>
                     </div>
                     <DialogFooter>
@@ -643,7 +573,10 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                     <div className="flex flex-col gap-4 py-2">
                         <div className="flex flex-col gap-1.5">
                             <Label className="text-xs">Nome Completo *</Label>
-                            <div className="relative"><User className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><Input className="pl-8 text-sm h-9" value={editName} onChange={e => setEditName(e.target.value)} /></div>
+                            <div className="relative">
+                                <User className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input className="pl-8 text-sm h-9" value={editName} onChange={e => setEditName(e.target.value)} />
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -653,55 +586,41 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <Label className="text-xs">Celular / WhatsApp</Label>
-                                <div className="relative"><Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><Input className="pl-8 text-sm h-9" value={editPhone} onChange={e => setEditPhone(e.target.value)} /></div>
+                                <div className="relative">
+                                    <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input className="pl-8 text-sm h-9" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
+                                </div>
                             </div>
                         </div>
-
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="flex flex-col gap-1.5">
                                 <Label className="text-xs">Igreja que congrega</Label>
-                                <div className="relative"><Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><Input className="pl-8 text-sm h-9" value={editChurch} onChange={e => setEditChurch(e.target.value)} /></div>
+                                <div className="relative">
+                                    <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input className="pl-8 text-sm h-9" value={editChurch} onChange={e => setEditChurch(e.target.value)} />
+                                </div>
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <Label className="text-xs">Pastor Dirigente</Label>
-                                <div className="relative"><UserCircle2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><Input className="pl-8 text-sm h-9" value={editPastor} onChange={e => setEditPastor(e.target.value)} /></div>
+                                <div className="relative">
+                                    <UserCircle2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input className="pl-8 text-sm h-9" value={editPastor} onChange={e => setEditPastor(e.target.value)} />
+                                </div>
                             </div>
-                        </div>                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-1.5">
-                                <Label className="text-xs">Turma</Label>
-                                <select value={editClassId} onChange={e => setEditClassId(e.target.value)} className="w-full text-sm h-9 border border-input rounded-md px-3 bg-background">
-                                    <option value="none">Sem turma</option>
-                                    {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({SHIFT_LABELS[c.shift] || c.shift})</option>)}
-                                </select>
-                                {editClassId !== "none" && (
-                                    <div className="mt-1 flex flex-wrap gap-1">
-                                        {schedules.filter(s => s.classId === editClassId).map(s => (
-                                            <span key={s.id} className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium uppercase">
-                                                {{
-                                                    segunda: "Seg", terca: "Ter", quarta: "Qua",
-                                                    quinta: "Qui", sexta: "Sex", sabado: "Sab"
-                                                }[s.dayOfWeek] || s.dayOfWeek}: {s.timeStart.substring(0, 5)}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label className="text-xs">Status Financeiro</Label>
-                                <select value={editPaymentStatus} onChange={e => setEditPaymentStatus(e.target.value)} className="w-full text-sm h-9 border border-input rounded-md px-3 bg-background">
-                                    <option value="paid">Pago</option>
-                                    <option value="pending">Pendente</option>
-                                    <option value="bolsa100">Bolsa 100%</option>
-                                    <option value="bolsa50">Bolsa 50%</option>
-                                </select>
-                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <Label className="text-xs">Turma</Label>
+                            <select value={editClassId} onChange={e => setEditClassId(e.target.value)} className="w-full text-sm h-9 border border-input rounded-md px-3 bg-background">
+                                <option value="none">Sem turma</option>
+                                {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({SHIFT_LABELS[c.shift] || c.shift})</option>)}
+                            </select>
                         </div>
 
                         <div className="flex flex-col gap-1.5">
                             <Label className="text-xs">Status da Matrícula</Label>
                             <select value={editStatus} onChange={e => setEditStatus(e.target.value as any)} className="w-full text-sm h-9 border border-input rounded-md px-3 bg-background">
-                                <option value="pending">Pendente (Oculto na listagem)</option>
                                 <option value="active">Ativo (Visível na listagem)</option>
                                 <option value="inactive">Inativo</option>
                             </select>
@@ -799,29 +718,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                 </DialogContent>
             </Dialog>
 
-            {/* ── Modal: CONFIRMAR EXCLUSÃO ────────────────────────────────────────── */}
-            <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-                <DialogContent className="max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-red-600">
-                            <AlertTriangle className="h-5 w-5" /> Confirmar Exclusão
-                        </DialogTitle>
-                        <DialogDescription>
-                            Tem certeza que deseja excluir o aluno <strong>{selected?.name}</strong>? Esta ação não pode ser desfeita.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 mt-1">
-                        ⚠️ O registro do aluno será removido do banco de dados. O acesso de login (conta Auth) do aluno não será apagado automaticamente.
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={deleting} className="text-xs h-9">Cancelar</Button>
-                        <Button onClick={handleDelete} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold h-9">
-                            {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Excluir Aluno
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
             {/* Bulk Import Modal */}
             <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
                 <DialogContent className="sm:max-w-2xl">
@@ -845,14 +741,6 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                             onChange={(e) => setBulkText(e.target.value)}
                             className="h-64 font-mono text-xs rounded-xl border-border/50 bg-muted/20"
                         />
-                        <div className="text-[10px] text-muted-foreground bg-muted/30 p-3 rounded-lg border border-border/30">
-                            <strong>Dicas:</strong> 
-                            <ul className="list-disc ml-4 space-y-1 mt-1">
-                                <li>Para o ID da Turma, use 'none' se não quiser vincular agora.</li>
-                                <li>A senha padrão para todos os novos alunos será '123456'.</li>
-                                <li>Se a primeira linha for um cabeçalho, ela será ignorada automaticamente.</li>
-                            </ul>
-                        </div>
                     </div>
 
                     <DialogFooter>
@@ -866,19 +754,18 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
-
-        </div >
+        </div>
     )
 }
 
-// ─── Aux Component ────────────────────────────────────────────────────────────
-function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) {
     return (
-        <div className="flex items-start gap-2">
-            <span className="text-muted-foreground mt-0.5">{icon}</span>
-            <span className="text-xs text-muted-foreground w-24 shrink-0">{label}</span>
-            <span className="text-foreground font-medium text-xs">{value}</span>
+        <div className="flex items-center gap-3 py-1 border-b border-border/50 last:border-0">
+            <div className="text-primary">{icon}</div>
+            <div className="flex-1">
+                <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{label}</div>
+                <div className="text-sm font-medium">{value}</div>
+            </div>
         </div>
     )
 }

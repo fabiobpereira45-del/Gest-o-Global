@@ -8,12 +8,11 @@ import {
 import { Button } from "@/components/ui/button"
 import {
     type StudentSession, type StudentProfile, getStudentProfileAuth, logoutStudentAuth,
-    type Semester, type Discipline, type StudyMaterial, type FinancialCharge, type ClassRoom, type ClassSchedule,
-    getSemesters, getDisciplines, getStudyMaterials, getFinancialCharges, getClasses, getClassSchedules,
-    getClassmates, getStudentGrades, type StudentGrade, getFinancialSettings
+    type Semester, type Discipline, type StudyMaterial, type ClassRoom, type ClassSchedule,
+    getSemesters, getDisciplines, getStudyMaterials, getClasses, getClassSchedules,
+    getClassmates, getStudentGrades, type StudentGrade
 } from "@/lib/store"
 import { StudentAuth } from "@/components/student-auth"
-import { FinancialStudentView } from "@/components/financial-student-view"
 import { StudentChatView } from "@/components/student-chat-view"
 import { StudentGradesView } from "@/components/student-grades-view"
 import { StudentAssessmentView } from "@/components/student-assessment-view"
@@ -42,7 +41,7 @@ interface Props {
     onLogout: () => void
 }
 
-type Tab = "overview" | "class-info" | "curriculum" | "materials" | "grades" | "exams" | "financial" | "chat" | "perfil"
+type Tab = "overview" | "class-info" | "curriculum" | "materials" | "grades" | "exams" | "chat" | "perfil"
 
 export function StudentDashboard({ session, onBack, onLogout }: Props) {
     const [profile, setProfile] = useState<StudentProfile | null>(null)
@@ -54,12 +53,10 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
     const [semesters, setSemesters] = useState<Semester[]>([])
     const [disciplines, setDisciplines] = useState<Discipline[]>([])
     const [materials, setMaterials] = useState<StudyMaterial[]>([])
-    const [charges, setCharges] = useState<FinancialCharge[]>([])
     const [myClass, setMyClass] = useState<ClassRoom | null>(null)
     const [mySchedules, setMySchedules] = useState<ClassSchedule[]>([])
     const [classmates, setClassmates] = useState<StudentProfile[]>([])
     const [officialGrades, setOfficialGrades] = useState<StudentGrade[]>([])
-    const [settings, setSettings] = useState<any>(null)
 
     const [dataLoading, setDataLoading] = useState(false)
 
@@ -69,15 +66,13 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
         setProfile(p)
         if (p) {
             setDataLoading(true)
-            const [s, d, m, c, cls, sch, fin] = await Promise.all([
-                getSemesters(), getDisciplines(), getStudyMaterials(), getFinancialCharges(p.id),
-                getClasses(), getClassSchedules(), getFinancialSettings()
+            const [s, d, m, cls, sch] = await Promise.all([
+                getSemesters(), getDisciplines(), getStudyMaterials(),
+                getClasses(), getClassSchedules()
             ])
-            setSettings(fin)
             setSemesters(s)
             setDisciplines(d)
             setMaterials(m)
-            setCharges(c)
             if (p.class_id) {
                 const foundClass = cls.find(cl => cl.id === p.class_id)
                 if (foundClass) setMyClass(foundClass)
@@ -127,8 +122,6 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
         )
     }
 
-    const isLocked = profile.payment_status !== 'paid' && charges.some(c => c.type === 'enrollment' && c.status !== 'paid')
-
     const navItems: { id: Tab; label: string; icon: any }[] = [
         { id: "overview", label: "Visão Geral", icon: Home },
         { id: "class-info", label: "Meu Núcleo", icon: Users },
@@ -136,7 +129,6 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
         { id: "materials", label: "Materiais EAD", icon: Library },
         { id: "exams", label: "Avaliações", icon: BookOpenCheck },
         { id: "grades", label: "Boletim e Notas", icon: FileText },
-        { id: "financial", label: "Financeiro", icon: Clock },
         { id: "chat", label: "Mensagens", icon: MessageSquare },
         { id: "perfil", label: "Meu Perfil", icon: User },
     ]
@@ -162,7 +154,7 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
 
             <ScrollArea className="flex-1 px-3">
                 <div className="flex flex-col gap-1.5 mb-8">
-                    {!isLocked && navItems.map((item) => (
+                    {navItems.map((item) => (
                         <button
                             key={item.id}
                             onClick={() => {
@@ -182,21 +174,6 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
                             {tab === item.id && <ChevronRight className="h-4 w-4 ml-auto opacity-70" />}
                         </button>
                     ))}
-
-                    {isLocked && (
-                        <button
-                            onClick={() => {
-                                setTab("financial")
-                                setIsMobileMenuOpen(false)
-                            }}
-                            className={cn(
-                                "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all bg-destructive text-white shadow-md shadow-destructive/20"
-                            )}
-                        >
-                            <Clock className="h-5 w-5" />
-                            Financeiro (Pendente)
-                        </button>
-                    )}
                 </div>
 
                 <div className="mt-4 px-3">
@@ -204,7 +181,7 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
                         <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#7c3aed' }}>Suporte Direto</p>
                         <p className="text-xs text-slate-400 mb-4 leading-relaxed">Dúvidas sobre o curso ou notas? Fale conosco.</p>
                         <Button variant="outline" size="sm" className="w-full bg-white/10 text-xs text-white border-white/20 hover:bg-white/20 h-8 gap-2" asChild>
-                            <a href={`https://wa.me/${settings?.whatsappNumber || "5571987483103"}`} target="_blank" rel="noopener noreferrer">
+                            <a href={`https://wa.me/5571987483103`} target="_blank" rel="noopener noreferrer">
                                 <MessageSquare className="h-3 w-3" /> WhatsApp
                             </a>
                         </Button>
@@ -306,26 +283,14 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
                             <Loader2 className="h-10 w-10 animate-spin text-primary opacity-40" />
                             <p className="text-sm font-medium text-muted-foreground">Sincronizando dados acadêmicos...</p>
                         </div>
-                    ) : isLocked && tab !== "financial" ? (
-                        <div className="flex flex-col items-center justify-center min-h-[400px] p-12 bg-white border border-destructive/10 rounded-3xl shadow-xl shadow-destructive/5 text-center max-w-2xl mx-auto">
-                            <div className="h-20 w-20 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-6 ring-8 ring-destructive/5">
-                                <Clock className="h-10 w-10" />
-                            </div>
-                            <h3 className="text-2xl font-bold text-foreground mb-3">Acesso Pendente</h3>
-                            <p className="text-muted-foreground leading-relaxed mb-8">Seu acesso ao Portal do Aluno está temporariamente limitado aguardando a confirmação do pagamento da matrícula. Por favor, regularize no setor financeiro.</p>
-                            <Button variant="default" onClick={() => setTab("financial")} className="bg-destructive hover:bg-destructive/90 text-white font-bold h-12 px-10 rounded-2xl shadow-lg shadow-destructive/20 transform hover:scale-105 transition-all">
-                                Acessar Financeiro Agora
-                            </Button>
-                        </div>
                     ) : (
                         <div className="w-full max-w-[1600px] mx-auto">
-                            {tab === "overview" && <OverviewTab profile={profile} charges={charges} onTabChange={setTab} />}
+                            {tab === "overview" && <OverviewTab profile={profile} onTabChange={setTab} />}
                             {tab === "class-info" && <ClassInfoTab myClass={myClass} classmates={classmates} mySchedules={mySchedules} disciplines={disciplines} officialGrades={officialGrades} />}
                             {tab === "curriculum" && <CurriculumTab semesters={semesters} disciplines={disciplines} />}
                             {tab === "materials" && <MaterialsTab filteredMaterials={filteredMaterials} disciplines={disciplines} />}
                             {tab === "exams" && <StudentAssessmentView studentId={profile.id} studentName={profile.name} studentEmail={session?.email || ""} studentDoc={profile.cpf} />}
                             {tab === "grades" && <StudentGradesView studentId={profile.id} studentEmail={session?.email || ""} studentDoc={profile.cpf} />}
-                            {tab === "financial" && <FinancialStudentView studentId={profile.id} />}
                             {tab === "chat" && <StudentChatView studentId={profile.id} studentName={profile.name} />}
                             {tab === "perfil" && <ProfileTab profile={profile} onUpdateSuccess={checkAuth} />}
                         </div>
