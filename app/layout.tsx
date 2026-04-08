@@ -38,6 +38,8 @@ export const metadata: Metadata = {
   },
 }
 
+import { ErrorBoundary } from "@/components/error-boundary"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -46,7 +48,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${inter.variable} ${merriweather.variable}`}>
       <body className="font-sans antialiased bg-background text-foreground" suppressHydrationWarning>
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
       </body>
     </html>
   )
