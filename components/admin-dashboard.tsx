@@ -33,8 +33,8 @@ import { AssessmentBuilder } from "@/components/assessment-builder"
 import { ProfessorManager } from "@/components/professor-manager"
 import { SemesterManager } from "@/components/semester-manager"
 import { StudyMaterialManager } from "@/components/study-material-manager"
-// Financial imports removed
 import { ProfessorChatView } from "@/components/professor-chat-view"
+import { FinancialDashboard } from "@/components/financial/FinancialDashboard"
 import { AttendanceManager } from "@/components/attendance-manager"
 import { ClassManager } from "@/components/class-manager"
 import { StudentManager } from "@/components/student-manager"
@@ -50,7 +50,6 @@ import { OverviewTab } from "./admin/tabs/OverviewTab"
 import { SubmissionsTab } from "./admin/tabs/SubmissionsTab"
 import { AssessmentsTab } from "./admin/tabs/AssessmentsTab"
 import { SettingsTab } from "./admin/tabs/SettingsTab"
-// Financial Dashboard removed
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -67,7 +66,7 @@ function formatTime(s: number) {
   return `${m}m${sec.toString().padStart(2, "0")}s`
 }
 
-type Tab = "overview" | "students" | "grades" | "submissions" | "questions" | "assessments" | "professors" | "semesters" | "class_schedules" | "materials" | "settings" | "chat" | "attendance" | "classes" | "institutional"
+type Tab = "overview" | "students" | "grades" | "submissions" | "questions" | "assessments" | "professors" | "semesters" | "class_schedules" | "materials" | "settings" | "chat" | "attendance" | "classes" | "institutional" | "financeiro"
 
 interface Props {
   onLogout: () => void
@@ -144,6 +143,7 @@ export function AdminDashboard({ onLogout }: Props) {
       title: "Administração",
       items: [
         { id: "professors", label: "Professores", icon: <ShieldCheck className="h-4 w-4" />, masterOnly: true },
+        { id: "financeiro", label: "Financeiro", icon: <DollarSign className="h-4 w-4" />, masterOnly: true },
         { id: "settings", label: "Configurações", icon: <Settings className="h-4 w-4" /> },
       ]
     },
@@ -370,6 +370,7 @@ export function AdminDashboard({ onLogout }: Props) {
                 {tab === "attendance" && <AttendanceManager />}
                 {tab === "classes" && isMaster && <ClassManager />}
                 {tab === "chat" && <ProfessorChatView />}
+                {tab === "financeiro" && isMaster && <FinancialDashboard />}
                 {tab === "professors" && isMaster && <ProfessorManager />}
                 {tab === "institutional" && <InstitutionalManager />}
                 {tab === "settings" && <SettingsTab assessments={assessments || []} onRefresh={refresh} onLogout={onLogout} />}
