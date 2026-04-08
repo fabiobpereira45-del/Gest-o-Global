@@ -152,6 +152,10 @@ function ProfessorForm({
 export function ProfessorManager() {
   const [accounts, setAccounts] = useState<ProfessorAccount[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [linkProfId, setLinkProfId] = useState<string | null>(null)
 
   async function refresh() {
     setAccounts(await getProfessorAccounts())
