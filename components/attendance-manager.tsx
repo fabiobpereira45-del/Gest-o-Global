@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select"
 import {
     type Discipline, type StudentProfile, type Attendance, type ClassRoom,
-    getDisciplines, getStudents, getAttendances, saveAttendance, getProfessorSession, getDisciplinesByProfessor, getClasses
+    getDisciplines, getStudents, getAttendances, saveAttendance, getProfessorSession, getDisciplinesByProfessor, getClasses, saveBatchAttendances
 } from "@/lib/store"
 import { printAttendanceReportPDF } from "@/lib/pdf"
 
@@ -29,6 +29,7 @@ export function AttendanceManager() {
     const [attendances, setAttendances] = useState<Record<string, boolean>>({})
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
 
     // Initialize
     useEffect(() => {
@@ -78,18 +79,30 @@ export function AttendanceManager() {
     async function handleSave() {
         if (selectedDisciplineId === "none" || !selectedDate) return
         setSaving(true)
+        setProgress(null)
+        
         try {
-            // For each student currently visible or in state, save their attendance
-            const promises = filteredStudents.map(student => {
-                const isPresent = attendances[student.id] === true
-                return saveAttendance(student.id, selectedDisciplineId, selectedDate, isPresent, lessonType)
+            // Prepare all attendance records in batch
+            const batchData = filteredStudents.map(student => ({
+                studentId: student.id,
+                disciplineId: selectedDisciplineId,
+                date: selectedDate,
+                isPresent: attendances[student.id] === true,
+                type: lessonType
+            }))
+
+            // Save all at once with progress tracking
+            await saveBatchAttendances(batchData, (current, total) => {
+                setProgress({ current, total })
             })
-            await Promise.all(promises)
+
             alert("Frequência salva com sucesso!")
         } catch (e: any) {
             alert("Erro ao salvar: " + e.message)
+        } finally {
+            setSaving(false)
+            setProgress(null)
         }
-        setSaving(false)
     }
 
     function toggleAttendance(studentId: string) {
@@ -127,9 +140,9 @@ export function AttendanceManager() {
                         <Download className="h-4 w-4 mr-2" />
                         Exportar PDF
                     </Button>
-                    <Button onClick={handleSave} disabled={saving || selectedDisciplineId === "none" || !selectedDate}>
+                    <Button onClick={handleSave} disabled={saving || selectedDisciplineId === "none" || !selectedDate} className="relative">
                         {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                        Salvar Frequência
+                        {saving && progress ? `Salvando... ${progress.current}/${progress.total}` : "Salvar Frequência"}
                     </Button>
                 </div>
             </div>

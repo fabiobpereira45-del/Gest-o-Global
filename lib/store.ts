@@ -1575,6 +1575,121 @@ export async function saveAttendance(studentId: string, disciplineId: string, da
   }
 }
 
+// 🚀 OPTIMIZED: Batch attendance save - Much faster for multiple students
+export async function saveBatchAttendances(
+  attendanceData: Array<{
+    studentId: string;
+    disciplineId: string;
+    date: string;
+    isPresent: boolean;
+    type?: "presencial" | "ead";
+  }>,
+  onProgress?: (current: number, total: number) => void
+): Promise<void> {
+  if (!attendanceData || attendanceData.length === 0) return;
+
+  const supabase = createClient();
+  const settings = await getGradingSettings();
+  const now = new Date().toISOString();
+
+  // Step 1: Prepare all attendance records for upsert (with unique constraint)
+  const attendanceRecords = attendanceData.map((att) => ({
+    student_id: att.studentId,
+    discipline_id: att.disciplineId,
+    date: att.date,
+    is_present: att.isPresent,
+    type: att.type || "presencial",
+    created_at: now,
+  }));
+
+  // Step 2: Upsert all attendance records at once (uses unique constraint)
+  const { error: attendanceError } = await supabase
+    .from("attendances")
+    .upsert(attendanceRecords, { onConflict: "student_id,discipline_id,date" });
+
+  if (attendanceError) {
+    throw new Error(`Erro ao salvar frequência: ${attendanceError.message}`);
+  }
+
+  onProgress?.(Math.floor(attendanceData.length * 0.33), attendanceData.length);
+
+  // Step 3: Get all unique student IDs and fetch their data
+  const uniqueStudentIds = [...new Set(attendanceData.map((a) => a.studentId))];
+  const { data: students } = await supabase
+    .from("students")
+    .select("id, cpf, enrollment_number, name")
+    .in("id", uniqueStudentIds);
+
+  onProgress?.(Math.floor(attendanceData.length * 0.66), attendanceData.length);
+
+  // Step 4: Calculate attendance scores for all students and sync with grades
+  if (students && students.length > 0) {
+    const disciplineIds = [...new Set(attendanceData.map((a) => a.disciplineId))];
+
+    // Fetch all attendance records for these students and disciplines
+    const { data: allAttendances } = await supabase
+      .from("attendances")
+      .select("student_id, discipline_id, is_present")
+      .in("student_id", uniqueStudentIds)
+      .in("discipline_id", disciplineIds);
+
+    // Calculate presence counts per student per discipline
+    const presenceCounts: Record<string, Record<string, number>> = {};
+    (allAttendances || []).forEach((att: any) => {
+      if (att.is_present) {
+        if (!presenceCounts[att.student_id]) {
+          presenceCounts[att.student_id] = {};
+        }
+        presenceCounts[att.student_id][att.discipline_id] =
+          (presenceCounts[att.student_id][att.discipline_id] || 0) + 1;
+      }
+    });
+
+    // Step 5: Prepare grade updates/inserts in batch
+    const gradeUpserts: any[] = [];
+
+    students.forEach((student: any) => {
+      disciplineIds.forEach((disciplineId: string) => {
+        const presenceCount =
+          presenceCounts[student.id]?.[disciplineId] || 0;
+        const newScore =
+          presenceCount * (settings.pointsPerPresence || 0);
+
+        gradeUpserts.push({
+          student_identifier: student.cpf || student.enrollment_number,
+          student_name: student.name,
+          discipline_id: disciplineId,
+          attendance_score: newScore,
+          is_public: false,
+          is_released: true,
+          exam_grade: 0,
+          works_grade: 0,
+          seminar_grade: 0,
+          participation_bonus: 0,
+          custom_divisor: settings.totalDivisor || 4,
+          created_at: now,
+        });
+      });
+    });
+
+    // Upsert all grades at once
+    if (gradeUpserts.length > 0) {
+      const { error: gradeError } = await supabase
+        .from("student_grades")
+        .upsert(gradeUpserts, {
+          onConflict: "student_identifier,discipline_id",
+        });
+
+      if (gradeError) {
+        console.error("Erro ao sincronizar notas:", gradeError.message);
+        // Don't throw - attendance was saved successfully
+      }
+    }
+  }
+
+  onProgress?.(attendanceData.length, attendanceData.length);
+}
+
 // â”€â”€â”€ n8n WhatsApp Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // â”€â”€â”€ Notas (Student Grades) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
