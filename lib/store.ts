@@ -2059,10 +2059,27 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
     let dueDate: string
     const cleanName = (disc.name || "").trim()
 
-    if (disc.execution_date) {
-      const [yr, mo] = disc.execution_date.split('-')
-      expectedDesc = `MENSALIDADE: ${cleanName} - ${mo}/${yr}`
-      dueDate = `${yr}-${mo}-10`
+    // Robust parsing for manual dates (MM/YYYY or Portuguese month/year)
+    const parseMonthYear = (s: string) => {
+      if (!s) return null
+      const clean = s.toLowerCase().trim()
+      const matchYm = clean.match(/^(\d{4})-(\d{1,2})/)
+      if (matchYm) return { yr: matchYm[1], mo: matchYm[2].padStart(2, '0') }
+      const matchMy = clean.match(/^(\d{1,2})[\/\-](\d{4})/)
+      if (matchMy) return { mo: matchMy[1].padStart(2, '0'), yr: matchMy[2] }
+      const months = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+      const normS = clean.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      const foundMonth = months.findIndex(m => normS.includes(m))
+      const foundYear = normS.match(/\d{4}/)
+      if (foundMonth !== -1 && foundYear) return { mo: String(foundMonth + 1).padStart(2, '0'), yr: foundYear[0] }
+      return null
+    }
+
+    const parsed = disc.execution_date ? parseMonthYear(disc.execution_date) : null
+
+    if (parsed) {
+      expectedDesc = `MENSALIDADE: ${cleanName} - ${parsed.mo}/${parsed.yr}`
+      dueDate = `${parsed.yr}-${parsed.mo}-10`
     } else {
       // Logic for auto-calculating date based on order if execution_date is missing
       const startMonth = 7 // August
@@ -2074,7 +2091,6 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
       
       for (let i = 0; i < indexOffset; i++) {
         targetMonth++
-        if (targetMonth === 11) { targetMonth = 0; targetYear++ }
         if (targetMonth === 12) { targetMonth = 0; targetYear++ }
       }
       
@@ -2099,17 +2115,15 @@ export async function syncStudentFinancialCharges(studentId: string, settings: F
         }
       }
     } else {
-      // Auto-mark as paid ONLY for historical data (2025)
-      const isHistorical = dueDate.startsWith('2025')
-      
+      // Charges are PENDING by default so they appear clearly for user action
       toInsert.push({
         student_id: studentId,
         type: 'monthly',
         description: expectedDesc,
         amount: settings.monthlyFee,
         due_date: dueDate,
-        status: isHistorical ? 'paid' : 'pending',
-        payment_date: isHistorical ? new Date().toISOString() : null,
+        status: 'pending',
+        payment_date: null,
         created_at: new Date().toISOString()
       })
     }
