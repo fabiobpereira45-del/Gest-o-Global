@@ -1913,71 +1913,98 @@ export async function deleteExpense(id: string): Promise<void> {
 // â”€â”€â”€ Bulk Disciplines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function insertIBADDisciplines(): Promise<void> {
-  const disciplines = [
-    "Hermenêutica",
-    "Introdução Bíblica",
-    "Teologia Sistemática",
-    "Pentateuco",
-    "Livros Históricos",
-    "Livros Poéticos",
-    "Profetas",
-    "História da Igreja",
-    "Maneiras e Costumes",
-    "Cristologia",
-    "Geografia Bíblica",
-    "Introdução ao Novo Testamento",
-    "Evangelhos e Atos",
-    "Epístolas Paulíneas",
-    "Hebreus e Epístolas Gerais",
-    "Escatologia",
-    "Religiões Comparadas",
-    "Missiologia",
-    "Evangelismo",
-    "Fundamentos da Psicologia e do Aconselhamento",
-    "Teologia Pastoral",
-    "Homilética",
-    "Escola Bíblica Dominical",
-    "Evidência Cristã",
-    "Português"
+  const officialNames = [
+    "Hermenêutica", "Introdução Bíblica", "Teologia Sistemática", "Pentateuco",
+    "Livros Históricos", "Livros Poéticos", "Profetas", "História da Igreja",
+    "Maneiras e Costumes", "Cristologia", "Geografia Bíblica", "Introdução ao Novo Testamento",
+    "Evangelhos e Atos", "Epístolas Paulíneas", "Hebreus e Epístolas Gerais", "Escatologia",
+    "Religiões Comparadas", "Missiologia", "Evangelismo", "Fundamentos da Psicologia e do Aconselhamento",
+    "Teologia Pastoral", "Homilética", "Escola Bíblica Dominical", "Evidência Cristã", "Português"
   ]
   const supabase = createClient()
-  const { data: existing } = await supabase.from('disciplines').select('name, id, order')
-  const existingMap = new Map<string, { id: string, order: number }>()
-  for (const d of existing || []) {
-    existingMap.set(d.name, d)
+  
+  // Normalization helper
+  const norm = (s: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim()
+  
+  const officialNormalized = officialNames.map(norm)
+  const normToOriginal = new Map<string, string>()
+  officialNames.forEach(n => normToOriginal.set(norm(n), n))
+
+  // 1. Fetch EVERYTHING
+  const { data: allDb } = await supabase.from('disciplines').select('id, name, semester_id, order')
+  if (!allDb) return
+
+  const toDelete: string[] = []
+  const existingMap = new Map<string, { id: string, semester_id: string | null }[]>()
+
+  // 2. Identify Residue & Group Duplicates
+  allDb.forEach(d => {
+    const n = norm(d.name)
+    if (!officialNormalized.includes(n)) {
+      // Residue: Not in the 25-item list
+      toDelete.push(d.id)
+    } else {
+      const list = existingMap.get(n) || []
+      list.push({ id: d.id, semester_id: d.semester_id })
+      existingMap.set(n, list)
+    }
+  })
+
+  // 3. Resolve Duplicates (Keep linked ones)
+  for (const [n, records] of existingMap.entries()) {
+    if (records.length > 1) {
+      // Sort: Linked ones first, then by earliest ID/created
+      records.sort((a, b) => {
+        if (a.semester_id && !b.semester_id) return -1
+        if (!a.semester_id && b.semester_id) return 1
+        return 0
+      })
+      // Keep the first, delete the others
+      for (let i = 1; i < records.length; i++) {
+        toDelete.push(records[i].id)
+      }
+    }
   }
 
+  // 4. Execut Delete Residue
+  if (toDelete.length > 0) {
+    console.log('[insertIBADDisciplines] Deleting residues:', toDelete)
+    await supabase.from('disciplines').delete().in('id', toDelete)
+  }
+
+  // 5. Final Upsert / Order Repair
   const toInsert: any[] = []
   const updates: any[] = []
 
-  disciplines.forEach((name, index) => {
+  officialNames.forEach((name, index) => {
     const canonicalOrder = 100 + index
-    const existing = existingMap.get(name)
+    const normName = norm(name)
+    const records = existingMap.get(normName)
+    const existing = records && records.length > 0 ? records[0] : null
 
-    if (!existing) {
+    if (!existing || toDelete.includes(existing.id)) {
       toInsert.push({
         id: uid(),
         name,
         order: canonicalOrder,
         created_at: new Date().toISOString()
       })
-    } else if (existing.order !== canonicalOrder) {
-      updates.push({
-        id: existing.id,
-        order: canonicalOrder
-      })
+    } else {
+      // Matched: Ensure Name and Order are canonical
+      // Using direct fetch search vs name mismatch repair
+      const dbMatch = allDb.find(x => x.id === existing.id)
+      if (dbMatch && (dbMatch.order !== canonicalOrder || dbMatch.name !== name)) {
+        updates.push({ id: existing.id, name, order: canonicalOrder })
+      }
     }
   })
 
-  // Insert missing
   if (toInsert.length > 0) {
-    const { error } = await supabase.from('disciplines').insert(toInsert)
-    if (error) throw new Error(error.message)
+    await supabase.from('disciplines').insert(toInsert)
   }
 
-  // Repair existing orders (Bulk update is not native in JS client for different values, doing one by one or small batches)
   for (const up of updates) {
-    await supabase.from('disciplines').update({ order: up.order }).eq('id', up.id)
+    await supabase.from('disciplines').update({ name: up.name, order: up.order }).eq('id', up.id)
   }
 }
 
