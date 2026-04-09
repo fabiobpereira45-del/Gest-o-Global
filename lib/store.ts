@@ -913,6 +913,25 @@ export async function getAttendanceFinalization(disciplineId: string, date: stri
   }
 }
 
+export async function getAttendancesByDate(disciplineId: string, date: string): Promise<Attendance[]> {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from('attendances')
+      .select('*')
+      .match({ discipline_id: disciplineId, date })
+    
+    if (error) {
+      console.error("Erro ao buscar presenças por data:", error)
+      return []
+    }
+    
+    return (data || []).map(mapAttendance)
+  } catch (err) {
+    console.error("Erro crítico em getAttendancesByDate:", err)
+    return []
+  }
+}
+
 
 export async function finalizeAttendance(disciplineId: string, date: string, finalizedBy: string): Promise<void> {
   try {
