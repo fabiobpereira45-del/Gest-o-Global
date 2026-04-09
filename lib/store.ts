@@ -891,23 +891,42 @@ export async function getAttendanceFinalization(disciplineId: string, date: stri
 
 
 export async function finalizeAttendance(disciplineId: string, date: string, finalizedBy: string): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase.from('attendance_finalizations').insert({
-    discipline_id: disciplineId,
-    date,
-    finalized_by: finalizedBy,
-    created_at: new Date().toISOString()
-  })
-  if (error) throw new Error(error.message)
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from('attendance_finalizations').insert({
+      discipline_id: disciplineId,
+      date,
+      finalized_by: finalizedBy,
+      created_at: new Date().toISOString()
+    })
+    if (error) {
+        if (error.message?.includes("not found")) {
+            throw new Error("O mecanismo de trancamento ainda não foi ativado no seu banco de dados. Por favor, execute o script SQL fornecido.")
+        }
+        throw new Error(error.message)
+    }
+  } catch (err: any) {
+    throw err
+  }
 }
 
 export async function unfinalizeAttendance(disciplineId: string, date: string): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase.from('attendance_finalizations')
-    .delete()
-    .match({ discipline_id: disciplineId, date })
-  if (error) throw new Error(error.message)
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from('attendance_finalizations')
+      .delete()
+      .match({ discipline_id: disciplineId, date })
+    if (error) {
+        if (error.message?.includes("not found")) {
+            return // Ignore if table doesn't exist, as it's definitely not finalized
+        }
+        throw new Error(error.message)
+    }
+  } catch (err) {
+    // Ignore errors for unfinalizing
+  }
 }
+
 
 
 export async function getClassSchedules(): Promise<ClassSchedule[]> {
