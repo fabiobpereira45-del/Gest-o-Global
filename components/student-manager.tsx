@@ -71,7 +71,7 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     // ── Add form ──────────────────────────────────────────────────────────────
     const [name, setName] = useState("")
     const [email, setEmail] = useState("")
-    const [password, setPassword] = useState("123456")
+    const [password, setPassword] = useState("IBAD2026")
     const [showPassword, setShowPassword] = useState(false)
     const [cpf, setCpf] = useState("")
     const [phone, setPhone] = useState("")
@@ -149,7 +149,7 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     // ─── Create ───────────────────────────────────────────────────────────────
 
     function resetAddForm() {
-        setName(""); setEmail(""); setPassword("123456"); setCpf(""); setPhone("")
+        setName(""); setEmail(""); setPassword("IBAD2026"); setCpf(""); setPhone("")
         setChurch(""); setPastor(""); setBirthDate(""); setStreet(""); setNumber("")
         setNeighborhood(""); setCity(""); setState(""); setClassId("none")
     }
@@ -322,7 +322,7 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                 await registerStudentByAdmin({
                     name: bulkName?.trim() || "",
                     email: bulkEmail?.trim() || "",
-                    password: "123456", // Default password
+                    password: "IBAD2026", // Default password
                     cpf: bulkCpf?.trim() || "",
                     phone: bulkPhone?.trim() || "",
                     class_id: bulkClassId?.trim() === "none" ? undefined : bulkClassId?.trim(),

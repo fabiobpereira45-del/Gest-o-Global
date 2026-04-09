@@ -82,7 +82,7 @@ async function registerAll() {
     for (const s of students) {
         console.log(`Processando: ${s.name}...`);
         try {
-            const password = "123456";
+            const password = "IBAD2026";
             const cleanCpf = s.cpf.replace(/\D/g, '');
             const email = s.email.toLowerCase().trim();
 

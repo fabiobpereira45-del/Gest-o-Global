@@ -111,7 +111,7 @@ function EnrollmentContent() {
                 </div>
                 <h2 className="text-3xl font-bold text-foreground">Matrícula Realizada!</h2>
                 <p className="text-muted-foreground">
-                    Sua matrícula no IBAD foi concluída com sucesso. Você já pode acessar o portal usando seu CPF e a senha padrão <b>123456</b>.
+                    Sua matrícula no IBAD foi concluída com sucesso. Você já pode acessar o portal usando seu CPF e a senha padrão <b>IBAD2026</b>.
                 </p>
                 <div className="bg-muted p-4 rounded-2xl border border-border">
                     <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Número de Matrícula</p>

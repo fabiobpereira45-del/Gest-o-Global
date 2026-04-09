@@ -198,7 +198,7 @@ export function StudentAuth({ onSuccess }: Props) {
                         </div>
                         {mode === "login" && (
                             <p className="text-xs text-muted-foreground mt-4 text-center leading-relaxed">
-                                💡 <b>Dica:</b> Sua senha inicial é seu <b>CPF (apenas números)</b> ou <b>123456</b>.
+                                💡 <b>Dica:</b> Sua senha inicial é seu <b>CPF (apenas números)</b> ou <b>IBAD2026</b>.
                             </p>
                         )}
                     </div>
