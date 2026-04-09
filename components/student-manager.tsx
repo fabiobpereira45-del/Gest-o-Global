@@ -77,6 +77,12 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     const [phone, setPhone] = useState("")
     const [church, setChurch] = useState("")
     const [pastor, setPastor] = useState("")
+    const [birthDate, setBirthDate] = useState("")
+    const [street, setStreet] = useState("")
+    const [number, setNumber] = useState("")
+    const [neighborhood, setNeighborhood] = useState("")
+    const [city, setCity] = useState("")
+    const [state, setState] = useState("")
     const [classId, setClassId] = useState("none")
 
     // ── Edit form ─────────────────────────────────────────────────────────────
@@ -85,6 +91,12 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     const [editPhone, setEditPhone] = useState("")
     const [editChurch, setEditChurch] = useState("")
     const [editPastor, setEditPastor] = useState("")
+    const [editBirthDate, setEditBirthDate] = useState("")
+    const [editStreet, setEditStreet] = useState("")
+    const [editNumber, setEditNumber] = useState("")
+    const [editNeighborhood, setEditNeighborhood] = useState("")
+    const [editCity, setEditCity] = useState("")
+    const [editState, setEditState] = useState("")
     const [editClassId, setEditClassId] = useState("none")
     const [editStatus, setEditStatus] = useState<StudentProfile['status']>('pending')
 
@@ -138,7 +150,8 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
 
     function resetAddForm() {
         setName(""); setEmail(""); setPassword("123456"); setCpf(""); setPhone("")
-        setChurch(""); setPastor(""); setClassId("none")
+        setChurch(""); setPastor(""); setBirthDate(""); setStreet(""); setNumber("")
+        setNeighborhood(""); setCity(""); setState(""); setClassId("none")
     }
 
     async function handleAdd() {
@@ -154,6 +167,12 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                 phone: phone.trim(),
                 church: church.trim(),
                 pastor: pastor.trim(),
+                birth_date: birthDate,
+                street: street,
+                number: number,
+                neighborhood: neighborhood,
+                city: city,
+                state: state,
                 classId: classId === "none" ? undefined : classId,
             })
             setIsAddOpen(false)
@@ -176,6 +195,12 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
         setEditPhone(stu.phone || "")
         setEditChurch(stu.church || "")
         setEditPastor(stu.pastor_name || "")
+        setEditBirthDate(stu.birth_date || "")
+        setEditStreet(stu.street || "")
+        setEditNumber(stu.number || "")
+        setEditNeighborhood(stu.neighborhood || "")
+        setEditCity(stu.city || "")
+        setEditState(stu.state || "")
         setEditClassId(stu.class_id || "none")
         setEditStatus(stu.status || 'pending')
         setEditPassword("")
@@ -195,6 +220,12 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                 phone: editPhone.trim(),
                 church: editChurch.trim(),
                 pastor_name: editPastor.trim(),
+                birth_date: editBirthDate,
+                street: editStreet,
+                number: editNumber,
+                neighborhood: editNeighborhood,
+                city: editCity,
+                state: editState,
                 class_id: editClassId === "none" ? null : editClassId,
                 status: 'active',
                 ...(editPassword ? { password: editPassword } : {}),
@@ -266,7 +297,7 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     }
 
     function downloadStudentsPDF() {
-        printStudentListPDF(filtered, classes)
+        printStudentListPDF(filtered, classes, "Cosme de Farias")
     }
 
     async function handleBulkImport() {
@@ -546,6 +577,39 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                             </div>
                         </div>
 
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-xs">Data de Nascimento</Label>
+                                <Input type="text" placeholder="Ex: DD/MM/AAAA" className="text-sm h-9" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-xs">Estado (UF)</Label>
+                                <Input className="text-sm h-9" placeholder="Ex: BA" value={state} onChange={e => setState(e.target.value)} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="flex flex-col gap-1.5 sm:col-span-2">
+                                <Label className="text-xs">Rua</Label>
+                                <Input className="text-sm h-9" value={street} onChange={e => setStreet(e.target.value)} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-xs">Nº</Label>
+                                <Input className="text-sm h-9" value={number} onChange={e => setNumber(e.target.value)} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-xs">Bairro</Label>
+                                <Input className="text-sm h-9" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-xs">Cidade</Label>
+                                <Input className="text-sm h-9" value={city} onChange={e => setCity(e.target.value)} />
+                            </div>
+                        </div>
+
                         <div className="flex flex-col gap-1.5">
                             <Label className="text-xs">Turma Inicial (Opcional)</Label>
                             <select value={classId} onChange={e => setClassId(e.target.value)} className="w-full text-sm h-9 border border-input rounded-md px-3 bg-background">
@@ -610,6 +674,39 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                             </div>
                         </div>
 
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-xs">Data de Nascimento</Label>
+                                <Input type="text" placeholder="Ex: DD/MM/AAAA" className="text-sm h-9" value={editBirthDate} onChange={e => setEditBirthDate(e.target.value)} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-xs">Estado (UF)</Label>
+                                <Input className="text-sm h-9" placeholder="Ex: BA" value={editState} onChange={e => setEditState(e.target.value)} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="flex flex-col gap-1.5 sm:col-span-2">
+                                <Label className="text-xs">Rua</Label>
+                                <Input className="text-sm h-9" value={editStreet} onChange={e => setEditStreet(e.target.value)} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-xs">Nº</Label>
+                                <Input className="text-sm h-9" value={editNumber} onChange={e => setEditNumber(e.target.value)} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-xs">Bairro</Label>
+                                <Input className="text-sm h-9" value={editNeighborhood} onChange={e => setEditNeighborhood(e.target.value)} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-xs">Cidade</Label>
+                                <Input className="text-sm h-9" value={editCity} onChange={e => setEditCity(e.target.value)} />
+                            </div>
+                        </div>
+
                         <div className="flex flex-col gap-1.5">
                             <Label className="text-xs">Turma</Label>
                             <select value={editClassId} onChange={e => setEditClassId(e.target.value)} className="w-full text-sm h-9 border border-input rounded-md px-3 bg-background">
@@ -667,6 +764,7 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                                 <InfoRow icon={<Phone className="h-3.5 w-3.5" />} label="Telefone" value={selected.phone || "—"} />
                                 <InfoRow icon={<Building2 className="h-3.5 w-3.5" />} label="Igreja" value={selected.church || "—"} />
                                 <InfoRow icon={<UserCircle2 className="h-3.5 w-3.5" />} label="Pastor" value={selected.pastor_name || "—"} />
+                                <InfoRow icon={<MapPin className="h-3.5 w-3.5" />} label="Endereço" value={`${selected.street || ""}, ${selected.number || ""}, ${selected.neighborhood || ""} - ${selected.city || ""}/${selected.state || ""}`} />
                                 <InfoRow icon={<Users className="h-3.5 w-3.5" />} label="Turma" value={cls ? `${cls.name} (${SHIFT_LABELS[cls.shift] || cls.shift})` : "Sem turma"} />
                                 <div className="text-xs text-muted-foreground pt-1">
                                     Cadastrado em: {new Date(selected.created_at).toLocaleDateString("pt-BR")}

@@ -92,7 +92,7 @@ export function AttendanceManager() {
             }))
 
             // Save all at once with progress tracking
-            await saveBatchAttendances(batchData, (current, total) => {
+            await saveBatchAttendances(batchData, (current: number, total: number) => {
                 setProgress({ current, total })
             })
 
@@ -133,7 +133,7 @@ export function AttendanceManager() {
                         try {
                             const att = await getAttendances(selectedDisciplineId)
                             const discName = disciplines.find(d => d.id === selectedDisciplineId)?.name || ""
-                            printAttendanceReportPDF(att, students, discName)
+                            printAttendanceReportPDF(att, students, discName, "Cosme de Farias")
                         } catch (e: any) { alert("Erro ao gerar PDF: " + e.message) }
                         setLoading(false)
                     }} className="border-primary text-primary hover:bg-primary/10">

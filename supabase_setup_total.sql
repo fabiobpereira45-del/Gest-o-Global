@@ -49,6 +49,12 @@ CREATE TABLE IF NOT EXISTS public.students (
     class_id UUID REFERENCES public.classes(id) ON DELETE SET NULL,
     avatar_url TEXT,
     bio TEXT,
+    birth_date TEXT,
+    street TEXT,
+    number TEXT,
+    neighborhood TEXT,
+    city TEXT,
+    state TEXT,
     status TEXT DEFAULT 'pending', -- 'pending', 'active', 'inactive'
     created_at TIMESTAMPTZ DEFAULT now()
 );

@@ -11,9 +11,12 @@ import {
   getStudentTuitions, 
   getDisciplines, 
   processTuitionPayment,
+  getStudentProfile,
   type StudentTuition, 
-  type Discipline 
+  type Discipline,
+  type StudentProfile
 } from "@/lib/store"
+import { printReceiptPDF } from "@/lib/pdf"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -24,18 +27,21 @@ interface Props {
 export function StudentFinancialView({ studentId }: Props) {
   const [tuitions, setTuitions] = useState<StudentTuition[]>([])
   const [disciplines, setDisciplines] = useState<Discipline[]>([])
+  const [student, setStudent] = useState<StudentProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"all" | "pending" | "paid">("all")
 
   async function load() {
     setLoading(true)
     try {
-      const [t, d] = await Promise.all([
+      const [t, d, s] = await Promise.all([
         getStudentTuitions(studentId),
-        getDisciplines()
+        getDisciplines(),
+        getStudentProfile(studentId)
       ])
       setTuitions(t)
       setDisciplines(d)
+      setStudent(s)
     } finally {
       setLoading(false)
     }
@@ -139,22 +145,34 @@ export function StudentFinancialView({ studentId }: Props) {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-6">
-                      <div className="text-right">
-                        <p className="font-black text-foreground">R$ {tu.amount.toFixed(2)}</p>
-                        <StatusBadge status={tu.status} />
+                      <div className="flex items-center justify-between sm:justify-end gap-2">
+                        <div className="text-right mr-4">
+                          <p className="font-black text-foreground">R$ {tu.amount.toFixed(2)}</p>
+                          <StatusBadge status={tu.status} />
+                        </div>
+                        {tu.status === 'paid' && (
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-8"
+                            onClick={() => {
+                              if (student && discipline) printReceiptPDF(tu, student, discipline, "Cosme de Farias")
+                            }}
+                          >
+                            <Download className="h-3 w-3 mr-1" /> Recibo
+                          </Button>
+                        )}
+                        {tu.status !== 'paid' && (
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="text-primary hover:bg-primary/5 font-bold h-8"
+                            onClick={() => processTuitionPayment(tu.id, new Date().toISOString().split('T')[0])}
+                          >
+                            Pagar <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        )}
                       </div>
-                      {tu.status !== 'paid' && (
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="text-primary hover:bg-primary/5 font-bold"
-                          onClick={() => processTuitionPayment(tu.id, new Date().toISOString().split('T')[0])}
-                        >
-                          Pagar <ChevronRight className="h-4 w-4 ml-1" />
-                        </Button>
-                      )}
-                    </div>
                   </div>
                 )
               })

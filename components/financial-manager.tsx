@@ -38,7 +38,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-// import { printFinancialDRE_PDF, printTuitionReportPDF } from "@/lib/pdf"
+import { printFinancialDRE_PDF, printTuitionReportPDF, printReceiptPDF } from "@/lib/pdf"
 
 // --- Constants ---
 const CATEGORIES = [
@@ -146,9 +146,12 @@ export function FinancialManager() {
           <Button onClick={loadData} variant="outline" size="icon">
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
           </Button>
-          {/* <Button variant="outline" onClick={() => printFinancialDRE_PDF(transactions, competencia)}>
+          <Button variant="outline" onClick={() => printFinancialDRE_PDF(transactions, competencia, "Cosme de Farias")}>
             <Download className="h-4 w-4 mr-2" /> PDF DRE
-          </Button> */}
+          </Button>
+          <Button variant="outline" onClick={() => printTuitionReportPDF(tuitions, students, "Cosme de Farias")}>
+            <Printer className="h-4 w-4 mr-2" /> Relatório Mensalidades
+          </Button>
         </div>
       </div>
 
@@ -297,7 +300,16 @@ export function FinancialManager() {
                                     <td className="p-4">
                                        <StatusBadge status={tu.status} />
                                     </td>
-                                    <td className="p-4">
+                                    <td className="p-4 flex gap-2">
+                                       {tu.status === 'paid' && (
+                                         <Button size="sm" variant="outline" onClick={() => {
+                                            const st = students.find(s => s.id === tu.studentId)
+                                            const ds = disciplines.find(d => d.id === tu.disciplineId)
+                                            if (st && ds) printReceiptPDF(tu, st, ds, "Cosme de Farias")
+                                         }}>
+                                            <Printer className="h-4 w-4 mr-2" /> Recibo
+                                         </Button>
+                                       )}
                                        {tu.status !== 'paid' && (
                                          <Button size="sm" onClick={() => processTuitionPayment(tu.id, new Date().toISOString().split('T')[0])}>
                                             Receber
