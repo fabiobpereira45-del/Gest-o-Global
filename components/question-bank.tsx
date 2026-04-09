@@ -428,84 +428,236 @@ function BulkImportModal({
 }) {
   const [text, setText] = useState("")
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [preview, setPreview] = useState<any[]>([])
 
   useEffect(() => {
     if (open) {
       setText("")
       setError("")
+      setPreview([])
     }
   }, [open])
 
+  // Improved parser for AI-structured format and CSV
+  function parseContent(content: string) {
+    const lines = content.split('\n');
+    const questions: any[] = [];
+    let currentQ: any = null;
+
+    // Pattern for AI-structured format (Questão X: text)
+    const qPattern = /^Questão\s*(\d+)?:?\s*(.*)/i;
+    const typePattern = /^Tipo:\s*(.*)/i;
+    const optionPattern = /^Opção\s*([A-D]):?\s*(.*)/i;
+    const answerPattern = /^Gabarito:\s*(.*)/i;
+    const rationalePattern = /^Fundamentação:\s*(.*)/i;
+
+    for (let line of lines) {
+      line = line.trim();
+      if (!line) continue;
+
+      const qMatch = line.match(qPattern);
+      if (qMatch) {
+        if (currentQ && currentQ.text) questions.push(currentQ);
+        currentQ = {
+          text: qMatch[2] || "",
+          type: "multiple-choice",
+          choices: [],
+          correctAnswer: "",
+          points: 1
+        };
+        continue;
+      }
+
+      if (!currentQ) {
+        // Fallback to CSV if not in AI format yet
+        if (line.includes(';')) {
+          const parts = line.split(';');
+          if (parts.length >= 6) {
+            const [qText, a, b, c, d, correctLetter] = parts;
+            const choices = [
+              { id: uid(), text: a.trim() },
+              { id: uid(), text: b.trim() },
+              { id: uid(), text: c.trim() },
+              { id: uid(), text: d.trim() },
+            ];
+            let correctId = choices[0].id;
+            const letter = correctLetter.trim().toUpperCase();
+            if (letter === "B") correctId = choices[1].id;
+            else if (letter === "C") correctId = choices[2].id;
+            else if (letter === "D") correctId = choices[3].id;
+
+            questions.push({
+              text: qText.trim(),
+              type: "multiple-choice",
+              choices,
+              correctAnswer: correctId,
+              points: 1
+            });
+          }
+        }
+        continue;
+      }
+
+      const typeMatch = line.match(typePattern);
+      if (typeMatch) {
+        const t = typeMatch[1].toLowerCase();
+        if (t.includes("verdadeiro") || t.includes("falso")) currentQ.type = "true-false";
+        else if (t.includes("discursiva")) currentQ.type = "discursive";
+        else currentQ.type = "multiple-choice";
+        continue;
+      }
+
+      const optMatch = line.match(optionPattern);
+      if (optMatch) {
+        currentQ.choices.push({
+          id: optMatch[1].toUpperCase(),
+          text: optMatch[2]
+        });
+        continue;
+      }
+
+      const ansMatch = line.match(answerPattern);
+      if (ansMatch) {
+        currentQ.correctAnswer = ansMatch[1].trim();
+        continue;
+      }
+      
+      // If none matched and we have a current question, maybe it's multi-line text
+      if (currentQ && !line.match(RationalePattern)) {
+        if (!currentQ.text) currentQ.text = line;
+        else currentQ.text += " " + line;
+      }
+    }
+
+    if (currentQ && currentQ.text) questions.push(currentQ);
+
+    // Map letter IDs to real UIDs for multiple choice
+    return questions.map(q => {
+      if (q.type === "multiple-choice" && q.choices.length > 0) {
+        const uids: Record<string, string> = {};
+        const finalChoices = q.choices.map((c: any) => {
+          const newId = uid();
+          uids[c.id] = newId;
+          return { id: newId, text: c.text };
+        });
+        
+        let finalCorrect = q.correctAnswer;
+        const letterMatch = q.correctAnswer.match(/([A-D])/i);
+        if (letterMatch && uids[letterMatch[1].toUpperCase()]) {
+          finalCorrect = uids[letterMatch[1].toUpperCase()];
+        }
+
+        return { ...q, choices: finalChoices, correctAnswer: finalCorrect };
+      }
+      
+      if (q.type === "true-false") {
+        let finalCorrect = "true";
+        if (q.correctAnswer.toLowerCase().includes("falso") || q.correctAnswer.toLowerCase() === "f") {
+          finalCorrect = "false";
+        }
+        return { ...q, correctAnswer: finalCorrect, choices: [] };
+      }
+
+      return q;
+    });
+  }
+
+  const RationalePattern = /^Fundamentação:.*/i;
+
+  useEffect(() => {
+    if (text.trim()) {
+      const parsed = parseContent(text);
+      setPreview(parsed);
+    } else {
+      setPreview([]);
+    }
+  }, [text]);
+
   async function handleImport() {
-    if (!text.trim()) return
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean)
-    let addedCount = 0
+    if (preview.length === 0) return;
+    setLoading(true);
+    setError("");
 
     try {
-      for (const line of lines) {
-        if (line.toLowerCase().startsWith("pergunta;")) continue
-
-        const parts = line.split(";")
-        if (parts.length >= 6) {
-          const [qText, a, b, c, d, correctLetter] = parts
-          const choices = [
-            { id: uid(), text: a.trim() },
-            { id: uid(), text: b.trim() },
-            { id: uid(), text: c.trim() },
-            { id: uid(), text: d.trim() },
-          ]
-          let correctId = choices[0].id
-          const letter = correctLetter.trim().toUpperCase()
-          if (letter === "B") correctId = choices[1].id
-          else if (letter === "C") correctId = choices[2].id
-          else if (letter === "D") correctId = choices[3].id
-
-          await addQuestion({
-            disciplineId,
-            type: "multiple-choice",
-            text: qText.trim(),
-            choices,
-            correctAnswer: correctId,
-            points: 1,
-          })
-          addedCount++
-        }
+      for (const q of preview) {
+        await addQuestion({
+          disciplineId,
+          ...q
+        });
       }
-      if (addedCount > 0) {
-        onSave()
-        onClose()
-      } else {
-        setError("Nenhuma questão válida encontrada. Verifique o uso de ponto e vírgula (;)")
-      }
+      onSave();
+      onClose();
     } catch (err) {
-      setError("Erro ao processar as questões. Verifique o formato.")
+      setError("Erro ao salvar algumas questões no banco de dados.");
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Importar Lote de Questões</DialogTitle>
-          <p className="text-sm text-muted-foreground mt-1 text-left">
-            Cole as questões no formato CSV (separado por ponto e vírgula):<br />
-            <code className="bg-muted px-1.5 py-0.5 rounded text-xs border border-border mt-2 inline-block">
-              Pergunta; Alternativa A; Alternativa B; Alternativa C; Alternativa D; Letra Correta
-            </code>
-          </p>
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-background">
+        <DialogHeader className="p-6 pb-2">
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5 text-primary" /> Importar Questões (Smart)
+          </DialogTitle>
+          <div className="text-sm text-muted-foreground mt-2">
+            Aceita o formato <strong>estruturado da IA</strong> ou <strong>CSV (ponto e vírgula)</strong>.
+          </div>
         </DialogHeader>
-        <div className="flex flex-col gap-3 py-2">
-          {error && <div className="text-destructive text-sm font-semibold">{error}</div>}
-          <Textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={`Exemplo:\nEm que ano o Brasil foi descoberto?; 1492; 1500; 1532; 1822; B\nQual o primeiro livro da Bíblia?; Gênesis; Êxodo; Levítico; Números; A`}
-            className="font-mono text-sm h-64 whitespace-pre"
-          />
+        
+        <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-0 border-t border-border">
+          {/* Input side */}
+          <div className="p-6 flex flex-col gap-4 border-r border-border bg-muted/5">
+            <Label className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Conteúdo para Importar</Label>
+            <Textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Cole o resultado da IA aqui..."
+              className="flex-1 font-mono text-xs resize-none bg-background shadow-inner scrollbar-thin"
+            />
+          </div>
+
+          {/* Preview side */}
+          <div className="p-6 flex flex-col gap-4 overflow-hidden bg-background">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Visualização ({preview.length})</Label>
+              {preview.length > 0 && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Válidas</span>}
+            </div>
+            
+            <div className="flex-1 overflow-y-auto pr-2 space-y-3 scrollbar-thin">
+              {preview.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
+                  <ListChecks className="h-10 w-10 mb-2" />
+                  <p className="text-xs">Aguardando dados estruturados...</p>
+                </div>
+              ) : (
+                preview.map((q, i) => (
+                  <div key={i} className="p-3 rounded-xl border border-border bg-muted/30 text-xs">
+                    <p className="font-bold text-foreground mb-1 line-clamp-2">{i+1}. {q.text}</p>
+                    <div className="flex gap-2 opacity-70">
+                      <span className="capitalize">{TYPE_LABELS[q.type as QuestionType]}</span>
+                      {q.type === 'multiple-choice' && <span>• {q.choices.length} opções</span>}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleImport} disabled={!text.trim()}>Importar Questões</Button>
+
+        <DialogFooter className="p-6 border-t border-border bg-muted/20">
+          {error && <p className="text-xs text-destructive font-bold mr-auto">{error}</p>}
+          <Button variant="ghost" onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button 
+            onClick={handleImport} 
+            disabled={preview.length === 0 || loading}
+            className="accent-gradient text-white min-w-[150px]"
+          >
+            {loading ? "Processando..." : `Importar ${preview.length} Questões`}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
