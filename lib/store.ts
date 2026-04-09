@@ -943,9 +943,13 @@ export async function finalizeAttendance(disciplineId: string, date: string, fin
 
     if (error) {
         console.error("Supabase Error (Finalize):", error);
+        
         if (error.message?.includes("security policy")) {
-            throw new Error("Erro de Permissão (RLS): O banco de dados não permitiu gravar esta finalização. Contacte o suporte técnico para ajustar as políticas da tabela 'attendance_finalizations'.")
+            const err: any = new Error("RLS_ERROR")
+            err.cause = error.message
+            throw err
         }
+
         if (error.message?.includes("not found")) {
             throw new Error("O mecanismo de trancamento ainda não foi ativado no seu banco de dados. Por favor, execute o script SQL fornecido.")
         }
