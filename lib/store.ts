@@ -893,10 +893,15 @@ export async function getAttendanceFinalization(disciplineId: string, date: stri
 export async function finalizeAttendance(disciplineId: string, date: string, finalizedBy: string): Promise<void> {
   try {
     const supabase = createClient()
+    
+    // Validate if finalizedBy is a valid UUID. If not (e.g., "master"), use null.
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const finalizedByValue = uuidRegex.test(finalizedBy) ? finalizedBy : null;
+
     const { error } = await supabase.from('attendance_finalizations').insert({
       discipline_id: disciplineId,
       date,
-      finalized_by: finalizedBy,
+      finalized_by: finalizedByValue,
       created_at: new Date().toISOString()
     })
     if (error) {
