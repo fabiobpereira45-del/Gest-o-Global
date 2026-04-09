@@ -183,26 +183,34 @@ export function printCurriculumPDF(semesters: Semester[], disciplines: Disciplin
   const win = window.open("", "_blank"); if (win) { win.document.write(html); win.document.close(); win.onload = () => win.print() }
 }
 
-export function printProfessorsPDF(professors: ProfessorAccount[], assignments: ProfessorDiscipline[], disciplines: Discipline[]): void {
+export function printProfessorsPDF(professors: ProfessorAccount[], assignments: ProfessorDiscipline[], disciplines: Discipline[], existingWin?: Window | null): void {
   const rows = professors.map(p => {
     const pDisciplines = assignments.filter(a => a.professorId === p.id).map(a => disciplines.find(d => d.id === a.disciplineId)?.name).filter(Boolean).join(', ')
     return `<tr><td>${p.name}</td><td>${p.email}</td><td>${p.active ? 'Ativo' : 'Inativo'}</td><td>${pDisciplines || 'Sem disciplinas'}</td></tr>`
   }).join('')
-  const html = `<!DOCTYPE html><html><head><title>Corpo Docente</title></head><body><h1>Corpo Docente e Mestres</h1><table border="1" width="100%"><thead><tr><th>Nome</th><th>E-mail</th><th>Status</th><th>Disciplinas</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
-  const win = window.open("", "_blank"); if (win) { win.document.write(html); win.document.close(); win.onload = () => win.print() }
+  const html = `<!DOCTYPE html><html><head><title>Corpo Docente</title><style>body{font-family:sans-serif;padding:24px;}</style></head><body onload="window.print()"><h1>Corpo Docente e Mestres</h1><table border="1" width="100%" style="border-collapse:collapse;"><thead><tr style="background:#f3f4f6;"><th>Nome</th><th>E-mail</th><th>Status</th><th>Disciplinas</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
+  const win = existingWin || window.open("", "_blank")
+  if (win) {
+    win.document.write(html)
+    win.document.close()
+  }
 }
 
-export function printGradesReportPDF(grades: StudentGrade[], disciplineName: string): void {
+export function printGradesReportPDF(grades: StudentGrade[], disciplineName: string, existingWin?: Window | null): void {
   const rows = grades.map(g => {
     const final = (g.examGrade + g.worksGrade + g.seminarGrade + (g.participationBonus || 0)) / (g.customDivisor || 3)
     const status = final >= 7 ? 'APROVADO' : 'REPROVADO'
     return `<tr><td>${g.studentName}</td><td>${g.examGrade.toFixed(1)}</td><td>${g.worksGrade.toFixed(1)}</td><td>${g.seminarGrade.toFixed(1)}</td><td>${final.toFixed(1)}</td><td>${status}</td></tr>`
   }).join('')
-  const html = `<!DOCTYPE html><html><head><title>Diário de Notas</title></head><body><h1>Diário de Notas: ${disciplineName}</h1><table border="1" width="100%"><thead><tr><th>ALUNO</th><th>PROVA</th><th>TRABALHO</th><th>SEMINÁRIO</th><th>MÉDIA</th><th>SITUAÇÃO</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
-  const win = window.open("", "_blank"); if (win) { win.document.write(html); win.document.close(); win.onload = () => win.print() }
+  const html = `<!DOCTYPE html><html><head><title>Diário de Notas</title><style>body{font-family:sans-serif;padding:24px;}</style></head><body onload="window.print()"><h1>Diário de Notas: ${disciplineName}</h1><table border="1" width="100%" style="border-collapse:collapse;"><thead><tr style="background:#f3f4f6;"><th>ALUNO</th><th>PROVA</th><th>TRABALHO</th><th>SEMINÁRIO</th><th>MÉDIA</th><th>SITUAÇÃO</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
+  const win = existingWin || window.open("", "_blank")
+  if (win) {
+    win.document.write(html)
+    win.document.close()
+  }
 }
 
-export function printAttendanceReportPDF(attendances: Attendance[], students: StudentProfile[], disciplineName: string): void {
+export function printAttendanceReportPDF(attendances: Attendance[], students: StudentProfile[], disciplineName: string, existingWin?: Window | null): void {
   const logs = students.map(s => {
     const sAtt = attendances.filter(a => a.studentId === s.id)
     const presents = sAtt.filter(a => a.isPresent).length
@@ -211,17 +219,25 @@ export function printAttendanceReportPDF(attendances: Attendance[], students: St
     return { name: s.name, presents, total, pct }
   })
   const rows = logs.map(l => `<tr><td>${l.name}</td><td>${l.presents} / ${l.total}</td><td>${l.pct.toFixed(0)}%</td></tr>`).join('')
-  const html = `<!DOCTYPE html><html><head><title>Relatório de Frequência</title></head><body><h1>Folha de Frequência: ${disciplineName}</h1><table border="1" width="100%"><thead><tr><th>ALUNO</th><th>PRESENÇAS</th><th>% FREQUÊNCIA</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
-  const win = window.open("", "_blank"); if (win) { win.document.write(html); win.document.close(); win.onload = () => win.print() }
+  const html = `<!DOCTYPE html><html><head><title>Relatório de Frequência</title><style>body{font-family:sans-serif;padding:24px;}</style></head><body onload="window.print()"><h1>Folha de Frequência: ${disciplineName}</h1><table border="1" width="100%" style="border-collapse:collapse;"><thead><tr style="background:#f3f4f6;"><th>ALUNO</th><th>PRESENÇAS</th><th>% FREQUÊNCIA</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
+  const win = existingWin || window.open("", "_blank")
+  if (win) {
+    win.document.write(html)
+    win.document.close()
+  }
 }
 
-export function printStudentListPDF(students: StudentProfile[], classes: any[]): void {
+export function printStudentListPDF(students: StudentProfile[], classes: any[], existingWin?: Window | null): void {
   const rows = students.map((s, i) => {
     const cls = classes.find(c => c.id === s.class_id)
     return `<tr><td>${i + 1}</td><td>${s.name}</td><td>${s.enrollment_number || "—"}</td><td>${cls?.name || "Sem Turma"}</td><td>${s.phone || "—"}</td></tr>`
   }).join('')
-  const html = `<!DOCTYPE html><html><head><title>Relatório de Alunos</title></head><body><h1>Relatório Geral de Alunos</h1><table border="1" width="100%"><thead><tr><th>#</th><th>Nome</th><th>Matrícula</th><th>Turma</th><th>Telefone</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
-  const win = window.open("", "_blank"); if (win) { win.document.write(html); win.document.close(); win.onload = () => win.print() }
+  const html = `<!DOCTYPE html><html><head><title>Relatório de Alunos</title><style>body{font-family:sans-serif;padding:24px;}</style></head><body onload="window.print()"><h1>Relatório Geral de Alunos</h1><table border="1" width="100%" style="border-collapse:collapse;"><thead><tr style="background:#f3f4f6;"><th>#</th><th>Nome</th><th>Matrícula</th><th>Turma</th><th>Telefone</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
+  const win = existingWin || window.open("", "_blank")
+  if (win) {
+    win.document.write(html)
+    win.document.close()
+  }
 }
 
 export function printBlankAssessmentPDF(assessment: Assessment, questions: Question[]): void {
