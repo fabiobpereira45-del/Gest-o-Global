@@ -18,7 +18,7 @@ export interface StudentSubmission { id: string; assessmentId: string; studentNa
 export interface ProfessorAccount { id: string; name: string; email: string; passwordHash: string; role: "master" | "professor"; avatar_url?: string | null; bio?: string | null; createdAt: string; active?: boolean }
 export interface ProfessorSession { loggedIn: boolean; professorId: string; role: "master" | "professor"; avatar_url?: string | null; expiresAt: string }
 export interface StudentSession { name: string; email: string; assessmentId: string; startedAt: string }
-export interface StudentProfile { id: string; auth_user_id: string; name: string; cpf: string; enrollment_number: string; phone?: string; church?: string; pastor_name?: string; class_id?: string; avatar_url?: string | null; bio?: string | null; status: "pending" | "active" | "inactive"; created_at: string; }
+export interface StudentProfile { id: string; auth_user_id: string; name: string; cpf: string; enrollment_number: string; phone?: string; church?: string; pastor_name?: string; class_id?: string; avatar_url?: string | null; bio?: string | null; birth_date?: string; street?: string; number?: string; neighborhood?: string; city?: string; state?: string; status: "pending" | "active" | "inactive"; created_at: string; }
 export interface ChatMessage { id: string; studentId: string; disciplineId: string; message: string; isFromStudent: boolean; read: boolean; createdAt: string; }
 export interface Attendance { id: string; studentId: string; disciplineId: string; date: string; isPresent: boolean; type?: "presencial" | "ead"; createdAt: string; }
 export interface BoardMember { id: string; name: string; role: string; category: string; avatar_url?: string | null; createdAt: string; }
@@ -185,6 +185,12 @@ export async function registerStudentByAdmin(data: any): Promise<void> {
     phone: data.phone || null,
     church: data.church || null,
     pastor_name: data.pastor || null,
+    birth_date: data.birth_date || null,
+    street: data.street || null,
+    number: data.number || null,
+    neighborhood: data.neighborhood || null,
+    city: data.city || null,
+    state: data.state || null,
     status: 'active',
     class_id: data.classId || null
   })
@@ -346,7 +352,7 @@ function mapProfessor(p: any): ProfessorAccount {
   return { id: p.id || "unknown", name: p.name || "Professor", email: p.email || "", passwordHash: p.password_hash || "", role: p.role || "professor", avatar_url: p.avatar_url, bio: p.bio || null, createdAt: p.created_at || new Date().toISOString(), active: p.active !== false }
 }
 function mapGradingSettings(row: any): GradingSettings { return { id: row.id, pointsPerPresence: Number(row.points_per_presence || 0), onlinePresencePoints: Number(row.online_presence_points || 0), interactionPoints: Number(row.interaction_points || 0), bookActivityPoints: Number(row.book_activity_points || 0), passingAverage: Number(row.passing_average || 70), totalDivisor: Number(row.total_divisor || 4), updatedAt: row.updated_at } }
-function mapStudentProfile(row: any): StudentProfile { return { id: row.id, auth_user_id: row.auth_user_id, name: row.name, cpf: row.cpf, enrollment_number: row.enrollment_number, phone: row.phone || undefined, church: row.church || undefined, pastor_name: row.pastor_name || undefined, class_id: row.class_id || undefined, avatar_url: row.avatar_url || null, bio: row.bio || null, status: row.status || 'pending', created_at: row.created_at } }
+function mapStudentProfile(row: any): StudentProfile { return { id: row.id, auth_user_id: row.auth_user_id, name: row.name, cpf: row.cpf, enrollment_number: row.enrollment_number, phone: row.phone || undefined, church: row.church || undefined, pastor_name: row.pastor_name || undefined, class_id: row.class_id || undefined, avatar_url: row.avatar_url || null, bio: row.bio || null, birth_date: row.birth_date, street: row.street, number: row.number, neighborhood: row.neighborhood, city: row.city, state: row.state, status: row.status || 'pending', created_at: row.created_at } }
 function mapChatMessage(row: any): ChatMessage { return { id: row.id, studentId: row.student_id, disciplineId: row.discipline_id, message: row.message, isFromStudent: row.is_from_student, read: row.read, createdAt: row.created_at } }
 function mapAttendance(row: any): Attendance { return { id: row.id, studentId: row.student_id, disciplineId: row.discipline_id, date: row.date, isPresent: row.is_present, type: row.type || "presencial", createdAt: row.created_at } }
 function mapClassRoom(row: any): ClassRoom { return { id: row.id, name: row.name, shift: row.shift as ClassRoom['shift'], dayOfWeek: row.day_of_week || undefined, maxStudents: Number(row.max_students), studentCount: row.student_count !== undefined ? Number(row.student_count) : undefined, createdAt: row.created_at } }
@@ -767,6 +773,12 @@ export async function deleteProfessorAccount(id: string): Promise<void> {
   await supabase.from('professor_accounts').delete().eq('id', id)
 }
 
+export async function getStudentProfile(id: string): Promise<StudentProfile | null> {
+  const supabase = createClient()
+  const { data } = await supabase.from('students').select('*').eq('id', id).maybeSingle()
+  return data ? mapStudentProfile(data) : null
+}
+
 export async function getStudents(): Promise<StudentProfile[]> {
   const supabase = createClient()
   const { data } = await supabase.from('students').select('*').order('name', { ascending: true })
@@ -782,6 +794,12 @@ export async function updateStudent(id: string, data: any): Promise<void> {
   if (data.church !== undefined) updateData.church = data.church || null
   if (data.pastor_name !== undefined) updateData.pastor_name = data.pastor_name || null
   if (data.class_id !== undefined) updateData.class_id = data.class_id || null
+  if (data.birth_date !== undefined) updateData.birth_date = data.birth_date || null
+  if (data.street !== undefined) updateData.street = data.street || null
+  if (data.number !== undefined) updateData.number = data.number || null
+  if (data.neighborhood !== undefined) updateData.neighborhood = data.neighborhood || null
+  if (data.city !== undefined) updateData.city = data.city || null
+  if (data.state !== undefined) updateData.state = data.state || null
   if (data.status !== undefined) updateData.status = data.status
   const { error } = await supabase.from('students').update(updateData).eq('id', id)
   if (error) throw new Error(error.message)
@@ -826,11 +844,95 @@ export async function saveAttendance(studentId: string, disciplineId: string, da
   else await supabase.from('attendances').insert({ student_id: studentId, discipline_id: disciplineId, date, is_present: isPresent, type, created_at: new Date().toISOString() })
 }
 
-export async function saveBatchAttendances(disciplineId: string, date: string, attendancesData: Array<{studentId: string, isPresent: boolean, type: "presencial"|"ead"}>): Promise<void> {
-  for (const a of attendancesData) {
-    await saveAttendance(a.studentId, disciplineId, date, a.isPresent, a.type)
+export async function saveBatchAttendances(data: Array<{studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial"|"ead"}>, onProgress?: (current: number, total: number) => void): Promise<void> {
+  if (data.length === 0) return
+  
+  // Check if finalized
+  try {
+    const isFinalized = await getAttendanceFinalization(data[0].disciplineId, data[0].date)
+    if (isFinalized) {
+      const session = getProfessorSession()
+      if (session?.role !== 'master') {
+        throw new Error("Esta chamada está trancada e não pode ser modificada.")
+      }
+    }
+  } catch (e: any) {
+    // If table doesn't exist in cache yet, allow saving (it's definitely not locked yet)
+    console.warn("Finalization check bypassed:", e.message)
+    if (e.message?.includes("trancada")) throw e
+  }
+
+  let count = 0
+  for (const a of data) {
+    await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
+    count++
+    if (onProgress) onProgress(count, data.length)
   }
 }
+
+export async function getAttendanceFinalization(disciplineId: string, date: string): Promise<boolean> {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from('attendance_finalizations')
+      .select('id')
+      .match({ discipline_id: disciplineId, date })
+      .maybeSingle()
+    
+    // ERROR CODE PGRST204 or 404 indicates table might not be in cache
+    if (error) {
+       console.error("Supabase error in getAttendanceFinalization:", error)
+       return false 
+    }
+    return !!data
+  } catch (err) {
+    return false
+  }
+}
+
+
+export async function finalizeAttendance(disciplineId: string, date: string, finalizedBy: string): Promise<void> {
+  try {
+    const supabase = createClient()
+    
+    // Validate if finalizedBy is a valid UUID. If not (e.g., "master"), use null.
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const finalizedByValue = uuidRegex.test(finalizedBy) ? finalizedBy : null;
+
+    const { error } = await supabase.from('attendance_finalizations').insert({
+      discipline_id: disciplineId,
+      date,
+      finalized_by: finalizedByValue,
+      created_at: new Date().toISOString()
+    })
+    if (error) {
+        if (error.message?.includes("not found")) {
+            throw new Error("O mecanismo de trancamento ainda não foi ativado no seu banco de dados. Por favor, execute o script SQL fornecido.")
+        }
+        throw new Error(error.message)
+    }
+  } catch (err: any) {
+    throw err
+  }
+}
+
+export async function unfinalizeAttendance(disciplineId: string, date: string): Promise<void> {
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from('attendance_finalizations')
+      .delete()
+      .match({ discipline_id: disciplineId, date })
+    if (error) {
+        if (error.message?.includes("not found")) {
+            return // Ignore if table doesn't exist, as it's definitely not finalized
+        }
+        throw new Error(error.message)
+    }
+  } catch (err) {
+    // Ignore errors for unfinalizing
+  }
+}
+
+
 
 export async function getClassSchedules(): Promise<ClassSchedule[]> {
   const supabase = createClient()
@@ -912,7 +1014,7 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     .select('id, points_per_question, question_ids')
     .eq('discipline_id', disciplineId)
   
-  const assessmentIds = assessments?.map(a => a.id) || []
+  const assessmentIds = (assessments || []).map((a: any) => a.id) || []
   if (assessmentIds.length === 0) return { updated: 0, reason: "Nenhuma prova encontrada para esta disciplina." }
 
   // 2. Buscar SubmissÃµes destas AvaliaÃ§Ãµes
@@ -928,25 +1030,26 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     .eq('discipline_id', disciplineId)
 
   // 4. Calcular Total de Aulas (Datas Ãšnicas)
-  const totalClasses = new Set(attendances?.map(a => a.date)).size
+  const totalClasses = new Set((attendances || []).map((a: any) => a.date)).size
 
   // 5. Buscar Estudantes para vincular ID -> Email
   const { data: studentProfiles } = await supabase.from('students').select('id, email, name, cpf')
 
   // Agrupar Resultados por Aluno (Email Ã© o identificador comum)
-  const syncResults: Record<string, { examGrade: number; attendanceScore: number; name: string }> = {}
+  const syncResults: Record<string, { examGrade: number; attendanceScore: number; name: string }> = {};
 
   // Processar Notas de Prova
-  submissions?.forEach(sub => {
-    const key = sub.student_email.toLowerCase().trim()
-    if (!syncResults[key]) syncResults[key] = { examGrade: 0, attendanceScore: 0, name: sub.student_name }
-    syncResults[key].examGrade += Number(sub.score)
-  })
+  (submissions || []).forEach((sub: any) => {
+    const key = (sub.student_email || "").toLowerCase().trim();
+    if (!key) return;
+    if (!syncResults[key]) syncResults[key] = { examGrade: 0, attendanceScore: 0, name: sub.student_name };
+    syncResults[key].examGrade += Number(sub.score || 0);
+  });
 
   // Processar FrequÃªncia
   if (totalClasses > 0) {
-    attendances?.forEach(att => {
-      const profile = studentProfiles?.find(p => p.id === att.student_id)
+    (attendances || []).forEach((att: any) => {
+      const profile = (studentProfiles || []).find((p: any) => p.id === att.student_id)
       if (profile) {
         const key = (profile.email || "").toLowerCase().trim()
         if (!key) return
@@ -1119,3 +1222,4 @@ export async function processTuitionPayment(tuitionId: string, paymentDate: stri
     transaction_id: transaction.id
   }).eq('id', tuitionId)
 }
+// Version 2.0.1 - Force Deploy

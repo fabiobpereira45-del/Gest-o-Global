@@ -258,7 +258,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {isMaster && (
-                            <Button variant="outline" onClick={() => printGradesReportPDF(grades, "Relatório Geral de Notas")} className="border-primary text-primary hover:bg-primary/10">
+                            <Button variant="outline" onClick={() => printGradesReportPDF(grades, "Relatório Geral de Notas", "Cosme de Farias")} className="border-primary text-primary hover:bg-primary/10">
                                 <Download className="h-4 w-4 mr-2" />
                                 Exportar PDF
                             </Button>

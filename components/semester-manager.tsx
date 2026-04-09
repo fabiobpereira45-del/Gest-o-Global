@@ -226,7 +226,7 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => printCurriculumPDF(semesters, disciplines)} className="border-primary text-primary hover:bg-primary/10">
+                    <Button variant="outline" onClick={() => printCurriculumPDF(semesters, disciplines, "Cosme de Farias")} className="border-primary text-primary hover:bg-primary/10">
                         <Download className="h-4 w-4 mr-2" /> Exportar PDF
                     </Button>
                     <Button variant="outline" onClick={() => {
