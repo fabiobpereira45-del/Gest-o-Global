@@ -43,6 +43,7 @@ export function StudentAuth({ onSuccess }: Props) {
                 if (identifier.replace(/\D/g, '').length !== 11) throw new Error("Informe um CPF válido.")
                 if (password.length < 6) throw new Error("A senha deve ter pelo menos 6 caracteres.")
 
+                console.log('[StudentAuth] Registrando aluno:', { name, identifier: identifier.replace(/\D/g, '') })
                 const { matricula } = await registerStudentAuth(name, identifier, password)
                 setSuccessMsg(`Cadastro realizado com sucesso! Sua MATRÍCULA é: ${matricula}. Por favor, anote este número.`)
                 setMode("login")
@@ -52,12 +53,13 @@ export function StudentAuth({ onSuccess }: Props) {
                 if (!identifier) throw new Error("Informe seu CPF, Matrícula ou E-mail.")
                 if (!password) throw new Error("Informe sua senha.")
 
-                console.log('[StudentAuth] Login with identifier:', identifier)
+                console.log('[StudentAuth] Iniciando login para:', identifier)
                 await loginStudentAuth(identifier, password)
+                console.log('[StudentAuth] Login bem-sucedido!')
                 onSuccess()
             }
         } catch (err: any) {
-            console.error('[StudentAuth] Login critical error:', err)
+            console.error('[StudentAuth] Erro crítico no login/registro:', err)
             setError(err.message || "Erro ao entrar no sistema.")
         } finally {
             setLoading(false)
@@ -130,6 +132,8 @@ export function StudentAuth({ onSuccess }: Props) {
                                 value={identifier}
                                 onChange={(e) => {
                                     const val = e.target.value
+                                    const lastChar = val.slice(-1)
+                                    const isDelete = (e.nativeEvent as any).inputType === 'deleteContentBackward' || val.length < identifier.length
                                     
                                     // Se estiver no login e contiver letras ou @, trata como e-mail/identificador livre
                                     const hasLetters = /[a-zA-Z]/.test(val)
@@ -139,10 +143,17 @@ export function StudentAuth({ onSuccess }: Props) {
                                     }
 
                                     const clean = val.replace(/\D/g, '')
+
+                                    // Se o usuário está apagando um caractere que é pontuação, deixamos apagar sem forçar formatação imediata
+                                    if (isDelete) {
+                                        setIdentifier(val)
+                                        return
+                                    }
+
                                     if (mode === "register") {
                                         setIdentifier(formatCpf(val))
                                     } else {
-                                        // No login, se for puramente numérico
+                                        // No login, se for puramente numérico ou parecer CPF
                                         if (clean.length > 0 && clean.length <= 11 && !val.startsWith('2026')) {
                                             setIdentifier(formatCpf(val))
                                         } else {

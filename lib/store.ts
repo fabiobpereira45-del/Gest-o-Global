@@ -219,30 +219,48 @@ export async function loginStudentAuth(identifier: string, password: string) {
     if (studentByEmail) email = studentByEmail.email
   } else {
     const cleanId = identifier.replace(/\D/g, '')
+    // Se for CPF (11 digitos)
     if (cleanId.length === 11) {
       const { data: studentData } = await supabase.from('students').select('email').eq('cpf', cleanId).maybeSingle()
       email = studentData?.email || `${cleanId}@student.ibad.com`
     } else {
+      // Se for Matrícula (ex: 2026xxxx)
       const { data } = await supabase.from('students').select('email').eq('enrollment_number', cleanId).maybeSingle()
-      if (!data) throw new Error("Identificador nÃ£o encontrado (CPF, MatrÃ­cula ou E-mail).")
+      if (!data) throw new Error("Identificador não encontrado (CPF, Matrícula ou E-mail). Verifique se digitou corretamente.")
       email = data.email
     }
   }
 
   const finalEmail = email.trim().toLowerCase()
-  const { data, error } = await supabase.auth.signInWithPassword({ email: finalEmail, password: cleanPass })
+  let { data, error } = await supabase.auth.signInWithPassword({ email: finalEmail, password: cleanPass })
   
   if (error) {
+    // FALLBACK: Se falhou e a senha parece um CPF pontuado (14 chars), tenta limpar a senha e tentar de novo
+    const digitsOnlyPass = cleanPass.replace(/\D/g, '')
+    if (digitsOnlyPass !== cleanPass && digitsOnlyPass.length === 11) {
+      console.log('[Auth] Tentando login com CPF limpo na senha...')
+      const retry = await supabase.auth.signInWithPassword({ email: finalEmail, password: digitsOnlyPass })
+      if (!retry.error) return retry.data
+    }
+
+    // FALLBACK 2: Tentativa com cashing do domínio (legado)
     if (finalEmail.endsWith('@student.ibad.com')) {
       const legacyEmail = finalEmail.replace('@student.ibad.com', '@student.IBAD.com')
       const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({ email: legacyEmail, password: cleanPass })
       if (!retryError) return retryData
+      
+      // Tenta também com senha limpa no legado
+      if (digitsOnlyPass !== cleanPass && digitsOnlyPass.length === 11) {
+        const retryLegacy = await supabase.auth.signInWithPassword({ email: legacyEmail, password: digitsOnlyPass })
+        if (!retryLegacy.error) return retryLegacy.data
+      }
     }
-    throw new Error("Credenciais invÃ¡lidas. Verifique seu CPF e senha.")
+
+    throw new Error("Credenciais inválidas. Verifique seu CPF e senha (lembre-se: se usar o CPF como senha, tente apenas os números).")
   }
 
   if (data.user) {
-    const { data: profile } = await supabase.from('students').select('id, auth_user_id').eq('email', email).maybeSingle()
+    const { data: profile } = await supabase.from('students').select('id, auth_user_id').eq('email', finalEmail).maybeSingle()
     if (profile && !profile.auth_user_id) {
       await supabase.from('students').update({ auth_user_id: data.user.id }).eq('id', profile.id)
     }
