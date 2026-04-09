@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label"
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import {
+import { 
     type Discipline, type StudentProfile, type Attendance, type ClassRoom,
     getDisciplines, getStudents, getAttendances, saveAttendance, getProfessorSession, getDisciplinesByProfessor, getClasses, saveBatchAttendances,
     getAttendanceFinalization, finalizeAttendance, unfinalizeAttendance, getAttendancesByDate
 } from "@/lib/store"
+import { AttendanceReportModal } from "./attendance-report-modal"
 import { printAttendanceReportPDF } from "@/lib/pdf"
 
 export function AttendanceManager() {
@@ -28,6 +29,7 @@ export function AttendanceManager() {
     const [classes, setClasses] = useState<ClassRoom[]>([])
 
     const [attendances, setAttendances] = useState<Record<string, boolean>>({})
+    const [allAttendances, setAllAttendances] = useState<Attendance[]>([])
     const [isFinalized, setIsFinalized] = useState(false)
     const [isMaster, setIsMaster] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -52,9 +54,19 @@ export function AttendanceManager() {
             
             const c = await getClasses()
             const s = await getStudents()
+            
+            // Pre-load all attendances for the report modal
+            let allAtt: Attendance[] = []
+            if (d.length > 0) {
+               // Limit to first few disciplines or optimize in production
+               const results = await Promise.all(d.map(disc => getAttendances(disc.id)))
+               allAtt = results.flat()
+            }
+
             setDisciplines(d)
             setClasses(c)
             setStudents(s)
+            setAllAttendances(allAtt)
             setLoading(false)
         }
         loadData()
@@ -110,8 +122,28 @@ export function AttendanceManager() {
                 setProgress({ current, total })
             })
 
-            alert("Frequência salva com sucesso!")
+            // Hard refresh - fetch latest data for this date and all data for report
+            const [updatedDateAtt, updatedAllAtt] = await Promise.all([
+                getAttendancesByDate(selectedDisciplineId, selectedDate),
+                getAttendances(selectedDisciplineId)
+            ])
+
+            // Update local state for current view
+            const attMap: Record<string, boolean> = {}
+            updatedDateAtt.forEach(a => {
+                attMap[a.studentId] = a.isPresent
+            })
+            setAttendances(attMap)
+
+            // Update allAttendances for the report modal (only for selected discipline to keep it clean)
+            setAllAttendances(prev => {
+                const others = prev.filter(a => a.disciplineId !== selectedDisciplineId)
+                return [...others, ...updatedAllAtt]
+            })
+
+            alert("Frequência salva e sincronizada com sucesso no banco de dados!")
         } catch (e: any) {
+            console.error("Erro crítico ao salvar chamada:", e)
             alert("Erro ao salvar: " + e.message)
         } finally {
             setSaving(false)
@@ -182,27 +214,12 @@ export function AttendanceManager() {
                     <p className="text-sm text-muted-foreground">Registre a presença dos alunos nas suas disciplinas</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={async () => {
-                        if (selectedDisciplineId === "none") return alert("Selecione uma disciplina.")
-                        const win = window.open("", "_blank")
-                        if (win) {
-                            win.document.write("<html><head><title>Carregando...</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666;}</style></head><body><div>Gerando PDF, aguarde...</div></body></html>")
-                        }
-                        setLoading(true)
-                        try {
-                            const att = await getAttendances(selectedDisciplineId)
-                            const discName = disciplines.find(d => d.id === selectedDisciplineId)?.name || ""
-                            printAttendanceReportPDF(att, students, discName, "Cosme de Farias", win)
-                        } catch (e: any) { 
-                            console.error("Erro ao gerar PDF:", e)
-                            if (win) win.close()
-                            alert("Erro ao gerar PDF: " + e.message) 
-                        }
-                        setLoading(false)
-                    }} className="border-primary text-primary hover:bg-primary/10">
-                        <Download className="h-4 w-4 mr-2" />
-                        Exportar PDF
-                    </Button>
+                    <AttendanceReportModal 
+                        disciplines={disciplines}
+                        classes={classes}
+                        students={students}
+                        allAttendances={allAttendances}
+                    />
 
                     {isFinalized ? (
                         <div className="flex items-center gap-2">

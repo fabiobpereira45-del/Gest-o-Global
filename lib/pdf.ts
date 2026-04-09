@@ -62,7 +62,7 @@ function getModernTemplate(content: string, title: string, hubName?: string): st
     <meta charset="UTF-8"/>
     <title>${title}</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -70,11 +70,16 @@ function getModernTemplate(content: string, title: string, hubName?: string): st
             color: #1a202c; 
             background: #fff; 
             line-height: 1.5;
-            padding: 40px;
+            padding: 20px;
         }
         
+        @page {
+            size: A4;
+            margin: 15mm;
+        }
+
         @media print {
-            body { padding: 20px; }
+            body { padding: 0; }
             .no-print { display: none; }
         }
 
@@ -82,78 +87,75 @@ function getModernTemplate(content: string, title: string, hubName?: string): st
         .header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            border-bottom: 4px solid #1e3a5f;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
+            gap: 20px;
+            border-bottom: 2px solid #1e3a5f;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
         }
-        .header-logo { height: 70px; width: auto; }
-        .header-info { text-align: right; }
+        .header-logo { height: 60px; width: auto; }
+        .header-info { flex: 1; }
         .institution-name { 
-            font-family: 'Playfair Display', serif;
             color: #1e3a5f; 
-            font-size: 22px; 
-            font-weight: 700;
-            margin-bottom: 4px;
+            font-size: 18px; 
+            font-weight: 800;
+            margin-bottom: 2px;
+            text-transform: uppercase;
         }
         .hub-name {
             color: #f97316;
             font-weight: 700;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        /* Typography */
-        h1 { font-size: 24px; color: #1e3a5f; margin-bottom: 20px; border-left: 5px solid #f97316; padding-left: 15px; }
-        h2 { font-size: 18px; color: #2d3748; margin-top: 25px; margin-bottom: 12px; font-weight: 700; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
-
-        /* Tables */
-        table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 12px; }
-        th { 
-            background-color: #f8fafc; 
-            color: #1e3a5f; 
-            font-weight: 800; 
-            text-align: left; 
-            padding: 12px 15px; 
-            border-bottom: 2px solid #e2e8f0;
+            font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        td { padding: 10px 15px; border-bottom: 1px solid #edf2f7; color: #4a5568; }
-        tr:nth-child(even) { background-color: #fcfcfc; }
-        .row-accent { font-weight: 600; color: #1e3a5f; }
+
+        /* Typography */
+        h1 { font-size: 20px; color: #1e3a5f; margin-bottom: 15px; font-weight: 800; }
+        h2 { font-size: 16px; color: #4a5568; margin-bottom: 10px; font-weight: 700; }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+        th { 
+            background-color: #1e3a5f; 
+            color: #fff; 
+            font-weight: 700; 
+            text-align: left; 
+            padding: 8px 12px; 
+            text-transform: uppercase;
+        }
+        td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #2d3748; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        .row-accent { font-weight: 700; color: #1e3a5f; }
 
         /* Status Badges */
         .badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 9px;
             font-weight: 700;
             text-transform: uppercase;
         }
-        .badge-success { background: #dcfce7; color: #166534; }
-        .badge-warning { background: #fef9c3; color: #854d0e; }
-        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-success { background: #dcfce7; color: #166534; border: 1px solid #16653433; }
+        .badge-danger { background: #fee2e2; color: #991b1b; border: 1px solid #991b1b33; }
 
         /* Footer */
         .footer {
-            margin-top: 50px;
-            padding-top: 20px;
+            margin-top: 30px;
+            padding-top: 15px;
             border-top: 1px solid #e2e8f0;
-            font-size: 10px;
+            font-size: 9px;
             color: #718096;
             display: flex;
             justify-content: space-between;
         }
     </style>
 </head>
-<body onload="window.print()">
+<body onload="setTimeout(() => window.print(), 500)">
     <div class="header">
         <img src="${IBAD_LOGO}" class="header-logo" alt="IBAD Logo" />
         <div class="header-info">
             <div class="institution-name">IBAD - Instituto Bíblico das Assembléias de Deus</div>
-            <div class="hub-name">${hubName || "Núcleo Central"}</div>
+            <div class="hub-name">${hubName || "Núcleo Cosme de Farias"}</div>
         </div>
     </div>
     
@@ -164,8 +166,8 @@ function getModernTemplate(content: string, title: string, hubName?: string): st
     </div>
 
     <div class="footer">
-        <div>Relatório gerado em ${new Date().toLocaleString('pt-BR')}</div>
-        <div>&copy; 2026 Teologia Global - Escola de Teologia</div>
+        <div>Relatório oficial gerado em ${new Date().toLocaleString('pt-BR')}</div>
+        <div>Página 1 de 1</div>
     </div>
 </body>
 </html>`
