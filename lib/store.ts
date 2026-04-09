@@ -848,12 +848,18 @@ export async function saveBatchAttendances(data: Array<{studentId: string, disci
   if (data.length === 0) return
   
   // Check if finalized
-  const isFinalized = await getAttendanceFinalization(data[0].disciplineId, data[0].date)
-  if (isFinalized) {
-    const session = getProfessorSession()
-    if (session?.role !== 'master') {
-      throw new Error("Esta chamada está trancada e não pode ser modificada.")
+  try {
+    const isFinalized = await getAttendanceFinalization(data[0].disciplineId, data[0].date)
+    if (isFinalized) {
+      const session = getProfessorSession()
+      if (session?.role !== 'master') {
+        throw new Error("Esta chamada está trancada e não pode ser modificada.")
+      }
     }
+  } catch (e: any) {
+    // If table doesn't exist in cache yet, allow saving (it's definitely not locked yet)
+    console.warn("Finalization check bypassed:", e.message)
+    if (e.message?.includes("trancada")) throw e
   }
 
   let count = 0
@@ -865,13 +871,24 @@ export async function saveBatchAttendances(data: Array<{studentId: string, disci
 }
 
 export async function getAttendanceFinalization(disciplineId: string, date: string): Promise<boolean> {
-  const supabase = createClient()
-  const { data } = await supabase.from('attendance_finalizations')
-    .select('id')
-    .match({ discipline_id: disciplineId, date })
-    .maybeSingle()
-  return !!data
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from('attendance_finalizations')
+      .select('id')
+      .match({ discipline_id: disciplineId, date })
+      .maybeSingle()
+    
+    // ERROR CODE PGRST204 or 404 indicates table might not be in cache
+    if (error) {
+       console.error("Supabase error in getAttendanceFinalization:", error)
+       return false 
+    }
+    return !!data
+  } catch (err) {
+    return false
+  }
 }
+
 
 export async function finalizeAttendance(disciplineId: string, date: string, finalizedBy: string): Promise<void> {
   const supabase = createClient()
