@@ -912,9 +912,9 @@ export async function finalizeAttendance(disciplineId: string, date: string, fin
   try {
     const supabase = createClient()
     
-    // Validate if finalizedBy is a valid UUID. If not (e.g., "master"), use null.
+    // Validate if finalizedBy is a valid UUID. If not (e.g., "master"), use a placeholder.
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    const finalizedByValue = uuidRegex.test(finalizedBy) ? finalizedBy : null;
+    const finalizedByValue = uuidRegex.test(finalizedBy) ? finalizedBy : "00000000-0000-0000-0000-000000000000";
 
     const { error } = await supabase.from('attendance_finalizations').insert({
       discipline_id: disciplineId,
