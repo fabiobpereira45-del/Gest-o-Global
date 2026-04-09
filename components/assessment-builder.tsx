@@ -44,6 +44,7 @@ interface Props {
 
 export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) {
   const [step, setStep] = useState(1)
+  const [saving, setSaving] = useState(false)
 
   // Step 1
   const [title, setTitle] = useState("")
@@ -231,40 +232,48 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
     const selectedDisc = disciplines.find(d => d.id === disciplineId)
     const professorName = selectedDisc?.professorName || PROFESSOR_CREDENTIALS.name
 
-    if (assessment) {
-      await updateAssessment(assessment.id, {
-        title: title.trim(),
-        disciplineId,
-        professor: professorName,
-        logoBase64,
-        rules: rules.trim(),
-        questionIds: finalIds,
-        pointsPerQuestion,
-        totalPoints: totalPointsNum,
-        modality,
-        timeLimitMinutes: timeLimitMinutes > 0 ? timeLimitMinutes : null,
-      })
-    } else {
-      await addAssessment({
-        title: title.trim(),
-        disciplineId,
-        professor: professorName,
-        institution: "Instituto Bíblico das Assembléias de Deus",
-        logoBase64,
-        rules: rules.trim(),
-        questionIds: finalIds,
-        pointsPerQuestion,
-        totalPoints: totalPointsNum,
-        openAt: null,
-        closeAt: null,
-        isPublished: false,
-        modality,
-        timeLimitMinutes: timeLimitMinutes > 0 ? timeLimitMinutes : null,
-      })
-    }
+    setSaving(true)
+    try {
+      if (assessment) {
+        await updateAssessment(assessment.id, {
+          title: title.trim(),
+          disciplineId,
+          professor: professorName,
+          logoBase64,
+          rules: rules.trim(),
+          questionIds: finalIds,
+          pointsPerQuestion,
+          totalPoints: totalPointsNum,
+          modality,
+          timeLimitMinutes: timeLimitMinutes > 0 ? timeLimitMinutes : null,
+        })
+      } else {
+        await addAssessment({
+          title: title.trim(),
+          disciplineId,
+          professor: professorName,
+          institution: "Instituto Bíblico das Assembléias de Deus",
+          logoBase64,
+          rules: rules.trim(),
+          questionIds: finalIds,
+          pointsPerQuestion,
+          totalPoints: totalPointsNum,
+          openAt: null,
+          closeAt: null,
+          isPublished: false,
+          modality,
+          timeLimitMinutes: timeLimitMinutes > 0 ? timeLimitMinutes : null,
+        })
+      }
 
-    onSave()
-    onClose()
+      onSave()
+      onClose()
+    } catch (error: any) {
+      console.error("Erro ao salvar prova:", error)
+      alert(`Erro ao salvar prova: ${error.message || "Tente novamente."}`)
+    } finally {
+      setSaving(false)
+    }
   }
 
 
@@ -744,9 +753,18 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
               Próximo <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
-            <Button onClick={handleSave}>
-              <Check className="h-4 w-4 mr-1.5" />
-              {assessment ? "Salvar Alterações" : "Publicar Prova"}
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-1.5" />
+                  {assessment ? "Salvar Alterações" : "Publicar Prova"}
+                </>
+              )}
             </Button>
           )}
         </div>
