@@ -100,7 +100,13 @@ function writeLocal<T>(key: string, value: T): void {
 }
 
 export function uid(): string {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
+  if (typeof window !== "undefined" && window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  // Fallback for older environments/SSR
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c: any) =>
+    (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)
+  );
 }
 
 // â€”â€”â€” Auth / Session â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
