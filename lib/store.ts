@@ -845,6 +845,17 @@ export async function saveAttendance(studentId: string, disciplineId: string, da
 }
 
 export async function saveBatchAttendances(data: Array<{studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial"|"ead"}>, onProgress?: (current: number, total: number) => void): Promise<void> {
+  if (data.length === 0) return
+  
+  // Check if finalized
+  const isFinalized = await getAttendanceFinalization(data[0].disciplineId, data[0].date)
+  if (isFinalized) {
+    const session = getProfessorSession()
+    if (session?.role !== 'master') {
+      throw new Error("Esta chamada está trancada e não pode ser modificada.")
+    }
+  }
+
   let count = 0
   for (const a of data) {
     await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
@@ -852,6 +863,35 @@ export async function saveBatchAttendances(data: Array<{studentId: string, disci
     if (onProgress) onProgress(count, data.length)
   }
 }
+
+export async function getAttendanceFinalization(disciplineId: string, date: string): Promise<boolean> {
+  const supabase = createClient()
+  const { data } = await supabase.from('attendance_finalizations')
+    .select('id')
+    .match({ discipline_id: disciplineId, date })
+    .maybeSingle()
+  return !!data
+}
+
+export async function finalizeAttendance(disciplineId: string, date: string, finalizedBy: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('attendance_finalizations').insert({
+    discipline_id: disciplineId,
+    date,
+    finalized_by: finalizedBy,
+    created_at: new Date().toISOString()
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function unfinalizeAttendance(disciplineId: string, date: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('attendance_finalizations')
+    .delete()
+    .match({ discipline_id: disciplineId, date })
+  if (error) throw new Error(error.message)
+}
+
 
 export async function getClassSchedules(): Promise<ClassSchedule[]> {
   const supabase = createClient()
@@ -933,7 +973,7 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     .select('id, points_per_question, question_ids')
     .eq('discipline_id', disciplineId)
   
-  const assessmentIds = assessments?.map(a => a.id) || []
+  const assessmentIds = (assessments || []).map((a: any) => a.id) || []
   if (assessmentIds.length === 0) return { updated: 0, reason: "Nenhuma prova encontrada para esta disciplina." }
 
   // 2. Buscar SubmissÃµes destas AvaliaÃ§Ãµes
@@ -949,25 +989,26 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     .eq('discipline_id', disciplineId)
 
   // 4. Calcular Total de Aulas (Datas Ãšnicas)
-  const totalClasses = new Set(attendances?.map(a => a.date)).size
+  const totalClasses = new Set((attendances || []).map((a: any) => a.date)).size
 
   // 5. Buscar Estudantes para vincular ID -> Email
   const { data: studentProfiles } = await supabase.from('students').select('id, email, name, cpf')
 
   // Agrupar Resultados por Aluno (Email Ã© o identificador comum)
-  const syncResults: Record<string, { examGrade: number; attendanceScore: number; name: string }> = {}
+  const syncResults: Record<string, { examGrade: number; attendanceScore: number; name: string }> = {};
 
   // Processar Notas de Prova
-  submissions?.forEach(sub => {
-    const key = sub.student_email.toLowerCase().trim()
-    if (!syncResults[key]) syncResults[key] = { examGrade: 0, attendanceScore: 0, name: sub.student_name }
-    syncResults[key].examGrade += Number(sub.score)
-  })
+  (submissions || []).forEach((sub: any) => {
+    const key = (sub.student_email || "").toLowerCase().trim();
+    if (!key) return;
+    if (!syncResults[key]) syncResults[key] = { examGrade: 0, attendanceScore: 0, name: sub.student_name };
+    syncResults[key].examGrade += Number(sub.score || 0);
+  });
 
   // Processar FrequÃªncia
   if (totalClasses > 0) {
-    attendances?.forEach(att => {
-      const profile = studentProfiles?.find(p => p.id === att.student_id)
+    (attendances || []).forEach((att: any) => {
+      const profile = (studentProfiles || []).find((p: any) => p.id === att.student_id)
       if (profile) {
         const key = (profile.email || "").toLowerCase().trim()
         if (!key) return

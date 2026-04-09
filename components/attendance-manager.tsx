@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/select"
 import {
     type Discipline, type StudentProfile, type Attendance, type ClassRoom,
-    getDisciplines, getStudents, getAttendances, saveAttendance, getProfessorSession, getDisciplinesByProfessor, getClasses, saveBatchAttendances
+    getDisciplines, getStudents, getAttendances, saveAttendance, getProfessorSession, getDisciplinesByProfessor, getClasses, saveBatchAttendances,
+    getAttendanceFinalization, finalizeAttendance, unfinalizeAttendance
 } from "@/lib/store"
 import { printAttendanceReportPDF } from "@/lib/pdf"
 
@@ -27,8 +28,11 @@ export function AttendanceManager() {
     const [classes, setClasses] = useState<ClassRoom[]>([])
 
     const [attendances, setAttendances] = useState<Record<string, boolean>>({})
+    const [isFinalized, setIsFinalized] = useState(false)
+    const [isMaster, setIsMaster] = useState(false)
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [finalizing, setFinalizing] = useState(false)
     const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
 
     // Initialize
@@ -39,8 +43,10 @@ export function AttendanceManager() {
             let d: Discipline[] = []
             
             if (session?.role === 'master') {
+                setIsMaster(true)
                 d = await getDisciplines()
             } else if (session?.professorId) {
+                setIsMaster(false)
                 d = await getDisciplinesByProfessor(session.professorId)
             }
             
@@ -59,8 +65,12 @@ export function AttendanceManager() {
         async function fetchAttendances() {
             if (selectedDisciplineId === "none" || !selectedDate) return
             setLoading(true)
-            const data = await getAttendances(selectedDisciplineId)
+            const [data, finalized] = await Promise.all([
+                getAttendances(selectedDisciplineId),
+                getAttendanceFinalization(selectedDisciplineId, selectedDate)
+            ])
 
+            setIsFinalized(finalized)
             const attMap: Record<string, boolean> = {}
             // We assume students not present in DB are absent
             // Default is false (absent) as requested by the user
@@ -105,7 +115,41 @@ export function AttendanceManager() {
         }
     }
 
+    async function handleFinalize() {
+        if (!confirm("Deseja realmente GRAVAR esta chamada? Uma vez gravada, apenas o Master poderá desbloquear para novas alterações.")) return
+        
+        if (selectedDisciplineId === "none" || !selectedDate) return
+        setFinalizing(true)
+        try {
+            // First save everything normally
+            await handleSave()
+            
+            const session = getProfessorSession()
+            if (session?.professorId) {
+                await finalizeAttendance(selectedDisciplineId, selectedDate, session.professorId)
+                setIsFinalized(true)
+                alert("Chamada GRAVADA e trancada com sucesso!")
+            }
+        } catch (e: any) {
+            alert("Erro ao gravar: " + e.message)
+        } finally {
+            setFinalizing(false)
+        }
+    }
+
+    async function handleUnlock() {
+        if (!confirm("Deseja DESBLOQUEAR esta chamada para edição?")) return
+        try {
+            await unfinalizeAttendance(selectedDisciplineId, selectedDate)
+            setIsFinalized(false)
+            alert("Chamada desbloqueada!")
+        } catch (e: any) {
+            alert("Erro ao desbloquear: " + e.message)
+        }
+    }
+
     function toggleAttendance(studentId: string) {
+        if (isFinalized && !isMaster) return
         setAttendances(prev => ({
             ...prev,
             [studentId]: prev[studentId] === false ? true : false
@@ -140,10 +184,30 @@ export function AttendanceManager() {
                         <Download className="h-4 w-4 mr-2" />
                         Exportar PDF
                     </Button>
-                    <Button onClick={handleSave} disabled={saving || selectedDisciplineId === "none" || !selectedDate} className="relative">
-                        {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                        {saving && progress ? `Salvando... ${progress.current}/${progress.total}` : "Salvar Frequência"}
-                    </Button>
+
+                    {isFinalized ? (
+                        <div className="flex items-center gap-2">
+                             <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold bg-amber-100 text-amber-700 border border-amber-200 shadow-sm">
+                                <AlertCircle className="h-4 w-4" /> Gravação Finalizada
+                            </span>
+                            {isMaster && (
+                                <Button onClick={handleUnlock} variant="destructive" className="rounded-lg shadow-lg">
+                                    <RefreshCw className="h-4 w-4 mr-2" /> Desbloquear
+                                </Button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="flex gap-2">
+                            <Button variant="secondary" onClick={handleSave} disabled={saving || selectedDisciplineId === "none" || !selectedDate} className="bg-slate-100 text-slate-700 hover:bg-slate-200">
+                                {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                                Salvar
+                            </Button>
+                            <Button onClick={handleFinalize} disabled={finalizing || saving || selectedDisciplineId === "none" || !selectedDate} className="bg-primary hover:bg-primary/90 text-white shadow-lg">
+                                {finalizing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                                Gravar Chamada
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -264,8 +328,9 @@ export function AttendanceManager() {
                                                     <td className="px-4 py-3 text-center flex justify-center">
                                                         <button
                                                             onClick={() => toggleAttendance(student.id)}
+                                                            disabled={isFinalized && !isMaster}
                                                             className={`w-12 h-6 rounded-full transition-colors flex items-center px-1 ${isPresent ? "bg-green-500 justify-end" : "bg-red-400 justify-start"
-                                                                }`}
+                                                                } ${isFinalized && !isMaster ? "opacity-50 cursor-not-allowed" : ""}`}
                                                         >
                                                             <div className="w-4 h-4 rounded-full bg-white shadow-sm" />
                                                         </button>
