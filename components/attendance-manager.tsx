@@ -11,7 +11,7 @@ import {
 import {
     type Discipline, type StudentProfile, type Attendance, type ClassRoom,
     getDisciplines, getStudents, getAttendances, saveAttendance, getProfessorSession, getDisciplinesByProfessor, getClasses, saveBatchAttendances,
-    getAttendanceFinalization, finalizeAttendance, unfinalizeAttendance
+    getAttendanceFinalization, finalizeAttendance, unfinalizeAttendance, getAttendancesByDate
 } from "@/lib/store"
 import { printAttendanceReportPDF } from "@/lib/pdf"
 
@@ -63,25 +63,29 @@ export function AttendanceManager() {
     // Load attendances when discipline or date changes
     useEffect(() => {
         async function fetchAttendances() {
-            if (selectedDisciplineId === "none" || !selectedDate) return
+            if (selectedDisciplineId === "none" || !selectedDate) {
+                setAttendances({})
+                setIsFinalized(false)
+                return
+            }
             setLoading(true)
-            const [data, finalized] = await Promise.all([
-                getAttendances(selectedDisciplineId),
-                getAttendanceFinalization(selectedDisciplineId, selectedDate)
-            ])
+            try {
+                const [data, finalized] = await Promise.all([
+                    getAttendancesByDate(selectedDisciplineId, selectedDate),
+                    getAttendanceFinalization(selectedDisciplineId, selectedDate)
+                ])
 
-            setIsFinalized(finalized)
-            const attMap: Record<string, boolean> = {}
-            // We assume students not present in DB are absent
-            // Default is false (absent) as requested by the user
-
-            data.forEach(a => {
-                if (a.date === selectedDate) {
+                const attMap: Record<string, boolean> = {}
+                data.forEach(a => {
                     attMap[a.studentId] = a.isPresent
-                }
-            })
-            setAttendances(attMap)
-            setLoading(false)
+                })
+                setAttendances(attMap)
+                setIsFinalized(finalized)
+            } catch (err) {
+                console.error("Erro ao carregar chamada:", err)
+            } finally {
+                setLoading(false)
+            }
         }
         fetchAttendances()
     }, [selectedDisciplineId, selectedDate])
