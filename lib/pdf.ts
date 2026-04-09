@@ -150,7 +150,10 @@ function getModernTemplate(content: string, title: string, hubName?: string): st
         }
     </style>
 </head>
-<body onload="setTimeout(() => window.print(), 500)">
+        }
+    </style>
+</head>
+<body>
     <div class="header">
         <img src="${IBAD_LOGO}" class="header-logo" alt="IBAD Logo" />
         <div class="header-info">
@@ -169,6 +172,13 @@ function getModernTemplate(content: string, title: string, hubName?: string): st
         <div>Relatório oficial gerado em ${new Date().toLocaleString('pt-BR')}</div>
         <div>Página 1 de 1</div>
     </div>
+    <script>
+      if (typeof window !== 'undefined') {
+        window.onload = function() {
+          setTimeout(function() { window.print(); }, 500);
+        };
+      }
+    </script>
 </body>
 </html>`
 }

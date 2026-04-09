@@ -33,25 +33,26 @@ export function AttendanceReportModal({ disciplines, classes, students, allAtten
     const [filterDate, setFilterDate] = useState<string>("")
     const [filterName, setFilterName] = useState("")
 
-    // Calculate report data
     const reportData = useMemo(() => {
-        let filtered = allAttendances
+        if (!students) return []
+        let filtered = allAttendances || []
 
         if (filterDisciplineId !== "all") {
-            filtered = filtered.filter(a => a.disciplineId === filterDisciplineId)
+            filtered = filtered.filter(a => a?.disciplineId === filterDisciplineId)
         }
         if (filterDate) {
-            filtered = filtered.filter(a => a.date === filterDate)
+            filtered = filtered.filter(a => a?.date === filterDate)
         }
 
-        return students
+        return (students || [])
             .filter(s => {
-                const matchName = s.name.toLowerCase().includes(filterName.toLowerCase())
+                if (!s) return false
+                const matchName = (s.name || "").toLowerCase().includes(filterName.toLowerCase())
                 const matchClass = filterClassId === "all" || s.class_id === filterClassId
                 return matchName && matchClass
             })
             .map(student => {
-                const studentAtts = filtered.filter(a => a.studentId === student.id)
+                const studentAtts = filtered.filter(a => a?.studentId === student.id)
                 const presents = studentAtts.filter(a => a.isPresent).length
                 const total = studentAtts.length
                 const pct = total > 0 ? (presents / total) * 100 : 0
