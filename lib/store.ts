@@ -912,9 +912,21 @@ export async function finalizeAttendance(disciplineId: string, date: string, fin
   try {
     const supabase = createClient()
     
-    // Validate if finalizedBy is a valid UUID. If not (e.g., "master"), use a placeholder.
+    let finalizedByValue = finalizedBy;
+
+    // Validate if finalizedBy is a valid UUID. 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    const finalizedByValue = uuidRegex.test(finalizedBy) ? finalizedBy : "00000000-0000-0000-0000-000000000000";
+    
+    if (!uuidRegex.test(finalizedBy)) {
+        // If it's "master" or something else, try to find a real ID from professor_accounts
+        const { data: prof } = await supabase.from('professor_accounts')
+            .select('id')
+            .eq('role', 'master')
+            .limit(1)
+            .maybeSingle();
+            
+        finalizedByValue = prof?.id || "00000000-0000-0000-0000-000000000000";
+    }
 
     const { error } = await supabase.from('attendance_finalizations').insert({
       discipline_id: disciplineId,
@@ -922,7 +934,12 @@ export async function finalizeAttendance(disciplineId: string, date: string, fin
       finalized_by: finalizedByValue,
       created_at: new Date().toISOString()
     })
+
     if (error) {
+        console.error("Supabase Error (Finalize):", error);
+        if (error.message?.includes("security policy")) {
+            throw new Error("Erro de Permissão (RLS): O banco de dados não permitiu gravar esta finalização. Contacte o suporte técnico para ajustar as políticas da tabela 'attendance_finalizations'.")
+        }
         if (error.message?.includes("not found")) {
             throw new Error("O mecanismo de trancamento ainda não foi ativado no seu banco de dados. Por favor, execute o script SQL fornecido.")
         }
