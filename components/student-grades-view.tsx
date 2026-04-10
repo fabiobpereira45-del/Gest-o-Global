@@ -140,8 +140,9 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
             const assessmentIds = disciplineAssessments.map(a => a.id);
             const studentDisciplineSubs = submissions.filter(s => assessmentIds.includes(s.assessmentId));
             if (studentDisciplineSubs.length > 0) {
-                // Get highest score from released assessments
-                finalExamGrade = Math.max(...studentDisciplineSubs.map(s => s.percentage));
+                // Get highest score (weighted to 10 points or actual points)
+                // We use s.score instead of s.percentage to avoid the 40.0 vs 4.0 confusion
+                finalExamGrade = Math.max(...studentDisciplineSubs.map(s => Number(s.score || 0)));
             }
 
             // Dynamic Attendance
