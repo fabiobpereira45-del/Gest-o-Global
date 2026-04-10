@@ -991,14 +991,21 @@ export async function saveBatchAttendances(data: Array<{studentId: string, disci
   if (error) {
     console.warn("Upsert em massa falhou (provavelmente falta a constraint SQL). Usando fallback PARALELO...")
     
-    // Fallback: Tentativa em PARALELO para ganhar performance mesmo sem a constraint
+    // Fallback: Tentativa em LOTES (chunking) para evitar o travamento do cursor e sobrecarga de rede
     let count = 0
-    const promises = data.map(async (a) => {
-      await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
-      count++
-      if (onProgress) onProgress(count, data.length)
-    })
-    await Promise.all(promises)
+    const chunkSize = 5
+    for (let i = 0; i < data.length; i += chunkSize) {
+      const chunk = data.slice(i, i + chunkSize)
+      await Promise.all(chunk.map(async (a) => {
+        try {
+          await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
+          count++
+          if (onProgress) onProgress(count, data.length)
+        } catch (e) {
+          console.error("Falha ao salvar presença individual no lote:", e)
+        }
+      }))
+    }
   } else if (onProgress) {
     onProgress(data.length, data.length)
   }

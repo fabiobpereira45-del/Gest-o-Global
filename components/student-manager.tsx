@@ -62,6 +62,9 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     const [showEditPassword, setShowEditPassword] = useState(false)
     const [importing, setImporting] = useState(false)
     const [syncing, setSyncing] = useState(false)
+    const [isBulkOpen, setIsBulkOpen] = useState(false)
+    const [bulkText, setBulkText] = useState("")
+    const [bulkError, setBulkError] = useState("")
 
     // Selected student (for edit / delete / view)
     const [selected, setSelected] = useState<StudentProfile | null>(null)

@@ -41,33 +41,40 @@ export function AttendanceManager() {
     useEffect(() => {
         async function loadData() {
             setLoading(true)
-            const session = getProfessorSession()
-            let d: Discipline[] = []
-            
-            if (session?.role === 'master') {
-                setIsMaster(true)
-                d = await getDisciplines()
-            } else if (session?.professorId) {
-                setIsMaster(false)
-                d = await getDisciplinesByProfessor(session.professorId)
-            }
-            
-            const c = await getClasses()
-            const s = await getStudents()
-            
-            // Pre-load all attendances for the report modal
-            let allAtt: Attendance[] = []
-            if (d.length > 0) {
-               // Limit to first few disciplines or optimize in production
-               const results = await Promise.all(d.map(disc => getAttendances(disc.id)))
-               allAtt = results.flat()
-            }
+            try {
+                const session = getProfessorSession()
+                let d: Discipline[] = []
+                
+                if (session?.role === 'master') {
+                    setIsMaster(true)
+                    d = await getDisciplines()
+                } else if (session?.professorId) {
+                    setIsMaster(false)
+                    d = await getDisciplinesByProfessor(session.professorId)
+                }
+                
+                const [c, s] = await Promise.all([getClasses(), getStudents()])
+                
+                // Pre-load all attendances for the report modal - USANDO CHUNKING PARA EVITAR TRAVAMENTO
+                let allAtt: Attendance[] = []
+                if (d.length > 0) {
+                    const chunkSize = 5
+                    for (let i = 0; i < d.length; i += chunkSize) {
+                        const chunk = d.slice(i, i + chunkSize)
+                        const results = await Promise.all(chunk.map(disc => getAttendances(disc.id)))
+                        allAtt = [...allAtt, ...results.flat()]
+                    }
+                }
 
-            setDisciplines(d)
-            setClasses(c)
-            setStudents(s)
-            setAllAttendances(allAtt)
-            setLoading(false)
+                setDisciplines(d)
+                setClasses(c)
+                setStudents(s)
+                setAllAttendances(allAtt)
+            } catch (err) {
+                console.error("Erro ao carregar dados iniciais do AttendanceManager:", err)
+            } finally {
+                setLoading(false)
+            }
         }
         loadData()
     }, [])

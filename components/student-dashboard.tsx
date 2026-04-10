@@ -63,25 +63,35 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
 
     async function checkAuth() {
         setLoading(true)
-        const p = await getStudentProfileAuth()
-        setProfile(p)
-        if (p) {
-            setDataLoading(true)
-            const [s, d, m, cls, sch] = await Promise.all([
-                getSemesters(), getDisciplines(), getStudyMaterials(),
-                getClasses(), getClassSchedules()
-            ])
-            setSemesters(s)
-            setDisciplines(d)
-            setMaterials(m)
-            if (p.class_id) {
-                const foundClass = cls.find(cl => cl.id === p.class_id)
-                if (foundClass) setMyClass(foundClass)
-                setMySchedules(sch.filter(sh => sh.classId === p.class_id))
+        try {
+            const p = await getStudentProfileAuth()
+            setProfile(p)
+            if (p) {
+                setDataLoading(true)
+                try {
+                    const [s, d, m, cls, sch] = await Promise.all([
+                        getSemesters(), getDisciplines(), getStudyMaterials(),
+                        getClasses(), getClassSchedules()
+                    ])
+                    setSemesters(s)
+                    setDisciplines(d)
+                    setMaterials(m)
+                    if (p.class_id) {
+                        const foundClass = cls.find(cl => cl.id === p.class_id)
+                        if (foundClass) setMyClass(foundClass)
+                        setMySchedules(sch.filter(sh => sh.classId === p.class_id))
+                    }
+                } catch (err) {
+                    console.error("Erro ao carregar dados acadêmicos:", err)
+                } finally {
+                    setDataLoading(false)
+                }
             }
-            setDataLoading(false)
+        } catch (err) {
+            console.error("Erro na autenticação do aluno:", err)
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }
 
     useEffect(() => {
