@@ -83,15 +83,16 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                 const flatAtts = allAttsArray.flat().filter(a => a.studentId === studentId)
                 setAttendances(flatAtts)
 
-                // Encontrar IDs de disciplinas com atividade
+                // Encontrar IDs de disciplinas com atividade RELEVANTE (Submissões Liberadas)
                 const activeDisciplineIds = new Set<string>();
                 mySubs.forEach(s => {
                     const assessment = asses.find(a => a.id === s.assessmentId);
                     if (assessment?.disciplineId) activeDisciplineIds.add(assessment.disciplineId);
                 });
-                flatAtts.forEach(a => {
-                    if (a.disciplineId) activeDisciplineIds.add(a.disciplineId);
-                });
+
+                // REMOVIDO: flatAtts.forEach(...) para não forçar exibição baseada apenas em presença
+                // Desta forma, se o Admin deletar o registro oficial, e não houver prova liberada,
+                // a disciplina deixará de ser injetada automaticamente.
 
                 // Injetar no mapa se não existir
                 activeDisciplineIds.forEach(discId => {
