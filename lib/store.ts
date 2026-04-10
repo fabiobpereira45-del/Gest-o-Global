@@ -1175,7 +1175,40 @@ export async function releaseAllGrades(isReleased: boolean = true): Promise<void
   if (error) throw new Error(error.message)
 }
 
-/** Sincroniza notas de submissÃµes e frequÃªncia para uma disciplina e aluno. */
+export async function saveBatchGrades(grades: Array<Omit<StudentGrade, "id" | "createdAt"> & { id?: string }>): Promise<void> {
+  const supabase = createClient()
+  if (grades.length === 0) return
+
+  const records = grades.map(g => ({
+    ...(g.id ? { id: g.id } : {}),
+    student_identifier: String(g.studentIdentifier || "").trim().toLowerCase(),
+    student_name: g.studentName,
+    discipline_id: g.disciplineId || null,
+    is_public: g.isPublic,
+    exam_grade: g.examGrade,
+    works_grade: g.worksGrade,
+    seminar_grade: g.seminarGrade,
+    participation_bonus: g.participationBonus,
+    attendance_score: g.attendanceScore,
+    custom_divisor: g.customDivisor,
+    is_released: g.isReleased,
+    created_at: new Date().toISOString()
+  }))
+
+  const { error } = await supabase.from('student_grades').upsert(records, {
+    onConflict: 'student_identifier,discipline_id'
+  })
+
+  if (error && error.message.includes("ON CONFLICT")) {
+    console.warn("Falta constraint de notas. Usando modo paralelo/individual...")
+    const promises = grades.map(g => saveStudentGrade(g, g.id))
+    await Promise.all(promises)
+  } else if (error) {
+    throw error
+  }
+}
+
+/** Sincroniza notas de submissões e frequência para uma disciplina e aluno. */
 export async function syncGradesForDiscipline(disciplineId: string) {
   const supabase = createClient()
 
@@ -1208,12 +1241,18 @@ export async function syncGradesForDiscipline(disciplineId: string) {
   // Agrupar Resultados por Aluno (Email é o identificador comum)
   const syncResults: Record<string, { examGrade: number; attendanceScore: number; name: string }> = {};
 
+  // NOVIDADE: Inicializar resultados com TODOS os alunos matriculados para permitir recuperação automática
+  (studentProfiles || []).forEach((p: any) => {
+    const key = (p.email || "").toLowerCase().trim();
+    if (!key) return;
+    syncResults[key] = { examGrade: 0, attendanceScore: 0, name: p.name };
+  });
+
   // Processar Notas de Prova
   (submissions || []).forEach((sub: any) => {
     const key = (sub.student_email || "").toLowerCase().trim();
-    if (!key) return;
-    if (!syncResults[key]) syncResults[key] = { examGrade: 0, attendanceScore: 0, name: sub.student_name };
-    syncResults[key].examGrade += Number(sub.score || 0);
+    if (!key || !syncResults[key]) return;
+    syncResults[key].examGrade = Math.max(syncResults[key].examGrade, Number(sub.score || 0));
   });
 
   // Processar Frequência
@@ -1222,49 +1261,14 @@ export async function syncGradesForDiscipline(disciplineId: string) {
       const profile = (studentProfiles || []).find((p: any) => p.id === att.student_id)
       if (profile) {
         const key = (profile.email || "").toLowerCase().trim()
-        if (!key) return
-        if (!syncResults[key]) syncResults[key] = { examGrade: 0, attendanceScore: 0, name: profile.name }
-        if (att.is_present) syncResults[key].attendanceScore += (10 / totalClasses)
+        if (key && syncResults[key] && att.is_present) {
+          syncResults[key].attendanceScore += (10 / totalClasses)
+        }
       }
     })
   }
 
-  // 6. PERSISTIR NO BANCO DE DADOS (student_grades)
-  const { data: existingGrades } = await supabase.from('student_grades').select('*').eq('discipline_id', disciplineId)
-  
-  const savePromises = Object.entries(syncResults).map(async ([identifier, data]) => {
-    const existing = (existingGrades || []).find((g: any) => 
-        g.student_identifier.toLowerCase().trim() === identifier
-    )
-
-    const gradeData = {
-        student_identifier: identifier,
-        student_name: data.name,
-        discipline_id: disciplineId,
-        exam_grade: data.examGrade,
-        attendance_score: data.attendanceScore,
-        is_released: true,
-        is_public: false,
-        custom_divisor: 4,
-        created_at: new Date().toISOString()
-    }
-
-    if (existing) {
-        // Atualizar se mudou
-        if (existing.exam_grade !== data.examGrade || existing.attendance_score !== data.attendanceScore) {
-            await supabase.from('student_grades').update({
-                exam_grade: data.examGrade,
-                attendance_score: data.attendanceScore
-            }).eq('id', existing.id)
-        }
-    } else {
-        // Inserir novo
-        await supabase.from('student_grades').insert(gradeData)
-    }
-  })
-
-  await Promise.all(savePromises)
-
+  // A função agora APENAS retorna os dados, não persiste no banco (deixando para a UI chamar saveBatchGrades)
   return syncResults
 }
 

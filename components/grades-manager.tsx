@@ -10,7 +10,7 @@ import {
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-    StudentGrade, getStudentGrades, saveStudentGrade, deleteStudentGrade,
+    StudentGrade, getStudentGrades, saveStudentGrade, deleteStudentGrade, saveBatchGrades,
     StudentProfile, getStudents, Discipline, getDisciplines, releaseAllGrades, syncGradesForDiscipline
 } from "@/lib/store"
 import { printGradesReportPDF } from "@/lib/pdf"
@@ -262,38 +262,30 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                 return
             }
 
-            // Converter os resultados em promessas de salvamento
-            const savePromises = Object.entries(syncData).map(([identifier, data]) => {
-                const existingGrade = grades.find(g => 
+            // Converter os resultados em um ÚNICO lote de salvamento (Muito mais rápido)
+            const recordsToSave = Object.entries(syncData).map(([identifier, data]) => {
+                const existing = grades.find(g => 
                     g.studentIdentifier.toLowerCase().trim() === identifier && 
                     g.disciplineId === selectedDiscipline
                 )
 
-                // Só atualizamos nota se for maior que a atual ou se não existir nota
-                if (existingGrade) {
-                    return saveStudentGrade({
-                        ...existingGrade,
-                        examGrade: Math.max(existingGrade.examGrade, (data as any).examGrade),
-                        attendanceScore: Math.max(existingGrade.attendanceScore, (data as any).attendanceScore)
-                    }, existingGrade.id)
-                } else {
-                    return saveStudentGrade({
-                        studentIdentifier: identifier,
-                        studentName: (data as any).name,
-                        disciplineId: selectedDiscipline,
-                        isPublic: false,
-                        examGrade: (data as any).examGrade,
-                        worksGrade: 0,
-                        seminarGrade: 0,
-                        participationBonus: 0,
-                        attendanceScore: (data as any).attendanceScore,
-                        customDivisor: 4,
-                        isReleased: true
-                    })
+                return {
+                    studentIdentifier: identifier,
+                    studentName: (data as any).name,
+                    disciplineId: selectedDiscipline as string,
+                    isPublic: false,
+                    examGrade: (data as any).examGrade,
+                    worksGrade: existing?.worksGrade || 0,
+                    seminarGrade: existing?.seminarGrade || 0,
+                    participationBonus: existing?.participationBonus || 0,
+                    attendanceScore: (data as any).attendanceScore,
+                    customDivisor: existing?.customDivisor || 4,
+                    isReleased: true,
+                    id: existing?.id
                 }
             })
 
-            await Promise.all(savePromises)
+            await saveBatchGrades(recordsToSave)
             alert("Sincronização concluída com sucesso!")
             loadData()
         } catch (err: any) {
