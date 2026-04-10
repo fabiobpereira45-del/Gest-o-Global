@@ -934,15 +934,16 @@ export async function saveBatchAttendances(data: Array<{studentId: string, disci
   })
 
   if (error) {
-    console.warn("Upsert em massa falhou (provavelmente falta a constraint SQL). Usando fallback individual...")
+    console.warn("Upsert em massa falhou (provavelmente falta a constraint SQL). Usando fallback PARALELO...")
     
-    // Fallback: Tentativa uma a uma para garantir o salvamento (saveAttendance já tem o fallback interno agora)
+    // Fallback: Tentativa em PARALELO para ganhar performance mesmo sem a constraint
     let count = 0
-    for (const a of data) {
+    const promises = data.map(async (a) => {
       await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
       count++
       if (onProgress) onProgress(count, data.length)
-    }
+    })
+    await Promise.all(promises)
   } else if (onProgress) {
     onProgress(data.length, data.length)
   }

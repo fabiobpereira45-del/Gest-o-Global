@@ -337,7 +337,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
 
     // --- Listas Memoizadas para Performance ---
     const filteredGrades = useMemo(() => {
-        return grades
+        const raw = grades
             .filter(g => {
                 const matchDiscipline = !selectedDiscipline || g.disciplineId === selectedDiscipline
                 const matchName = !searchName || g.studentName.toLowerCase().includes(searchName.toLowerCase()) || g.studentIdentifier.toLowerCase().includes(searchName.toLowerCase())
@@ -345,6 +345,26 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                 return matchDiscipline && matchName && matchStatus
             })
             .sort((a, b) => a.studentName.localeCompare(b.studentName))
+
+        // DEDUPLICAÇÃO: Agrupar por estudante + disciplina para evitar duplicidade visual
+        const uniqueGradesMap = new Map<string, StudentGrade>();
+        raw.forEach(g => {
+            const key = `${String(g.studentIdentifier || "").trim().toLowerCase()}-${g.disciplineId || 'geral'}`;
+            const existing = uniqueGradesMap.get(key);
+            
+            if (!existing) {
+                uniqueGradesMap.set(key, g);
+            } else {
+                // Se o novo registro tiver mais notas (ex: examGrade > 0), ele substitui o "vazio"
+                const existingPoints = (existing.examGrade || 0) + (existing.attendanceScore || 0);
+                const newPoints = (g.examGrade || 0) + (g.attendanceScore || 0);
+                if (newPoints > existingPoints) {
+                    uniqueGradesMap.set(key, g);
+                }
+            }
+        });
+
+        return Array.from(uniqueGradesMap.values());
     }, [grades, selectedDiscipline, searchName, statusFilter])
 
     const listMatriculados = useMemo(() => filteredGrades.filter(g => !g.isPublic), [filteredGrades])
