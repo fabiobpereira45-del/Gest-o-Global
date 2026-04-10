@@ -857,18 +857,18 @@ export async function markChatAsRead(studentId: string, disciplineId: string): P
 
 export async function getAttendances(disciplineId: string): Promise<Attendance[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('attendances').select('*').eq('discipline_id', disciplineId).order('date', { ascending: false })
+  const { data } = await supabase.from('attendance').select('*').eq('discipline_id', disciplineId).order('date', { ascending: false })
   return (data || []).map(mapAttendance)
 }
 
 export async function saveAttendance(studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial" | "ead" = "presencial"): Promise<void> {
   const supabase = createClient()
-  const { data: existing } = await supabase.from('attendances').select('id').match({ student_id: studentId, discipline_id: disciplineId, date }).maybeSingle()
-  if (existing) await supabase.from('attendances').update({ is_present: isPresent, type }).eq('id', existing.id)
-  else await supabase.from('attendances').insert({ student_id: studentId, discipline_id: disciplineId, date, is_present: isPresent, type, created_at: new Date().toISOString() })
+  const dbData = { student_id: studentId, discipline_id: disciplineId, date, is_present: isPresent, type }
+  const { error } = await supabase.from('attendance').upsert(dbData, { onConflict: 'student_id,discipline_id,date' })
+  if (error) throw new Error(error.message)
 }
 
-export async function saveBatchAttendances(data: Array<{studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial"|"ead"}>, onProgress?: (current: number, total: number) => void): Promise<void> {
+export async function saveBatchAttendances(data: Array<{studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial"|"ead"}>): Promise<void> {
   if (data.length === 0) return
   
   // Check if finalized
@@ -881,17 +881,20 @@ export async function saveBatchAttendances(data: Array<{studentId: string, disci
       }
     }
   } catch (e: any) {
-    // If table doesn't exist in cache yet, allow saving (it's definitely not locked yet)
-    console.warn("Finalization check bypassed:", e.message)
     if (e.message?.includes("trancada")) throw e
   }
 
-  let count = 0
-  for (const a of data) {
-    await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
-    count++
-    if (onProgress) onProgress(count, data.length)
-  }
+  const supabase = createClient()
+  const dbBatch = data.map(a => ({
+    student_id: a.studentId,
+    discipline_id: a.disciplineId,
+    date: a.date,
+    is_present: a.isPresent,
+    type: a.type
+  }))
+
+  const { error } = await supabase.from('attendance').upsert(dbBatch, { onConflict: 'student_id,discipline_id,date' })
+  if (error) throw new Error(error.message)
 }
 
 export async function getAttendanceFinalization(disciplineId: string, date: string): Promise<boolean> {
@@ -974,6 +977,9 @@ export async function finalizeAttendance(disciplineId: string, date: string, fin
         }
         throw new Error(error.message)
     }
+
+    // Auto-sync grades after finalization
+    await syncGradesForDiscipline(disciplineId)
   } catch (err: any) {
     throw err
   }
@@ -990,6 +996,12 @@ export async function unfinalizeAttendance(disciplineId: string, date: string): 
             return // Ignore if table doesn't exist, as it's definitely not finalized
         }
         throw new Error(error.message)
+    }
+    
+    // Auto-sync grades after unfinalization (to reflect changes if any)
+    const { data: remains } = await supabase.from('attendance_finalizations').select('discipline_id').eq('discipline_id', disciplineId).limit(1)
+    if (remains) {
+        await syncGradesForDiscipline(disciplineId)
     }
   } catch (err) {
     // Ignore errors for unfinalizing
@@ -1072,34 +1084,33 @@ export async function releaseAllGrades(isReleased: boolean = true): Promise<void
 export async function syncGradesForDiscipline(disciplineId: string) {
   const supabase = createClient()
 
-  // 1. Buscar AvaliaÃ§Ãµes da Disciplina
+  // 1. Buscar Avaliações da Disciplina
   const { data: assessments } = await supabase
     .from('assessments')
     .select('id, points_per_question, question_ids')
     .eq('discipline_id', disciplineId)
   
   const assessmentIds = (assessments || []).map((a: any) => a.id) || []
-  if (assessmentIds.length === 0) return { updated: 0, reason: "Nenhuma prova encontrada para esta disciplina." }
-
-  // 2. Buscar SubmissÃµes destas AvaliaÃ§Ãµes
-  const { data: submissions } = await supabase
+  
+  // 2. Buscar Submissões destas Avaliações
+  const { data: submissions } = assessmentIds.length > 0 ? await supabase
     .from('student_submissions')
     .select('student_email, student_name, score, assessment_id')
-    .in('assessment_id', assessmentIds)
+    .in('assessment_id', assessmentIds) : { data: [] }
 
-  // 3. Buscar FrequÃªncia da Disciplina
+  // 3. Buscar Frequência da Disciplina
   const { data: attendances } = await supabase
-    .from('attendances')
+    .from('attendance')
     .select('student_id, is_present, date')
     .eq('discipline_id', disciplineId)
 
-  // 4. Calcular Total de Aulas (Datas Ãšnicas)
+  // 4. Calcular Total de Aulas (Datas Únicas)
   const totalClasses = new Set((attendances || []).map((a: any) => a.date)).size
 
   // 5. Buscar Estudantes para vincular ID -> Email
   const { data: studentProfiles } = await supabase.from('students').select('id, email, name, cpf')
 
-  // Agrupar Resultados por Aluno (Email Ã© o identificador comum)
+  // Agrupar Resultados por Aluno (Email é o identificador comum)
   const syncResults: Record<string, { examGrade: number; attendanceScore: number; name: string }> = {};
 
   // Processar Notas de Prova
@@ -1110,7 +1121,7 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     syncResults[key].examGrade += Number(sub.score || 0);
   });
 
-  // Processar FrequÃªncia
+  // Processar Frequência
   if (totalClasses > 0) {
     (attendances || []).forEach((att: any) => {
       const profile = (studentProfiles || []).find((p: any) => p.id === att.student_id)
@@ -1122,6 +1133,42 @@ export async function syncGradesForDiscipline(disciplineId: string) {
       }
     })
   }
+
+  // 6. PERSISTIR NO BANCO DE DADOS (student_grades)
+  const { data: existingGrades } = await supabase.from('student_grades').select('*').eq('discipline_id', disciplineId)
+  
+  const savePromises = Object.entries(syncResults).map(async ([identifier, data]) => {
+    const existing = (existingGrades || []).find((g: any) => 
+        g.student_identifier.toLowerCase().trim() === identifier
+    )
+
+    const gradeData = {
+        student_identifier: identifier,
+        student_name: data.name,
+        discipline_id: disciplineId,
+        exam_grade: data.examGrade,
+        attendance_score: data.attendanceScore,
+        is_released: true,
+        is_public: false,
+        custom_divisor: 4,
+        created_at: new Date().toISOString()
+    }
+
+    if (existing) {
+        // Atualizar se mudou
+        if (existing.exam_grade !== data.examGrade || existing.attendance_score !== data.attendanceScore) {
+            await supabase.from('student_grades').update({
+                exam_grade: data.examGrade,
+                attendance_score: data.attendanceScore
+            }).eq('id', existing.id)
+        }
+    } else {
+        // Inserir novo
+        await supabase.from('student_grades').insert(gradeData)
+    }
+  })
+
+  await Promise.all(savePromises)
 
   return syncResults
 }

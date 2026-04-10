@@ -117,10 +117,8 @@ export function AttendanceManager() {
                 type: lessonType
             }))
 
-            // Save all at once with progress tracking
-            await saveBatchAttendances(batchData, (current: number, total: number) => {
-                setProgress({ current, total })
-            })
+            // Save all at once with bulk upsert (instant)
+            await saveBatchAttendances(batchData)
 
             // Hard refresh - fetch latest data for this date and all data for report
             const [updatedDateAtt, updatedAllAtt] = await Promise.all([
@@ -164,7 +162,7 @@ export function AttendanceManager() {
             if (session?.professorId) {
                 await finalizeAttendance(selectedDisciplineId, selectedDate, session.professorId)
                 setIsFinalized(true)
-                alert("Chamada GRAVADA e trancada com sucesso!")
+                alert("Chamada GRAVADA e trancada com sucesso! As notas dos alunos já foram atualizadas automaticamente.")
             }
         } catch (e: any) {
             if (e.message === "RLS_ERROR" && isMaster) {
