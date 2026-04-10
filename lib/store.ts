@@ -863,12 +863,12 @@ export async function getAttendances(disciplineId: string): Promise<Attendance[]
 
 export async function saveAttendance(studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial" | "ead" = "presencial"): Promise<void> {
   const supabase = createClient()
-  const dbData = { student_id: studentId, discipline_id: disciplineId, date, is_present: isPresent, type }
-  const { error } = await supabase.from('attendance').upsert(dbData, { onConflict: 'student_id,discipline_id,date' })
-  if (error) throw new Error(error.message)
+  const { data: existing } = await supabase.from('attendance').select('id').match({ student_id: studentId, discipline_id: disciplineId, date }).maybeSingle()
+  if (existing) await supabase.from('attendance').update({ is_present: isPresent, type }).eq('id', existing.id)
+  else await supabase.from('attendance').insert({ student_id: studentId, discipline_id: disciplineId, date, is_present: isPresent, type, created_at: new Date().toISOString() })
 }
 
-export async function saveBatchAttendances(data: Array<{studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial"|"ead"}>): Promise<void> {
+export async function saveBatchAttendances(data: Array<{studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial"|"ead"}>, onProgress?: (current: number, total: number) => void): Promise<void> {
   if (data.length === 0) return
   
   // Check if finalized
@@ -884,17 +884,12 @@ export async function saveBatchAttendances(data: Array<{studentId: string, disci
     if (e.message?.includes("trancada")) throw e
   }
 
-  const supabase = createClient()
-  const dbBatch = data.map(a => ({
-    student_id: a.studentId,
-    discipline_id: a.disciplineId,
-    date: a.date,
-    is_present: a.isPresent,
-    type: a.type
-  }))
-
-  const { error } = await supabase.from('attendance').upsert(dbBatch, { onConflict: 'student_id,discipline_id,date' })
-  if (error) throw new Error(error.message)
+  let count = 0
+  for (const a of data) {
+    await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
+    count++
+    if (onProgress) onProgress(count, data.length)
+  }
 }
 
 export async function getAttendanceFinalization(disciplineId: string, date: string): Promise<boolean> {

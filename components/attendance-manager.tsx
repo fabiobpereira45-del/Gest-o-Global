@@ -117,8 +117,10 @@ export function AttendanceManager() {
                 type: lessonType
             }))
 
-            // Save all at once with bulk upsert (instant)
-            await saveBatchAttendances(batchData)
+            // Save with progress tracking (compatible loop)
+            await saveBatchAttendances(batchData, (current: number, total: number) => {
+                setProgress({ current, total })
+            })
 
             // Hard refresh - fetch latest data for this date and all data for report
             const [updatedDateAtt, updatedAllAtt] = await Promise.all([
