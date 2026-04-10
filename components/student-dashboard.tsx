@@ -78,13 +78,6 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
                 const foundClass = cls.find(cl => cl.id === p.class_id)
                 if (foundClass) setMyClass(foundClass)
                 setMySchedules(sch.filter(sh => sh.classId === p.class_id))
-                
-                const [members, grades] = await Promise.all([
-                    getClassmates(p.class_id),
-                    getStudentGrades()
-                ])
-                setClassmates(members.filter(m => m.id !== p.id))
-                setOfficialGrades(grades.filter(g => g.studentIdentifier === p.cpf || g.studentIdentifier === p.id))
             }
             setDataLoading(false)
         }

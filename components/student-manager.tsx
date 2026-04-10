@@ -60,10 +60,8 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     const [deleting, setDeleting] = useState(false)
     const [editPassword, setEditPassword] = useState("")
     const [showEditPassword, setShowEditPassword] = useState(false)
-    const [isBulkOpen, setIsBulkOpen] = useState(false)
-    const [bulkText, setBulkText] = useState("")
-    const [bulkError, setBulkError] = useState("")
     const [importing, setImporting] = useState(false)
+    const [syncing, setSyncing] = useState(false)
 
     // Selected student (for edit / delete / view)
     const [selected, setSelected] = useState<StudentProfile | null>(null)
@@ -343,6 +341,22 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
         }
         setImporting(false)
     }
+    
+    async function handleSyncAuth() {
+        if (!confirm("Isso criará contas de acesso automático para todos os alunos que ainda não possuem login. A senha inicial será IBAD2026. Deseja continuar?")) return
+        setSyncing(true)
+        try {
+            const res = await fetch("/api/admin/sync-auth", { method: "POST" })
+            const data = await res.json()
+            if (data.error) throw new Error(data.error)
+            alert(data.message || "Sincronização concluída com sucesso!")
+            await load()
+        } catch (err: any) {
+            alert("Erro na sincronização: " + err.message)
+        } finally {
+            setSyncing(false)
+        }
+    }
 
     // ─── Render ───────────────────────────────────────────────────────────────
     if (loading) return (
@@ -361,6 +375,15 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                     <p className="text-muted-foreground text-sm">Visualize, edite e gerencie os alunos com matrícula ativa.</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={handleSyncAuth}
+                        disabled={syncing}
+                        className="rounded-xl border-orange-200 bg-orange-50/50 text-orange-700 hover:bg-orange-100 transition-colors"
+                    >
+                        {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ShieldCheck className="h-4 w-4 mr-1.5" />}
+                        Sincronizar Contas
+                    </Button>
                     <Button
                         variant="outline"
                         onClick={() => setIsBulkOpen(true)}

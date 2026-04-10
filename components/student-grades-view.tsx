@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { FileText, Award, CalendarCheck, Loader2, Calculator, CheckCircle2 } from "lucide-react"
 import {
     type Discipline, type Semester, type StudentSubmission, type Attendance, type Assessment, type StudentGrade, type GradingSettings,
-    getDisciplines, getSemesters, getSubmissions, getAttendances, getAssessments, getStudentGrades, getGradingSettings
+    getDisciplines, getSemesters, getSubmissions, getAttendances, getAttendancesByStudent, getAssessments, getStudentGrades, getGradingSettings
 } from "@/lib/store"
 
 interface Props {
@@ -78,9 +78,7 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                 })
                 setSubmissions(mySubs)
 
-                const attPromises = d.map(disc => getAttendances(disc.id))
-                const allAttsArray = await Promise.all(attPromises)
-                const flatAtts = allAttsArray.flat().filter(a => a.studentId === studentId)
+                const flatAtts = await getAttendancesByStudent(studentId)
                 setAttendances(flatAtts)
 
                 // Encontrar IDs de disciplinas com atividade RELEVANTE (Submissões Liberadas)

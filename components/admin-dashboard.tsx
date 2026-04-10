@@ -92,18 +92,38 @@ export function AdminDashboard({ onLogout }: Props) {
 
   async function refresh(showLoading: boolean = true) {
     if (showLoading) setLoading(true)
-    const [a, s, q, d] = await Promise.all([
-      getAssessments(),
-      getSubmissions(),
-      getQuestions(),
-      getDisciplines()
-    ])
-    setAssessments(a)
-    setSubmissions(s)
-    setQuestions(q)
-    setDisciplines(d)
-    if (showLoading) setLoading(false)
+    try {
+      const [a, d] = await Promise.all([
+        getAssessments(),
+        getDisciplines()
+      ])
+      setAssessments(a)
+      setDisciplines(d)
+    } catch (err) {
+      console.error("Erro ao atualizar dados principais:", err)
+    } finally {
+      if (showLoading) setLoading(false)
+    }
   }
+
+  async function loadAnalytics() {
+    try {
+      const [s, q] = await Promise.all([
+        getSubmissions(200), // Limit to avoid hang
+        getQuestions(200)    // Limit to avoid hang
+      ])
+      setSubmissions(s)
+      setQuestions(q)
+    } catch (err) {
+      console.error("Erro ao carregar estatísticas:", err)
+    }
+  }
+
+  useEffect(() => {
+    if (tab === "overview") {
+      loadAnalytics()
+    }
+  }, [tab])
 
   async function handleLogout() {
     clearProfessorSession()

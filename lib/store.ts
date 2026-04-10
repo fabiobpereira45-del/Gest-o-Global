@@ -134,26 +134,59 @@ export async function registerStudentAuth(name: string, cpf: string, password: s
   const cleanCpf = cpf.replace(/\D/g, '')
   const email = `${cleanCpf}@student.ibad.com`
 
+  // 1. Verificar se o aluno já existe na tabela de estudantes (mas sem Auth)
+  const { data: existingStudent } = await supabase
+    .from('students')
+    .select('id, auth_user_id')
+    .eq('cpf', cleanCpf)
+    .maybeSingle()
+
+  if (existingStudent?.auth_user_id) {
+    throw new Error("Este CPF já possui uma matrícula ativa e acesso ao Portal. Por favor, faça login.")
+  }
+
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { name, type: 'student' } }
-  })
-  if (authError) throw new Error(authError.message)
-  if (!authData.user) throw new Error("Erro ao criar usuÃ¡rio na base de dados.")
-
-  const matricula = `2026${Math.floor(1000 + Math.random() * 9000)}`
-
-  const { error: dbError } = await supabase.from('students').insert({
-    auth_user_id: authData.user.id,
-    name,
-    cpf: cleanCpf,
-    email,
-    enrollment_number: matricula
+    options: { data: { name: name.toUpperCase(), type: 'student' } }
   })
 
-  if (dbError) throw new Error(dbError.message)
-  return { matricula, name }
+  if (authError) {
+    if (authError.message.includes("already registered")) {
+      throw new Error("Este e-mail/CPF já está registrado. Tente recuperar sua senha.")
+    }
+    throw new Error(authError.message)
+  }
+  if (!authData.user) throw new Error("Erro ao criar usuário na base de dados.")
+
+  let matricula = ""
+
+  if (existingStudent) {
+    // 2. Se o aluno já existia (vínculo manual ou importação), apenas vincula o auth_user_id
+    await supabase.from('students').update({
+      auth_user_id: authData.user.id,
+      name: name.toUpperCase(),
+      email // Garante que o e-mail bate com o Auth
+    }).eq('id', existingStudent.id)
+    
+    // Recupera a matrícula para informar ao usuário
+    const { data: fullProfile } = await supabase.from('students').select('enrollment_number').eq('id', existingStudent.id).single()
+    matricula = fullProfile?.enrollment_number || "Matrícula Vinculada"
+  } else {
+    // 3. Caso contrário, cria um novo registro completo
+    matricula = `2026${Math.floor(1000 + Math.random() * 9000)}`
+    const { error: dbError } = await supabase.from('students').insert({
+      auth_user_id: authData.user.id,
+      name: name.toUpperCase(),
+      cpf: cleanCpf,
+      email,
+      enrollment_number: matricula,
+      status: 'active'
+    })
+    if (dbError) throw new Error(dbError.message)
+  }
+
+  return { matricula, name: name.toUpperCase() }
 }
 
 export async function registerStudentByAdmin(data: any): Promise<void> {
@@ -241,6 +274,17 @@ export async function loginStudentAuth(identifier: string, password: string) {
   let { data, error } = await supabase.auth.signInWithPassword({ email: finalEmail, password: cleanPass })
   
   if (error) {
+    // Diagnóstico inteligente: verifica se o estudante existe no Banco mas não tem Auth
+    const { data: dbStudent } = await supabase
+      .from('students')
+      .select('id, name, auth_user_id')
+      .eq('email', finalEmail)
+      .maybeSingle()
+
+    if (dbStudent && !dbStudent.auth_user_id) {
+        throw new Error(`Olá ${dbStudent.name.split(' ')[0]}, sua matrícula foi encontrada, mas o acesso ao Portal ainda não foi ativado. Por favor, clique em 'Realizar Matrícula' abaixo para criar sua senha.`)
+    }
+
     // FALLBACK: Se falhou e a senha parece um CPF pontuado (14 chars), tenta limpar a senha e tentar de novo
     const digitsOnlyPass = cleanPass.replace(/\D/g, '')
     if (digitsOnlyPass !== cleanPass && digitsOnlyPass.length === 11) {
@@ -560,9 +604,11 @@ export async function deleteStudyMaterial(id: string): Promise<void> {
   await supabase.from('study_materials').delete().eq('id', id)
 }
 
-export async function getQuestions(): Promise<Question[]> {
+export async function getQuestions(limit?: number): Promise<Question[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('questions').select('*')
+  let query = supabase.from('questions').select('*')
+  if (limit) query = query.limit(limit)
+  const { data } = await query
   return (data || []).map(mapQuestion)
 }
 
@@ -660,9 +706,12 @@ export async function deleteAssessment(id: string): Promise<void> {
   await supabase.from('assessments').delete().eq('id', id)
 }
 
-export async function getSubmissions(): Promise<StudentSubmission[]> {
+export async function getSubmissions(limit: number = 500): Promise<StudentSubmission[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('student_submissions').select('*')
+  const { data } = await supabase.from('student_submissions')
+    .select('*')
+    .order('submitted_at', { ascending: false })
+    .limit(limit)
   return (data || []).map(mapSubmission)
 }
 
@@ -858,6 +907,12 @@ export async function markChatAsRead(studentId: string, disciplineId: string): P
 export async function getAttendances(disciplineId: string): Promise<Attendance[]> {
   const supabase = createClient()
   const { data } = await supabase.from('attendance').select('*').eq('discipline_id', disciplineId).order('date', { ascending: false })
+  return (data || []).map(mapAttendance)
+}
+
+export async function getAttendancesByStudent(studentId: string): Promise<Attendance[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('attendance').select('*').eq('student_id', studentId)
   return (data || []).map(mapAttendance)
 }
 
@@ -1103,9 +1158,9 @@ export async function getClassmates(classId: string): Promise<StudentProfile[]> 
   return (data || []).map(mapStudentProfile)
 }
 
-export async function getStudentGrades(disciplineId?: string): Promise<StudentGrade[]> {
+export async function getStudentGrades(disciplineId?: string, limit: number = 1000): Promise<StudentGrade[]> {
   const supabase = createClient()
-  let query = supabase.from('student_grades').select('*').order('created_at', { ascending: false })
+  let query = supabase.from('student_grades').select('*').order('created_at', { ascending: false }).limit(limit)
   
   if (disciplineId) {
     query = query.eq('discipline_id', disciplineId)
