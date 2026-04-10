@@ -863,6 +863,8 @@ export async function getAttendances(disciplineId: string): Promise<Attendance[]
 
 export async function saveAttendance(studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial" | "ead" = "presencial"): Promise<void> {
   const supabase = createClient()
+  
+  // Tenta o Upsert de Alta Performance primeiro (requer constraint UNIQUE)
   const { error } = await supabase.from('attendance').upsert({
     student_id: studentId,
     discipline_id: disciplineId,
@@ -874,7 +876,30 @@ export async function saveAttendance(studentId: string, disciplineId: string, da
     onConflict: 'student_id,discipline_id,date' 
   })
   
-  if (error) throw error
+  // Se falhar por falta de constraint (ON CONFLICT error), usa o modo tradicional (Lento mas seguro)
+  if (error && (error.message.includes("ON CONFLICT") || error.code === "PGRST204")) {
+    console.warn("Constraint ausente. Usando modo tradicional de salvamento para presença.")
+    const { data: existing } = await supabase
+      .from('attendance')
+      .select('id')
+      .match({ student_id: studentId, discipline_id: disciplineId, date })
+      .maybeSingle()
+
+    if (existing) {
+      await supabase.from('attendance').update({ is_present: isPresent, type }).eq('id', existing.id)
+    } else {
+      await supabase.from('attendance').insert({ 
+        student_id: studentId, 
+        discipline_id: disciplineId, 
+        date, 
+        is_present: isPresent, 
+        type, 
+        created_at: new Date().toISOString() 
+      })
+    }
+  } else if (error) {
+    throw error
+  }
 }
 
 export async function saveBatchAttendances(data: Array<{studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial"|"ead"}>, onProgress?: (current: number, total: number) => void): Promise<void> {
@@ -909,15 +934,15 @@ export async function saveBatchAttendances(data: Array<{studentId: string, disci
   })
 
   if (error) {
-    console.error("Erro no upsert em massa, tentando modo paralelo:", error)
-    // Fallback: Tentativa em paralelo se o upsert em massa falhar por falta de constraint
+    console.warn("Upsert em massa falhou (provavelmente falta a constraint SQL). Usando fallback individual...")
+    
+    // Fallback: Tentativa uma a uma para garantir o salvamento (saveAttendance já tem o fallback interno agora)
     let count = 0
-    const promises = data.map(async (a) => {
+    for (const a of data) {
       await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
       count++
       if (onProgress) onProgress(count, data.length)
-    })
-    await Promise.all(promises)
+    }
   } else if (onProgress) {
     onProgress(data.length, data.length)
   }
@@ -1084,7 +1109,7 @@ export async function getStudentGrades(): Promise<StudentGrade[]> {
   return (data || []).map(mapStudentGrade)
 }
 
-export async function saveStudentGrade(grade: Omit<StudentGrade, 'id' | 'createdAt'>, id?: string): Promise<void> {
+export async function saveStudentGrade(grade: Omit<StudentGrade, "id" | "createdAt">, id?: string): Promise<void> {
   const supabase = createClient()
   const cleanIdentifier = String(grade.studentIdentifier || "").trim().toLowerCase()
   const dbData = { 
@@ -1100,8 +1125,38 @@ export async function saveStudentGrade(grade: Omit<StudentGrade, 'id' | 'created
     custom_divisor: grade.customDivisor, 
     is_released: grade.isReleased 
   }
-  if (id) await supabase.from('student_grades').update(dbData).eq('id', id)
-  else await supabase.from('student_grades').insert({ ...dbData, created_at: new Date().toISOString() })
+
+  // Tenta upsert primeiro
+  const { error } = await supabase.from('student_grades').upsert({
+    ...(id ? { id } : {}),
+    ...dbData,
+    created_at: new Date().toISOString()
+  }, {
+    onConflict: 'student_identifier,discipline_id'
+  })
+
+  // Fallback se faltar constraint
+  if (error && error.message.includes("ON CONFLICT")) {
+    console.warn("Constraint de notas ausente. Usando modo tradicional.")
+    if (id) {
+        await supabase.from('student_grades').update(dbData).eq('id', id)
+    } else {
+        // Verifica se já existe manualmente para evitar erro
+        const { data: existing } = await supabase
+            .from('student_grades')
+            .select('id')
+            .match({ student_identifier: cleanIdentifier, discipline_id: grade.disciplineId || null })
+            .maybeSingle()
+
+        if (existing) {
+            await supabase.from('student_grades').update(dbData).eq('id', existing.id)
+        } else {
+            await supabase.from('student_grades').insert({ ...dbData, created_at: new Date().toISOString() })
+        }
+    }
+  } else if (error) {
+    throw error
+  }
 }
 
 export async function deleteStudentGrade(id: string): Promise<void> {
