@@ -244,7 +244,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
         }
     }
 
+    const [statusFilter, setStatusFilter] = useState<"all" | "released" | "hidden">("all")
+
     const handleSync = async () => {
+
         if (!selectedDiscipline) {
             alert("Selecione uma disciplina no filtro abaixo para sincronizar.")
             return
@@ -334,12 +337,15 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
 
     // --- Listas Memoizadas para Performance ---
     const filteredGrades = useMemo(() => {
-        return grades.filter(g => {
-            const matchDiscipline = !selectedDiscipline || g.disciplineId === selectedDiscipline
-            const matchName = !searchName || g.studentName.toLowerCase().includes(searchName.toLowerCase()) || g.studentIdentifier.toLowerCase().includes(searchName.toLowerCase())
-            return matchDiscipline && matchName
-        })
-    }, [grades, selectedDiscipline, searchName])
+        return grades
+            .filter(g => {
+                const matchDiscipline = !selectedDiscipline || g.disciplineId === selectedDiscipline
+                const matchName = !searchName || g.studentName.toLowerCase().includes(searchName.toLowerCase()) || g.studentIdentifier.toLowerCase().includes(searchName.toLowerCase())
+                const matchStatus = statusFilter === "all" || (statusFilter === "released" ? g.isReleased : !g.isReleased)
+                return matchDiscipline && matchName && matchStatus
+            })
+            .sort((a, b) => a.studentName.localeCompare(b.studentName))
+    }, [grades, selectedDiscipline, searchName, statusFilter])
 
     const listMatriculados = useMemo(() => filteredGrades.filter(g => !g.isPublic), [filteredGrades])
     const listPublicos = useMemo(() => filteredGrades.filter(g => g.isPublic), [filteredGrades])
@@ -433,7 +439,20 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                         </select>
                     </div>
 
-                    <div className="md:col-span-5 flex flex-col gap-1.5">
+                    <div className="md:col-span-2 flex flex-col gap-1.5">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Situação</Label>
+                        <select
+                            className="flex h-12 w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as any)}
+                        >
+                            <option value="all">Todas</option>
+                            <option value="released">Liberadas</option>
+                            <option value="hidden">Ocultas</option>
+                        </select>
+                    </div>
+
+                    <div className="md:col-span-6 flex flex-col gap-1.5">
                         <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Localizar Aluno</Label>
                         <div className="relative group">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
