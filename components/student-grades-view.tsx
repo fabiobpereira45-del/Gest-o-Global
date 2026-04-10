@@ -44,27 +44,20 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
 
                 allGrades.forEach(g => {
                     if (!g.isReleased) return;
-                    
                     const gId = String(g.studentIdentifier || "").trim().toLowerCase();
                     const sEmail = String(studentEmail || "").trim().toLowerCase();
                     const sId = String(studentId || "").trim().toLowerCase();
                     const sDoc = String(studentDoc || "").replace(/\D/g, "");
                     const gIdClean = gId.replace(/\D/g, "");
 
-                    const isMe = (
-                        gId === sEmail || 
-                        gId === sId || 
-                        (sDoc && (gId === sDoc || gIdClean === sDoc))
-                    );
+                    const isMe = (gId === sEmail || gId === sId || (sDoc && (gId === sDoc || gIdClean === sDoc)));
 
                     if (isMe) {
                         const discKey = g.disciplineId || 'geral';
                         const existing = consolidatedGradesMap.get(discKey);
-
                         if (!existing) {
                             consolidatedGradesMap.set(discKey, { ...g });
                         } else {
-                            // CONSOLIDAÇÃO: Soma ou pega o maior valor para evitar duplicidade
                             consolidatedGradesMap.set(discKey, {
                                 ...existing,
                                 examGrade: Math.max(existing.examGrade, g.examGrade),
@@ -72,26 +65,56 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                                 seminarGrade: Math.max(existing.seminarGrade, g.seminarGrade),
                                 participationBonus: Math.max(existing.participationBonus, g.participationBonus),
                                 attendanceScore: Math.max(existing.attendanceScore, g.attendanceScore),
-                                // Mantém o ID do primeiro registro encontrado para a chave do React
                             });
                         }
                     }
                 });
 
-                setOfficialGrades(Array.from(consolidatedGradesMap.values()))
-
-                // Submissions only shown if exam results were released
+                // --- AUTO-INJEÇÃO DE DISCIPLINAS ATIVAS ---
+                // Verifica se há submissões ou frequências em disciplinas que ainda não estão no mapa
                 const mySubs = sub.filter(s => {
                     const assessment = asses.find(a => a.id === s.assessmentId)
                     return s.studentEmail === studentEmail && assessment?.releaseResults === true
                 })
                 setSubmissions(mySubs)
 
-                // Attendances
                 const attPromises = d.map(disc => getAttendances(disc.id))
                 const allAttsArray = await Promise.all(attPromises)
                 const flatAtts = allAttsArray.flat().filter(a => a.studentId === studentId)
                 setAttendances(flatAtts)
+
+                // Encontrar IDs de disciplinas com atividade
+                const activeDisciplineIds = new Set<string>();
+                mySubs.forEach(s => {
+                    const assessment = asses.find(a => a.id === s.assessmentId);
+                    if (assessment?.disciplineId) activeDisciplineIds.add(assessment.disciplineId);
+                });
+                flatAtts.forEach(a => {
+                    if (a.disciplineId) activeDisciplineIds.add(a.disciplineId);
+                });
+
+                // Injetar no mapa se não existir
+                activeDisciplineIds.forEach(discId => {
+                    if (!consolidatedGradesMap.has(discId)) {
+                        consolidatedGradesMap.set(discId, {
+                            id: `auto-${discId}-${studentId}`,
+                            studentIdentifier: studentEmail || studentId,
+                            studentName: "", 
+                            disciplineId: discId,
+                            isPublic: false,
+                            examGrade: 0,
+                            worksGrade: 0,
+                            seminarGrade: 0,
+                            participationBonus: 0,
+                            attendanceScore: 0,
+                            customDivisor: 4,
+                            isReleased: true, // Auto-liberado para visualização dinâmica
+                            createdAt: new Date().toISOString()
+                        });
+                    }
+                });
+
+                setOfficialGrades(Array.from(consolidatedGradesMap.values()))
 
             } catch (err) {
                 console.error("Erro ao carregar notas:", err)
