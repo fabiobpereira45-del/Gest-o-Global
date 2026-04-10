@@ -39,9 +39,11 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                 setGradingSettings(setts)
                 setAssessments(asses)
 
-                // Filter official grades by student identifier and release status
-                const myGrades = allGrades.filter(g => {
-                    if (!g.isReleased) return false;
+                // Filter and CONSOLIDATE official grades by student identifier and discipline
+                const consolidatedGradesMap = new Map<string, StudentGrade>();
+
+                allGrades.forEach(g => {
+                    if (!g.isReleased) return;
                     
                     const gId = String(g.studentIdentifier || "").trim().toLowerCase();
                     const sEmail = String(studentEmail || "").trim().toLowerCase();
@@ -49,13 +51,34 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                     const sDoc = String(studentDoc || "").replace(/\D/g, "");
                     const gIdClean = gId.replace(/\D/g, "");
 
-                    return (
+                    const isMe = (
                         gId === sEmail || 
                         gId === sId || 
                         (sDoc && (gId === sDoc || gIdClean === sDoc))
                     );
+
+                    if (isMe) {
+                        const discKey = g.disciplineId || 'geral';
+                        const existing = consolidatedGradesMap.get(discKey);
+
+                        if (!existing) {
+                            consolidatedGradesMap.set(discKey, { ...g });
+                        } else {
+                            // CONSOLIDAÇÃO: Soma ou pega o maior valor para evitar duplicidade
+                            consolidatedGradesMap.set(discKey, {
+                                ...existing,
+                                examGrade: Math.max(existing.examGrade, g.examGrade),
+                                worksGrade: Math.max(existing.worksGrade, g.worksGrade),
+                                seminarGrade: Math.max(existing.seminarGrade, g.seminarGrade),
+                                participationBonus: Math.max(existing.participationBonus, g.participationBonus),
+                                attendanceScore: Math.max(existing.attendanceScore, g.attendanceScore),
+                                // Mantém o ID do primeiro registro encontrado para a chave do React
+                            });
+                        }
+                    }
                 });
-                setOfficialGrades(myGrades)
+
+                setOfficialGrades(Array.from(consolidatedGradesMap.values()))
 
                 // Submissions only shown if exam results were released
                 const mySubs = sub.filter(s => {

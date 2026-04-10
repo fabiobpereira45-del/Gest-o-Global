@@ -1086,7 +1086,20 @@ export async function getStudentGrades(): Promise<StudentGrade[]> {
 
 export async function saveStudentGrade(grade: Omit<StudentGrade, 'id' | 'createdAt'>, id?: string): Promise<void> {
   const supabase = createClient()
-  const dbData = { student_identifier: grade.studentIdentifier, student_name: grade.studentName, discipline_id: grade.disciplineId || null, is_public: grade.isPublic, exam_grade: grade.examGrade, works_grade: grade.worksGrade, seminar_grade: grade.seminarGrade, participation_bonus: grade.participationBonus, attendance_score: grade.attendanceScore, custom_divisor: grade.customDivisor, is_released: grade.isReleased }
+  const cleanIdentifier = String(grade.studentIdentifier || "").trim().toLowerCase()
+  const dbData = { 
+    student_identifier: cleanIdentifier, 
+    student_name: grade.studentName, 
+    discipline_id: grade.disciplineId || null, 
+    is_public: grade.isPublic, 
+    exam_grade: grade.examGrade, 
+    works_grade: grade.worksGrade, 
+    seminar_grade: grade.seminarGrade, 
+    participation_bonus: grade.participationBonus, 
+    attendance_score: grade.attendanceScore, 
+    custom_divisor: grade.customDivisor, 
+    is_released: grade.isReleased 
+  }
   if (id) await supabase.from('student_grades').update(dbData).eq('id', id)
   else await supabase.from('student_grades').insert({ ...dbData, created_at: new Date().toISOString() })
 }
