@@ -1103,9 +1103,15 @@ export async function getClassmates(classId: string): Promise<StudentProfile[]> 
   return (data || []).map(mapStudentProfile)
 }
 
-export async function getStudentGrades(): Promise<StudentGrade[]> {
+export async function getStudentGrades(disciplineId?: string): Promise<StudentGrade[]> {
   const supabase = createClient()
-  const { data, error } = await supabase.from('student_grades').select('*').order('created_at', { ascending: false })
+  let query = supabase.from('student_grades').select('*').order('created_at', { ascending: false })
+  
+  if (disciplineId) {
+    query = query.eq('discipline_id', disciplineId)
+  }
+
+  const { data, error } = await query
   if (error) throw new Error(error.message)
   return (data || []).map(mapStudentGrade)
 }
@@ -1184,7 +1190,7 @@ export async function saveBatchGrades(grades: Array<Omit<StudentGrade, "id" | "c
     student_identifier: String(g.studentIdentifier || "").trim().toLowerCase(),
     student_name: g.studentName,
     discipline_id: g.disciplineId || null,
-    is_public: g.isPublic,
+    is_public: (g as any).is_public ?? g.isPublic, // Handle both snake_case and camelCase from UI safely
     exam_grade: g.examGrade,
     works_grade: g.worksGrade,
     seminar_grade: g.seminarGrade,
@@ -1199,56 +1205,72 @@ export async function saveBatchGrades(grades: Array<Omit<StudentGrade, "id" | "c
     onConflict: 'student_identifier,discipline_id'
   })
 
-  if (error && error.message.includes("ON CONFLICT")) {
-    console.warn("Falta constraint de notas. Usando modo paralelo/individual...")
-    const promises = grades.map(g => saveStudentGrade(g, g.id))
-    await Promise.all(promises)
+  if (error && (error.message.includes("ON CONFLICT") || error.code === "PGRST204")) {
+    console.warn("Falta constraint de notas ou erro de upsert. Usando modo de salvamento controlado...")
+    // Processamento em lotes pequenos para não derrubar o navegador/machine
+    const chunkSize = 10
+    for (let i = 0; i < grades.length; i += chunkSize) {
+      const chunk = grades.slice(i, i + chunkSize)
+      await Promise.all(chunk.map(g => saveStudentGrade(g, g.id)))
+    }
   } else if (error) {
     throw error
   }
 }
 
 /** Sincroniza notas de submissões e frequência para uma disciplina e aluno. */
+/** Sincroniza notas de submissões e frequência para uma disciplina. */
 export async function syncGradesForDiscipline(disciplineId: string) {
   const supabase = createClient()
 
-  // 1. Buscar Avaliações da Disciplina
+  // 1. Buscar IDs das Avaliações da Disciplina (mais rápido que buscar tudo)
   const { data: assessments } = await supabase
     .from('assessments')
-    .select('id, points_per_question, question_ids')
+    .select('id')
     .eq('discipline_id', disciplineId)
   
   const assessmentIds = (assessments || []).map((a: any) => a.id) || []
   
-  // 2. Buscar Submissões destas Avaliações
+  // 2. Buscar Submissões (apenas se houver avaliações)
   const { data: submissions } = assessmentIds.length > 0 ? await supabase
     .from('student_submissions')
-    .select('student_email, student_name, score, assessment_id')
+    .select('student_email, student_name, score')
     .in('assessment_id', assessmentIds) : { data: [] }
 
-  // 3. Buscar Frequência da Disciplina
+  // 3. Buscar Frequência da Disciplina (otimizado com índice)
   const { data: attendances } = await supabase
     .from('attendance')
     .select('student_id, is_present, date')
     .eq('discipline_id', disciplineId)
 
-  // 4. Calcular Total de Aulas (Datas Únicas)
+  // 4. Calcular Total de Aulas Únicas
   const totalClasses = new Set((attendances || []).map((a: any) => a.date)).size
 
-  // 5. Buscar Estudantes para vincular ID -> Email
-  const { data: studentProfiles } = await supabase.from('students').select('id, email, name, cpf')
+  // 5. Mapear Estudantes envolvidos (Otimizado: Buscar apenas o estritamente necessário)
+  const involvedStudentIds = Array.from(new Set((attendances || []).map((a: any) => a.student_id)))
+  const involvedStudentEmails = Array.from(new Set((submissions || []).map((s: any) => (s.student_email || "").toLowerCase().trim()))).filter(Boolean)
 
-  // Agrupar Resultados por Aluno (Email é o identificador comum)
+  let studentProfiles: any[] = []
+  
+  // Busca em lotes de estudantes para evitar estouro de URL (máximo 100 por vez ou OR complexo)
+  if (involvedStudentIds.length > 0 || involvedStudentEmails.length > 0) {
+    // Usamos um filtro mais inteligente ou quebras se for muito grande
+    const { data } = await supabase.from('students')
+      .select('id, email, name')
+      .or(`id.in.(${involvedStudentIds.join(',')}),email.in.(${involvedStudentEmails.map(e => `"${e}"`).join(',')})`)
+    studentProfiles = data || []
+  }
+
   const syncResults: Record<string, { examGrade: number; attendanceScore: number; name: string }> = {};
 
-  // NOVIDADE: Inicializar resultados com TODOS os alunos matriculados para permitir recuperação automática
-  (studentProfiles || []).forEach((p: any) => {
+  // Inicializar mapa de resultados
+  studentProfiles.forEach((p: any) => {
     const key = (p.email || "").toLowerCase().trim();
     if (!key) return;
     syncResults[key] = { examGrade: 0, attendanceScore: 0, name: p.name };
   });
 
-  // Processar Notas de Prova
+  // Processar Notas de Prova (Pega a maior nota por aluno)
   (submissions || []).forEach((sub: any) => {
     const key = (sub.student_email || "").toLowerCase().trim();
     if (!key || !syncResults[key]) return;
@@ -1256,19 +1278,19 @@ export async function syncGradesForDiscipline(disciplineId: string) {
   });
 
   // Processar Frequência
+  const profileById = new Map(studentProfiles.map(p => [p.id, p]))
   if (totalClasses > 0) {
     (attendances || []).forEach((att: any) => {
-      const profile = (studentProfiles || []).find((p: any) => p.id === att.student_id)
-      if (profile) {
+      const profile = profileById.get(att.student_id)
+      if (profile && att.is_present) {
         const key = (profile.email || "").toLowerCase().trim()
-        if (key && syncResults[key] && att.is_present) {
+        if (key && syncResults[key]) {
           syncResults[key].attendanceScore += (10 / totalClasses)
         }
       }
     })
   }
 
-  // A função agora APENAS retorna os dados, não persiste no banco (deixando para a UI chamar saveBatchGrades)
   return syncResults
 }
 

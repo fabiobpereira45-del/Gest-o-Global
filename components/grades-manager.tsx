@@ -158,7 +158,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
         try {
             setLoading(true)
             const [fetchedGrades, fetchedStudents, fetchedDisciplines] = await Promise.all([
-                getStudentGrades(),
+                getStudentGrades(selectedDiscipline || undefined),
                 getStudents(),
                 getDisciplines()
             ])
@@ -175,7 +175,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
 
     useEffect(() => {
         loadData()
-    }, [])
+    }, [selectedDiscipline])
 
     const handleCreateOrUpdate = async () => {
         try {
@@ -259,6 +259,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
             
             if ((syncData as any).reason) {
                 alert((syncData as any).reason)
+                setIsSyncing(false)
                 return
             }
 
@@ -409,15 +410,22 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                 Exportar PDF
                             </Button>
                         )}
-                        <Button 
-                            variant="secondary" 
-                            onClick={handleSync} 
-                            disabled={isSyncing || !selectedDiscipline}
-                            className="flex-1 lg:flex-none bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20 font-black h-11 px-6 uppercase text-[10px] tracking-widest disabled:opacity-50 transition-all"
-                        >
-                            {isSyncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                            Sincronizar Diário
-                        </Button>
+                        <div className="relative group flex-1 lg:flex-none">
+                            <Button 
+                                variant="secondary" 
+                                onClick={handleSync} 
+                                disabled={isSyncing || !selectedDiscipline}
+                                className="w-full bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20 font-black h-11 px-6 uppercase text-[10px] tracking-widest disabled:opacity-30 disabled:bg-slate-300 disabled:text-slate-500 transition-all"
+                            >
+                                {isSyncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                                Sincronizar Diário
+                            </Button>
+                            {!selectedDiscipline && !isSyncing && (
+                                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-xl font-bold">
+                                    Selecione uma disciplina para sincronizar
+                                </div>
+                            )}
+                        </div>
                         <Button variant="outline" onClick={() => setBulkReleaseConfirm(true)} className="flex-1 lg:flex-none border-green-600 text-green-600 hover:bg-green-500 hover:text-white font-black h-11 px-6 uppercase text-[10px] tracking-widest transition-all">
                             <CheckCheck className="h-4 w-4 mr-2" />
                             Liberar Tudo
