@@ -863,9 +863,18 @@ export async function getAttendances(disciplineId: string): Promise<Attendance[]
 
 export async function saveAttendance(studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial" | "ead" = "presencial"): Promise<void> {
   const supabase = createClient()
-  const { data: existing } = await supabase.from('attendance').select('id').match({ student_id: studentId, discipline_id: disciplineId, date }).maybeSingle()
-  if (existing) await supabase.from('attendance').update({ is_present: isPresent, type }).eq('id', existing.id)
-  else await supabase.from('attendance').insert({ student_id: studentId, discipline_id: disciplineId, date, is_present: isPresent, type, created_at: new Date().toISOString() })
+  const { error } = await supabase.from('attendance').upsert({
+    student_id: studentId,
+    discipline_id: disciplineId,
+    date,
+    is_present: isPresent,
+    type,
+    created_at: new Date().toISOString()
+  }, { 
+    onConflict: 'student_id,discipline_id,date' 
+  })
+  
+  if (error) throw error
 }
 
 export async function saveBatchAttendances(data: Array<{studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial"|"ead"}>, onProgress?: (current: number, total: number) => void): Promise<void> {
@@ -884,11 +893,33 @@ export async function saveBatchAttendances(data: Array<{studentId: string, disci
     if (e.message?.includes("trancada")) throw e
   }
 
-  let count = 0
-  for (const a of data) {
-    await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
-    count++
-    if (onProgress) onProgress(count, data.length)
+  const supabase = createClient()
+  const records = data.map(a => ({
+    student_id: a.studentId,
+    discipline_id: a.disciplineId,
+    date: a.date,
+    is_present: a.isPresent,
+    type: a.type,
+    created_at: new Date().toISOString()
+  }))
+
+  // Otimização Massiva: Upsert em bloco ÚNICO
+  const { error } = await supabase.from('attendance').upsert(records, {
+    onConflict: 'student_id,discipline_id,date'
+  })
+
+  if (error) {
+    console.error("Erro no upsert em massa, tentando modo paralelo:", error)
+    // Fallback: Tentativa em paralelo se o upsert em massa falhar por falta de constraint
+    let count = 0
+    const promises = data.map(async (a) => {
+      await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
+      count++
+      if (onProgress) onProgress(count, data.length)
+    })
+    await Promise.all(promises)
+  } else if (onProgress) {
+    onProgress(data.length, data.length)
   }
 }
 

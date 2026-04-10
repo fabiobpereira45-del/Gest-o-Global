@@ -17,7 +17,7 @@ import { printGradesReportPDF } from "@/lib/pdf"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Switch } from "@/components/ui/switch"
 
-// --- Sub-componente Memoizado para cada Linha de Nota ---
+// --- Sub-componente Memoizado para cada Linha de Nota (Expansível) ---
 const GradeCard = memo(({ 
     grade, 
     disciplines, 
@@ -33,60 +33,92 @@ const GradeCard = memo(({
     onDelete: (id: string) => void,
     calculateAverage: (g: StudentGrade) => string
 }) => {
+    const [isExpanded, setIsExpanded] = useState(false)
     const discipline = disciplines.find(d => d.id === grade.disciplineId)
     const average = calculateAverage(grade)
     const isApproved = parseFloat(average) >= 7
 
     return (
-        <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:bg-slate-50/50 group">
-            <div className="flex-1">
-                <div className="flex items-center flex-wrap gap-2 mb-1">
-                    <h4 className="font-bold text-foreground text-lg tracking-tight">{grade.studentName}</h4>
-                    {discipline && (
-                        <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded-full font-black uppercase border border-primary/20 tracking-widest">
-                            {discipline.name}
-                        </span>
-                    )}
-                </div>
-                <p className="text-xs text-muted-foreground font-mono mb-3 lowercase opacity-70">ID: {grade.studentIdentifier}</p>
-                <div className="flex flex-wrap gap-2">
-                    {[
-                        { label: 'Prova', val: grade.examGrade },
-                        { label: 'Trabalhos', val: grade.worksGrade },
-                        { label: 'Seminário', val: grade.seminarGrade },
-                        { label: 'Partic.', val: grade.participationBonus },
-                        { label: 'Presença', val: grade.attendanceScore },
-                    ].map(tag => (
-                        <span key={tag.label} className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold bg-white text-slate-600 border border-slate-200 shadow-sm">
-                            {tag.label}: {tag.val}
-                        </span>
-                    ))}
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${grade.isReleased ? 'bg-green-500 text-white border-green-600 shadow-sm' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                        {grade.isReleased ? <CheckCheck className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                        {grade.isReleased ? 'Liberada' : 'Oculta'}
-                    </span>
-                </div>
-            </div>
-
-            <div className="flex items-center gap-6">
-                <div className="text-center bg-white px-5 py-3 rounded-2xl border border-slate-100 shadow-sm min-w-[120px]">
-                    <div className="text-[9px] text-muted-foreground uppercase font-black tracking-widest mb-1">Média Final</div>
-                    <div className={`text-2xl font-black tabular-nums ${isApproved ? 'text-green-600' : 'text-amber-600'}`}>
-                        {average}
+        <div className={`overflow-hidden transition-all duration-300 border-l-4 ${isExpanded ? 'bg-slate-50/80 border-primary' : 'hover:bg-slate-50/50 border-transparent bg-white'}`}>
+            {/* Cabeçalho do Card (Sempre Visível) */}
+            <div 
+                className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <div className="flex-1 flex items-center gap-4">
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-black text-sm shadow-sm border ${isApproved ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                        {grade.studentName.charAt(0)}
+                    </div>
+                    <div>
+                        <div className="flex items-center flex-wrap gap-2 mb-0.5">
+                            <h4 className="font-bold text-foreground text-base tracking-tight">{grade.studentName}</h4>
+                            {discipline && (
+                                <span className="bg-primary/5 text-primary text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
+                                    {discipline.name}
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground font-mono opacity-60">ID: {grade.studentIdentifier}</p>
                     </div>
                 </div>
 
-                <div className="flex md:flex-col gap-2">
-                    <Button variant="outline" size="sm" className="h-9 px-4 font-bold border-slate-200 hover:bg-primary/5 hover:text-primary transition-all" onClick={() => onEdit(grade)}>
-                        <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
-                    </Button>
-                    {isMaster && (
-                        <Button variant="ghost" size="sm" className="h-9 px-4 font-bold text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => onDelete(grade.id)}>
-                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir
-                        </Button>
-                    )}
+                <div className="flex items-center gap-4">
+                    <div className="text-right hidden sm:block">
+                        <div className="text-[9px] text-muted-foreground uppercase font-black tracking-widest mb-0.5">Média</div>
+                        <div className={`text-xl font-black tabular-nums ${isApproved ? 'text-green-600' : 'text-amber-600'}`}>
+                            {average}
+                        </div>
+                    </div>
+                    <div className={`p-2 rounded-full transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-primary/10 text-primary' : 'bg-slate-100 text-slate-400'}`}>
+                        <Plus className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-45' : ''}`} />
+                    </div>
                 </div>
             </div>
+
+            {/* Conteúdo Detalhado (Expansível) */}
+            {isExpanded && (
+                <div className="px-5 pb-6 pt-2 animate-in slide-in-from-top-2 duration-300">
+                    <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+                            {[
+                                { label: 'Prova Online', val: grade.examGrade, color: 'text-blue-600' },
+                                { label: 'Atividades', val: grade.worksGrade, color: 'text-slate-600' },
+                                { label: 'Seminário', val: grade.seminarGrade, color: 'text-slate-600' },
+                                { label: 'Participação', val: grade.participationBonus, color: 'text-slate-600' },
+                                { label: 'Presença', val: grade.attendanceScore, color: 'text-green-600' },
+                            ].map(tag => (
+                                <div key={tag.label} className="flex flex-col gap-1">
+                                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">{tag.label}</span>
+                                    <span className={`text-sm font-black tabular-nums ${tag.color}`}>{tag.val}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-slate-50">
+                            <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black border uppercase tracking-wider ${grade.isReleased ? 'bg-green-500 text-white border-green-600 shadow-lg shadow-green-500/20' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                                    {grade.isReleased ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                                    {grade.isReleased ? 'Liberada para o Aluno' : 'Oculta no Boletim'}
+                                </span>
+                                <span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-full border ${isApproved ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                    {isApproved ? 'Aprovado' : 'Reprovado / Pendente'}
+                                </span>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" className="h-10 px-5 font-bold border-slate-200 hover:bg-primary/5 hover:text-primary transition-all rounded-xl" onClick={(e) => { e.stopPropagation(); onEdit(grade); }}>
+                                    <Pencil className="h-3.5 w-3.5 mr-2" /> Editar Notas
+                                </Button>
+                                {isMaster && (
+                                    <Button variant="ghost" size="sm" className="h-10 px-5 font-bold text-red-400 hover:text-red-600 hover:bg-red-50 transition-all rounded-xl" onClick={(e) => { e.stopPropagation(); onDelete(grade.id); }}>
+                                        <Trash2 className="h-3.5 w-3.5 mr-2" /> Remover
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 })
