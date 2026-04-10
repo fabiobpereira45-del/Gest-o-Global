@@ -914,7 +914,7 @@ export async function getAttendanceFinalization(disciplineId: string, date: stri
 export async function getAttendancesByDate(disciplineId: string, date: string): Promise<Attendance[]> {
   try {
     const supabase = createClient()
-    const { data, error } = await supabase.from('attendances')
+    const { data, error } = await supabase.from('attendance')
       .select('*')
       .match({ discipline_id: disciplineId, date })
     
