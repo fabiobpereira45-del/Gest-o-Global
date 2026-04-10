@@ -816,7 +816,41 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                 </DialogContent>
             </Dialog>
 
+            {/* ── Modal: EXCLUIR ────────────────────────────────────────────────────── */}
+            <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-red-600">
+                            <Trash2 className="h-5 w-5" /> Confirmar Exclusão
+                        </DialogTitle>
+                        <DialogDescription>
+                            Tem certeza que deseja excluir o aluno <strong>{selected?.name}</strong>?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex gap-3">
+                        <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
+                        <div className="text-xs text-red-800 leading-relaxed">
+                            Esta ação é <strong>permanente</strong> e removerá todos os dados, notas e acesso ao portal deste aluno.
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={deleting} className="text-xs h-9">
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold h-9"
+                        >
+                            {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                            Confirmar Exclusão
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Bulk Import Modal */}
+
             <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
                 <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
