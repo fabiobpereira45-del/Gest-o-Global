@@ -90,7 +90,7 @@ export function AttendanceManager() {
             setLoading(true)
             try {
                 const [data, finalized] = await Promise.all([
-                    getAttendancesByDate(selectedDisciplineId, selectedDate),
+                    getAttendancesByDate(selectedDisciplineId, selectedDate, lessonType),
                     getAttendanceFinalization(selectedDisciplineId, selectedDate)
                 ])
 
@@ -107,7 +107,7 @@ export function AttendanceManager() {
             }
         }
         fetchAttendances()
-    }, [selectedDisciplineId, selectedDate])
+    }, [selectedDisciplineId, selectedDate, lessonType])
 
     async function handleSave() {
         if (selectedDisciplineId === "none" || !selectedDate) return
@@ -254,7 +254,7 @@ export function AttendanceManager() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 border border-border rounded-xl p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 bg-muted/30 border border-border rounded-xl p-4">
                 <div className="flex flex-col gap-1.5 align-bottom">
                     <Label>Disciplina *</Label>
                     <Select value={selectedDisciplineId} onValueChange={setSelectedDisciplineId}>
@@ -271,16 +271,14 @@ export function AttendanceManager() {
                 </div>
                 
                 <div className="flex flex-col gap-1.5 align-bottom">
-                    <Label>Turma (Opcional)</Label>
-                    <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                    <Label>Tipo de Aula *</Label>
+                    <Select value={lessonType} onValueChange={(val) => setLessonType(val as "presencial" | "ead")}>
                         <SelectTrigger>
-                            <SelectValue placeholder="Todos os Núcleos" />
+                            <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Todos os Núcleos</SelectItem>
-                            {classes.map(c => (
-                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                            ))}
+                            <SelectItem value="presencial">📍 Presencial</SelectItem>
+                            <SelectItem value="ead">💻 Online</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -296,6 +294,21 @@ export function AttendanceManager() {
                             className="pl-10"
                         />
                     </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 align-bottom">
+                    <Label>Turma (Opcional)</Label>
+                    <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Todos os Núcleos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos os Núcleos</SelectItem>
+                            {classes.map(c => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 <div className="flex flex-col gap-1.5 align-bottom">

@@ -82,10 +82,10 @@ const GradeCard = memo(({
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
                             {[
                                 { label: 'Prova Online', val: grade.examGrade, color: 'text-blue-600' },
-                                { label: 'Atividades', val: grade.worksGrade, color: 'text-slate-600' },
-                                { label: 'Seminário', val: grade.seminarGrade, color: 'text-slate-600' },
-                                { label: 'Participação', val: grade.participationBonus, color: 'text-slate-600' },
-                                { label: 'Presença', val: grade.attendanceScore, color: 'text-green-600' },
+                                { label: 'Leitura Livro', val: grade.worksGrade, color: 'text-slate-600' },
+                                { label: 'Quest. Livro', val: grade.seminarGrade, color: 'text-slate-600' },
+                                { label: 'Vídeo Aula', val: grade.participationBonus, color: 'text-purple-600' },
+                                { label: 'Frequência', val: grade.attendanceScore, color: 'text-green-600' },
                             ].map(tag => (
                                 <div key={tag.label} className="flex flex-col gap-1">
                                     <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">{tag.label}</span>
@@ -150,7 +150,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
         seminarGrade: "",
         participationBonus: "",
         attendanceScore: "",
-        customDivisor: "4",
+        customDivisor: "2",
         isReleased: true
     })
 
@@ -320,15 +320,15 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
     }
 
     const calculateAverage = (grade: StudentGrade) => {
-        const total =
-            (parseFloat(grade.examGrade as any) || 0) +
+        const notaAtividades = 
             (parseFloat(grade.worksGrade as any) || 0) +
             (parseFloat(grade.seminarGrade as any) || 0) +
             (parseFloat(grade.participationBonus as any) || 0) +
             (parseFloat(grade.attendanceScore as any) || 0)
 
-        const divisor = grade.customDivisor > 0 ? grade.customDivisor : 1;
-        return (total / divisor).toFixed(2)
+        const provaOnline = parseFloat(grade.examGrade as any) || 0
+        const media = (notaAtividades + provaOnline) / 2
+        return media.toFixed(2)
     }
 
     // --- Listas Memoizadas para Performance ---
@@ -595,28 +595,31 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
 
                             <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 lg:col-span-3 pt-4">
                                <div className="space-y-2">
-                                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Prova</Label>
-                                   <Input type="number" step="0.1" value={formData.examGrade} disabled className="h-11 bg-slate-100 border-none rounded-lg font-mono font-bold" />
+                                   <Label className="text-xs font-bold text-blue-500 uppercase tracking-widest">📝 Prova Online</Label>
+                                   <Input type="number" step="0.1" value={formData.examGrade} disabled className="h-11 bg-blue-50 border-blue-100 rounded-lg font-mono font-bold text-blue-700" />
+                                   <p className="text-[10px] text-muted-foreground">Sincronizada automaticamente das avaliações.</p>
                                </div>
                                <div className="space-y-2">
-                                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Atividades</Label>
-                                   <Input type="number" step="0.1" value={formData.worksGrade} onChange={(e) => setFormData({ ...formData, worksGrade: e.target.value })} className="h-11 bg-white border-slate-200 rounded-lg font-mono font-bold" />
+                                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">📚 Leitura do Livro (máx 3)</Label>
+                                   <Input type="number" step="0.1" min="0" max="3" value={formData.worksGrade} onChange={(e) => setFormData({ ...formData, worksGrade: e.target.value })} className="h-11 bg-white border-slate-200 rounded-lg font-mono font-bold" />
                                </div>
                                <div className="space-y-2">
-                                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Seminários</Label>
-                                   <Input type="number" step="0.1" value={formData.seminarGrade} onChange={(e) => setFormData({ ...formData, seminarGrade: e.target.value })} className="h-11 bg-white border-slate-200 rounded-lg font-mono font-bold" />
+                                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">❓ Quest. Livro (máx 1)</Label>
+                                   <Input type="number" step="0.1" min="0" max="1" value={formData.seminarGrade} onChange={(e) => setFormData({ ...formData, seminarGrade: e.target.value })} className="h-11 bg-white border-slate-200 rounded-lg font-mono font-bold" />
                                </div>
                                <div className="space-y-2">
-                                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Participação</Label>
-                                   <Input type="number" step="0.1" value={formData.participationBonus} onChange={(e) => setFormData({ ...formData, participationBonus: e.target.value })} className="h-11 bg-white border-slate-200 rounded-lg font-mono font-bold" />
+                                   <Label className="text-xs font-bold text-purple-500 uppercase tracking-widest">🎬 Vídeo Aula (máx 1)</Label>
+                                   <Input type="number" step="0.1" min="0" max="1" value={formData.participationBonus} onChange={(e) => setFormData({ ...formData, participationBonus: e.target.value })} className="h-11 bg-white border-slate-200 rounded-lg font-mono font-bold" />
                                </div>
                                <div className="space-y-2">
-                                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Presença</Label>
-                                   <Input type="number" step="0.1" value={formData.attendanceScore} disabled className="h-11 bg-slate-100 border-none rounded-lg font-mono font-bold" />
+                                   <Label className="text-xs font-bold text-green-500 uppercase tracking-widest">📊 Frequência (auto)</Label>
+                                   <Input type="number" step="0.1" value={formData.attendanceScore} disabled className="h-11 bg-green-50 border-green-100 rounded-lg font-mono font-bold text-green-700" />
+                                   <p className="text-[10px] text-muted-foreground">Calculada das chamadas (Presencial + Online).</p>
                                </div>
                                <div className="space-y-2">
-                                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Divisor Média</Label>
-                                   <Input type="number" step="1" min="1" value={formData.customDivisor} onChange={(e) => setFormData({ ...formData, customDivisor: e.target.value })} className="h-11 bg-amber-50 border-amber-100 rounded-lg font-mono font-bold text-amber-700" title="Ideal manter 4 ou 5 dependendo do núcleo" />
+                                   <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">÷ Divisor</Label>
+                                   <Input type="number" value={2} disabled className="h-11 bg-slate-100 border-none rounded-lg font-mono font-bold text-slate-400" />
+                                   <p className="text-[10px] text-muted-foreground">Fixo: (Atividades + Prova) / 2</p>
                                </div>
                             </div>
                         </div>

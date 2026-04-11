@@ -441,7 +441,7 @@ export async function getGradingSettings(): Promise<GradingSettings> {
   const supabase = createClient()
   const { data } = await supabase.from('grading_settings').select('*').limit(1).maybeSingle()
   if (data) return mapGradingSettings(data)
-  return { id: 'default', pointsPerPresence: 10, onlinePresencePoints: 10, interactionPoints: 10, bookActivityPoints: 10, passingAverage: 70, totalDivisor: 4, updatedAt: new Date().toISOString() }
+  return { id: 'default', pointsPerPresence: 3, onlinePresencePoints: 2, interactionPoints: 1, bookActivityPoints: 3, passingAverage: 7, totalDivisor: 2, updatedAt: new Date().toISOString() }
 }
 
 export async function updateGradingSettings(settings: Omit<GradingSettings, "id" | "updatedAt">): Promise<void> {
@@ -1030,12 +1030,16 @@ export async function getAttendanceFinalization(disciplineId: string, date: stri
   }
 }
 
-export async function getAttendancesByDate(disciplineId: string, date: string): Promise<Attendance[]> {
+export async function getAttendancesByDate(disciplineId: string, date: string, type?: "presencial" | "ead"): Promise<Attendance[]> {
   try {
     const supabase = createClient()
-    const { data, error } = await supabase.from('attendance')
+    let query = supabase.from('attendance')
       .select('*')
       .match({ discipline_id: disciplineId, date })
+    
+    if (type) query = query.eq('type', type)
+    
+    const { data, error } = await query
     
     if (error) {
       console.error("Erro ao buscar presenças por data:", error)
@@ -1299,16 +1303,24 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     .select('student_email, student_name, score')
     .in('assessment_id', assessmentIds) : { data: [] }
 
-  // 3. Buscar Frequência da Disciplina (otimizado com índice)
+  // 3. Buscar Frequência da Disciplina COM TIPO (otimizado com índice)
   const { data: attendances } = await supabase
     .from('attendance')
-    .select('student_id, is_present, date')
+    .select('student_id, is_present, date, type')
     .eq('discipline_id', disciplineId)
 
-  // 4. Calcular Total de Aulas Únicas
-  const totalClasses = new Set((attendances || []).map((a: any) => a.date)).size
+  // 4. Buscar Configurações de Pesos
+  const gradingSettings = await getGradingSettings()
+  const maxPresencial = gradingSettings.pointsPerPresence || 3  // Max 3 pts
+  const maxOnline = gradingSettings.onlinePresencePoints || 2    // Max 2 pts
 
-  // 5. Mapear Estudantes envolvidos (Otimizado: Buscar apenas o estritamente necessário)
+  // 5. Calcular Total de Aulas por Tipo
+  const presencialDates = new Set((attendances || []).filter((a: any) => (a.type || 'presencial') === 'presencial').map((a: any) => a.date))
+  const onlineDates = new Set((attendances || []).filter((a: any) => a.type === 'ead').map((a: any) => a.date))
+  const totalPresencial = presencialDates.size
+  const totalOnline = onlineDates.size
+
+  // 6. Mapear Estudantes envolvidos (Otimizado: Buscar apenas o estritamente necessário)
   const involvedStudentIds = Array.from(new Set((attendances || []).map((a: any) => a.student_id)))
   const involvedStudentEmails = Array.from(new Set((submissions || []).map((s: any) => (s.student_email || "").toLowerCase().trim()))).filter(Boolean)
 
@@ -1316,7 +1328,6 @@ export async function syncGradesForDiscipline(disciplineId: string) {
   
   // Busca em lotes de estudantes para evitar estouro de URL (máximo 100 por vez ou OR complexo)
   if (involvedStudentIds.length > 0 || involvedStudentEmails.length > 0) {
-    // Usamos um filtro mais inteligente ou quebras se for muito grande
     const { data } = await supabase.from('students')
       .select('id, email, name')
       .or(`id.in.(${involvedStudentIds.join(',')}),email.in.(${involvedStudentEmails.map(e => `"${e}"`).join(',')})`)
@@ -1339,19 +1350,38 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     syncResults[key].examGrade = Math.max(syncResults[key].examGrade, Number(sub.score || 0));
   });
 
-  // Processar Frequência
+  // Processar Frequência com PESOS por tipo
   const profileById = new Map(studentProfiles.map(p => [p.id, p]))
-  if (totalClasses > 0) {
-    (attendances || []).forEach((att: any) => {
-      const profile = profileById.get(att.student_id)
-      if (profile && att.is_present) {
-        const key = (profile.email || "").toLowerCase().trim()
-        if (key && syncResults[key]) {
-          syncResults[key].attendanceScore += (10 / totalClasses)
-        }
-      }
-    })
-  }
+  const studentPresencial: Record<string, number> = {}
+  const studentOnline: Record<string, number> = {}
+
+  ;(attendances || []).forEach((att: any) => {
+    const profile = profileById.get(att.student_id)
+    if (!profile || !att.is_present) return
+    const key = (profile.email || "").toLowerCase().trim()
+    if (!key || !syncResults[key]) return
+
+    const attType = att.type || 'presencial'
+    if (attType === 'presencial') {
+      studentPresencial[key] = (studentPresencial[key] || 0) + 1
+    } else if (attType === 'ead') {
+      studentOnline[key] = (studentOnline[key] || 0) + 1
+    }
+  })
+
+  // Calcular nota de frequência ponderada: (presenças/total) * max
+  Object.keys(syncResults).forEach(key => {
+    let score = 0
+    if (totalPresencial > 0) {
+      const ratio = (studentPresencial[key] || 0) / totalPresencial
+      score += ratio * maxPresencial
+    }
+    if (totalOnline > 0) {
+      const ratio = (studentOnline[key] || 0) / totalOnline
+      score += ratio * maxOnline
+    }
+    syncResults[key].attendanceScore = Math.round(score * 100) / 100
+  })
 
   return syncResults
 }

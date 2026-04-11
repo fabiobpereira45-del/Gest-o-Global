@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { FileText, Award, CalendarCheck, Loader2, Calculator, CheckCircle2 } from "lucide-react"
+import { FileText, Award, CalendarCheck, Loader2, Calculator, CheckCircle2, Clock, Lock } from "lucide-react"
 import {
     type Discipline, type Semester, type StudentSubmission, type Attendance, type Assessment, type StudentGrade, type GradingSettings,
     getDisciplines, getSemesters, getSubmissions, getAttendances, getAttendancesByStudent, getAssessments, getStudentGrades, getGradingSettings
@@ -71,7 +71,6 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                 });
 
                 // --- AUTO-INJEÇÃO DE DISCIPLINAS ATIVAS ---
-                // Verifica se há submissões ou frequências em disciplinas que ainda não estão no mapa
                 const mySubs = sub.filter(s => {
                     const assessment = asses.find(a => a.id === s.assessmentId)
                     return s.studentEmail === studentEmail && assessment?.releaseResults === true
@@ -88,10 +87,6 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                     if (assessment?.disciplineId) activeDisciplineIds.add(assessment.disciplineId);
                 });
 
-                // REMOVIDO: flatAtts.forEach(...) para não forçar exibição baseada apenas em presença
-                // Desta forma, se o Admin deletar o registro oficial, e não houver prova liberada,
-                // a disciplina deixará de ser injetada automaticamente.
-
                 // Injetar no mapa se não existir
                 activeDisciplineIds.forEach(discId => {
                     if (!consolidatedGradesMap.has(discId)) {
@@ -106,8 +101,8 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                             seminarGrade: 0,
                             participationBonus: 0,
                             attendanceScore: 0,
-                            customDivisor: 4,
-                            isReleased: true, // Auto-liberado para visualização dinâmica
+                            customDivisor: 2,
+                            isReleased: true,
                             createdAt: new Date().toISOString()
                         });
                     }
@@ -131,7 +126,11 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
 
     const calculateDynamicGrade = (grade: StudentGrade) => {
         let finalExamGrade = grade.examGrade || 0;
-        let finalAttendanceScore = grade.attendanceScore || 0;
+        let presencialScore = 0;
+        let onlineScore = 0;
+
+        const maxPresencial = gradingSettings?.pointsPerPresence || 3
+        const maxOnline = gradingSettings?.onlinePresencePoints || 2
 
         // Dynamic Exam Grade
         if (grade.disciplineId) {
@@ -139,37 +138,46 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
             const assessmentIds = disciplineAssessments.map(a => a.id);
             const studentDisciplineSubs = submissions.filter(s => assessmentIds.includes(s.assessmentId));
             if (studentDisciplineSubs.length > 0) {
-                // Get highest score (weighted to 10 points or actual points)
-                // We use s.score instead of s.percentage to avoid the 40.0 vs 4.0 confusion
                 finalExamGrade = Math.max(...studentDisciplineSubs.map(s => Number(s.score || 0)));
             }
 
-            // Dynamic Attendance
+            // Dynamic Attendance by type
             const disciplineAtts = attendances.filter(a => a.disciplineId === grade.disciplineId && a.isPresent);
-            if (gradingSettings && disciplineAtts.length > 0) {
-                let score = 0;
-                disciplineAtts.forEach(att => {
-                    score += att.type === 'ead' ? gradingSettings.onlinePresencePoints : gradingSettings.pointsPerPresence;
-                });
-                finalAttendanceScore = score;
+            const presencialAtts = disciplineAtts.filter(a => (a.type || 'presencial') === 'presencial');
+            const onlineAtts = disciplineAtts.filter(a => a.type === 'ead');
+            
+            // Count unique dates
+            const totalPresencialDates = new Set(attendances.filter(a => a.disciplineId === grade.disciplineId && (a.type || 'presencial') === 'presencial').map(a => a.date)).size;
+            const totalOnlineDates = new Set(attendances.filter(a => a.disciplineId === grade.disciplineId && a.type === 'ead').map(a => a.date)).size;
+            
+            const uniquePresencialPresent = new Set(presencialAtts.map(a => a.date)).size;
+            const uniqueOnlinePresent = new Set(onlineAtts.map(a => a.date)).size;
+
+            if (totalPresencialDates > 0) {
+                presencialScore = (uniquePresencialPresent / totalPresencialDates) * maxPresencial;
+            }
+            if (totalOnlineDates > 0) {
+                onlineScore = (uniqueOnlinePresent / totalOnlineDates) * maxOnline;
             }
         }
 
-        const total =
-            finalExamGrade +
-            (grade.worksGrade || 0) +
-            (grade.seminarGrade || 0) +
-            (grade.participationBonus || 0) +
-            finalAttendanceScore;
+        const frequenciaTotal = Math.round((presencialScore + onlineScore) * 100) / 100;
+        const videoAula = grade.participationBonus || 0;
+        const leituraLivro = grade.worksGrade || 0;
+        const questionarioLivro = grade.seminarGrade || 0;
 
-        const divisor = gradingSettings?.totalDivisor && gradingSettings.totalDivisor > 0 ? gradingSettings.totalDivisor : (grade.customDivisor > 0 ? grade.customDivisor : 1);
-        
+        const notaAtividades = Math.round((presencialScore + onlineScore + videoAula + leituraLivro + questionarioLivro) * 100) / 100;
+        const media = (notaAtividades + finalExamGrade) / 2;
+
         return {
+            presencialScore: Math.round(presencialScore * 100) / 100,
+            onlineScore: Math.round(onlineScore * 100) / 100,
+            videoAula,
+            leituraLivro,
+            questionarioLivro,
+            notaAtividades: Math.min(notaAtividades, 10),
             examGrade: finalExamGrade,
-            attendanceScore: finalAttendanceScore,
-            total,
-            avg: (total / divisor).toFixed(2),
-            divisor
+            media: Math.round(media * 100) / 100,
         }
     }
 
@@ -210,9 +218,11 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                         {officialGrades.map(grade => {
                             const disc = disciplines.find(d => d.id === grade.disciplineId)
                             const dyn = calculateDynamicGrade(grade)
-                            const avg = parseFloat(dyn.avg)
-                            const minAverage = gradingSettings?.passingAverage || 70
-                            const isPassing = avg >= minAverage
+                            const passingGrade = gradingSettings?.passingAverage || 7
+                            const isPassing = dyn.media >= passingGrade
+
+                            // Check if exam was released by professor
+                            const examReleased = grade.isReleased && (grade.examGrade > 0 || dyn.examGrade > 0)
 
                             return (
                                 <div key={grade.id} className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -224,9 +234,9 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
 
                                         <div className="flex items-center gap-4 bg-muted/50 p-3 rounded-xl border border-border">
                                             <div className="text-right">
-                                                <div className="text-[10px] uppercase font-bold text-muted-foreground">Média Final ({dyn.total} / {dyn.divisor})</div>
+                                                <div className="text-[10px] uppercase font-bold text-muted-foreground">Média Final</div>
                                                 <div className={`text-2xl font-black ${isPassing ? 'text-green-600' : 'text-amber-600'}`}>
-                                                    {avg.toFixed(2)}
+                                                    {dyn.media.toFixed(2)}
                                                 </div>
                                             </div>
                                             <div className={`h-10 w-10 border rounded-full flex items-center justify-center ${isPassing ? 'bg-green-100 text-green-600 border-green-200' : 'bg-red-100 text-red-600 border-red-200'}`}>
@@ -235,27 +245,73 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                                         </div>
                                     </div>
                                     
-                                    <div className={`mb-6 text-sm font-bold p-3 rounded-lg flex items-center gap-2 ${isPassing ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    <div className={`mb-4 text-sm font-bold p-3 rounded-lg flex items-center gap-2 ${isPassing ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                         <CheckCircle2 className="h-5 w-5" />
                                         {isPassing ? 'Aprovado' : 'Reprovado'}
                                     </div>
 
-                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
-                                        {[
-                                            { label: "Prova Online", val: dyn.examGrade },
-                                            { label: "Ativ. Livro", val: grade.worksGrade || 0 },
-                                            { label: "Trabalhos Extras", val: grade.seminarGrade || 0 },
-                                            { label: "Interação", val: grade.participationBonus || 0 },
-                                            { label: "Presença", val: dyn.attendanceScore },
-                                        ].map(item => (
-                                            <div key={item.label} className="bg-background border border-border rounded-lg p-3 text-center">
-                                                <div className="text-[10px] text-muted-foreground font-bold uppercase mb-1">{item.label}</div>
-                                                <div className="font-bold text-foreground">{item.val.toFixed(1)}</div>
+                                    {/* Nota das Atividades - Breakdown */}
+                                    <div className="mb-4">
+                                        <div className="text-[10px] uppercase font-bold text-blue-600 tracking-wider mb-2">📋 Composição das Notas de Atividades</div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                                            <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-center">
+                                                <div className="text-[9px] text-emerald-600 font-bold uppercase mb-1">📍 Presencial</div>
+                                                <div className="font-black text-emerald-700 text-lg">{dyn.presencialScore.toFixed(1)}</div>
+                                                <div className="text-[9px] text-emerald-500">máx {gradingSettings?.pointsPerPresence || 3}</div>
                                             </div>
-                                        ))}
+                                            <div className="bg-sky-50 border border-sky-100 rounded-lg p-3 text-center">
+                                                <div className="text-[9px] text-sky-600 font-bold uppercase mb-1">💻 Online</div>
+                                                <div className="font-black text-sky-700 text-lg">{dyn.onlineScore.toFixed(1)}</div>
+                                                <div className="text-[9px] text-sky-500">máx {gradingSettings?.onlinePresencePoints || 2}</div>
+                                            </div>
+                                            <div className="bg-purple-50 border border-purple-100 rounded-lg p-3 text-center">
+                                                <div className="text-[9px] text-purple-600 font-bold uppercase mb-1">🎬 Vídeo Aula</div>
+                                                <div className="font-black text-purple-700 text-lg">{dyn.videoAula.toFixed(1)}</div>
+                                                <div className="text-[9px] text-purple-500">máx {gradingSettings?.interactionPoints || 1}</div>
+                                            </div>
+                                            <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 text-center">
+                                                <div className="text-[9px] text-amber-600 font-bold uppercase mb-1">📖 Leitura</div>
+                                                <div className="font-black text-amber-700 text-lg">{dyn.leituraLivro.toFixed(1)}</div>
+                                                <div className="text-[9px] text-amber-500">máx {gradingSettings?.bookActivityPoints || 3}</div>
+                                            </div>
+                                            <div className="bg-rose-50 border border-rose-100 rounded-lg p-3 text-center">
+                                                <div className="text-[9px] text-rose-600 font-bold uppercase mb-1">❓ Questionário</div>
+                                                <div className="font-black text-rose-700 text-lg">{dyn.questionarioLivro.toFixed(1)}</div>
+                                                <div className="text-[9px] text-rose-500">máx 1</div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="mt-4 text-[10px] text-muted-foreground text-right italic">
-                                        Cálculo: (Soma das notas) / {dyn.divisor} ({gradingSettings?.passingAverage}% para fechar)
+
+                                    {/* Totais */}
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                                            <div className="text-[10px] text-blue-600 font-bold uppercase mb-1">Nota Atividades</div>
+                                            <div className="font-black text-blue-700 text-xl">{dyn.notaAtividades.toFixed(1)}</div>
+                                            <div className="text-[9px] text-blue-400">máx 10</div>
+                                        </div>
+                                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-center">
+                                            <div className="text-[10px] text-indigo-600 font-bold uppercase mb-1">Prova Online</div>
+                                            {examReleased ? (
+                                                <>
+                                                    <div className="font-black text-indigo-700 text-xl">{dyn.examGrade.toFixed(1)}</div>
+                                                    <div className="text-[9px] text-indigo-400">máx 10</div>
+                                                </>
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-1 py-1">
+                                                    <Lock className="h-4 w-4 text-indigo-300" />
+                                                    <div className="text-[10px] text-indigo-400 font-semibold">Aguardando</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className={`rounded-lg p-4 text-center border-2 ${isPassing ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-200'}`}>
+                                            <div className={`text-[10px] font-bold uppercase mb-1 ${isPassing ? 'text-green-600' : 'text-red-600'}`}>Média Final</div>
+                                            <div className={`font-black text-xl ${isPassing ? 'text-green-700' : 'text-red-700'}`}>{dyn.media.toFixed(2)}</div>
+                                            <div className={`text-[9px] ${isPassing ? 'text-green-400' : 'text-red-400'}`}>(Ativ + Prova) / 2</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3 text-[10px] text-muted-foreground text-right italic">
+                                        Fórmula: (Nota Atividades + Prova Online) / 2 — Aprovação: {passingGrade.toFixed(1)}
                                     </div>
                                 </div>
                             )
