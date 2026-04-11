@@ -43,7 +43,7 @@ export function GradingConfig() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                 <div>
-                    <label className="text-xs font-semibold text-muted-foreground block mb-1">Ponto por Presença (Presencial)</label>
+                    <label className="text-xs font-semibold text-muted-foreground block mb-1">Ponto por Presença (Presencial e EAD)</label>
                     <div className="relative">
                         <CalendarCheck className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                         <input
@@ -56,7 +56,7 @@ export function GradingConfig() {
                     <p className="text-[10px] text-muted-foreground mt-1">Soma-se ao diário por aula dada.</p>
                 </div>
                 <div>
-                    <label className="text-xs font-semibold text-muted-foreground block mb-1">Ponto por Presença (EAD)</label>
+                    <label className="text-xs font-semibold text-muted-foreground block mb-1">Ponto por Vídeo Aula</label>
                     <div className="relative">
                         <LayoutDashboard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                         <input
