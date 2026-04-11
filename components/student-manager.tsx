@@ -60,10 +60,11 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
     const [deleting, setDeleting] = useState(false)
     const [editPassword, setEditPassword] = useState("")
     const [showEditPassword, setShowEditPassword] = useState(false)
+    const [importing, setImporting] = useState(false)
+    const [syncing, setSyncing] = useState(false)
     const [isBulkOpen, setIsBulkOpen] = useState(false)
     const [bulkText, setBulkText] = useState("")
     const [bulkError, setBulkError] = useState("")
-    const [importing, setImporting] = useState(false)
 
     // Selected student (for edit / delete / view)
     const [selected, setSelected] = useState<StudentProfile | null>(null)
@@ -343,6 +344,22 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
         }
         setImporting(false)
     }
+    
+    async function handleSyncAuth() {
+        if (!confirm("Isso criará contas de acesso automático para todos os alunos que ainda não possuem login. A senha inicial será IBAD2026. Deseja continuar?")) return
+        setSyncing(true)
+        try {
+            const res = await fetch("/api/admin/sync-auth", { method: "POST" })
+            const data = await res.json()
+            if (data.error) throw new Error(data.error)
+            alert(data.message || "Sincronização concluída com sucesso!")
+            await load()
+        } catch (err: any) {
+            alert("Erro na sincronização: " + err.message)
+        } finally {
+            setSyncing(false)
+        }
+    }
 
     // ─── Render ───────────────────────────────────────────────────────────────
     if (loading) return (
@@ -361,6 +378,15 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                     <p className="text-muted-foreground text-sm">Visualize, edite e gerencie os alunos com matrícula ativa.</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={handleSyncAuth}
+                        disabled={syncing}
+                        className="rounded-xl border-orange-200 bg-orange-50/50 text-orange-700 hover:bg-orange-100 transition-colors"
+                    >
+                        {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ShieldCheck className="h-4 w-4 mr-1.5" />}
+                        Sincronizar Contas
+                    </Button>
                     <Button
                         variant="outline"
                         onClick={() => setIsBulkOpen(true)}
@@ -816,7 +842,41 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                 </DialogContent>
             </Dialog>
 
+            {/* ── Modal: EXCLUIR ────────────────────────────────────────────────────── */}
+            <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-red-600">
+                            <Trash2 className="h-5 w-5" /> Confirmar Exclusão
+                        </DialogTitle>
+                        <DialogDescription>
+                            Tem certeza que deseja excluir o aluno <strong>{selected?.name}</strong>?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex gap-3">
+                        <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
+                        <div className="text-xs text-red-800 leading-relaxed">
+                            Esta ação é <strong>permanente</strong> e removerá todos os dados, notas e acesso ao portal deste aluno.
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={deleting} className="text-xs h-9">
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold h-9"
+                        >
+                            {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                            Confirmar Exclusão
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Bulk Import Modal */}
+
             <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
                 <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>

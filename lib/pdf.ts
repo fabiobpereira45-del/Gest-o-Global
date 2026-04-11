@@ -11,13 +11,17 @@ const IBAD_LOGO = "/ibad-logo.png"
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—"
-  return new Date(iso).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+  try {
+    return new Date(iso).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  } catch {
+    return iso
+  }
 }
 
 function formatTime(seconds: number): string {
@@ -31,14 +35,14 @@ function getAnswerLabel(answer: string, question: Question): string {
     return answer === "true" ? "Verdadeiro" : answer === "false" ? "Falso" : "—"
   }
   if (question.type === "discursive") return answer || "—"
-  const choice = question.choices.find((c) => c.id === answer)
+  const choice = (question.choices || []).find((c) => c.id === answer)
   return choice ? choice.text : "—"
 }
 
 function getCorrectLabel(question: Question): string {
   if (question.type === "true-false") return question.correctAnswer === "true" ? "Verdadeiro" : "Falso"
   if (question.type === "discursive") return "Questão discursiva — correção manual"
-  const choice = question.choices.find((c) => c.id === question.correctAnswer)
+  const choice = (question.choices || []).find((c) => c.id === question.correctAnswer)
   return choice ? choice.text : "—"
 }
 
@@ -48,9 +52,8 @@ function typeLabel(type: Question["type"]): string {
   return "Discursiva"
 }
 
-
 function formatCurrency(value: number): string {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  return (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
 // ——— Modern Template Wrapper ——————————————————————————————————————————————————————
@@ -137,6 +140,7 @@ function getModernTemplate(content: string, title: string, hubName?: string): st
         }
         .badge-success { background: #dcfce7; color: #166534; border: 1px solid #16653433; }
         .badge-danger { background: #fee2e2; color: #991b1b; border: 1px solid #991b1b33; }
+        .badge-warning { background: #fef3c7; color: #92400e; border: 1px solid #92400e33; }
 
         /* Footer */
         .footer {
@@ -148,8 +152,18 @@ function getModernTemplate(content: string, title: string, hubName?: string): st
             display: flex;
             justify-content: space-between;
         }
-    </style>
-</head>
+        .signature-box {
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+        .signature-line {
+            border-top: 1px solid #cbd5e1;
+            padding-top: 8px;
+            text-align: center;
+            font-size: 10px;
+            color: #64748b;
         }
     </style>
 </head>
@@ -175,7 +189,9 @@ function getModernTemplate(content: string, title: string, hubName?: string): st
     <script>
       if (typeof window !== 'undefined') {
         window.onload = function() {
-          setTimeout(function() { window.print(); }, 500);
+          setTimeout(function() { 
+            window.print();
+          }, 500);
         };
       }
     </script>
@@ -183,88 +199,114 @@ function getModernTemplate(content: string, title: string, hubName?: string): st
 </html>`
 }
 
+function safePrint(html: string, existingWin?: Window | null) {
+    try {
+        const win = existingWin || window.open("", "_blank")
+        if (win) {
+            win.document.open()
+            win.document.write(html)
+            win.document.close()
+        }
+    } catch (err) {
+        console.error("Erro ao imprimir PDF:", err)
+        throw err
+    }
+}
+
 // ——— Individual Report Functions ——————————————————————————————————————————————————
 
 export function printStudentListPDF(students: StudentProfile[], classes: any[], hubName?: string, existingWin?: Window | null): void {
-  const rows = students.map((s, i) => {
-    const cls = classes.find(c => c.id === s.class_id)
-    return `<tr>
-        <td>${i + 1}</td>
-        <td class="row-accent">${s.name}</td>
-        <td>${s.enrollment_number || "—"}</td>
-        <td>${cls?.name || hubName || "—"}</td>
-        <td>${s.phone || "—"}</td>
-    </tr>`
-  }).join('')
+  try {
+    const list = Array.isArray(students) ? students : []
+    const clsList = Array.isArray(classes) ? classes : []
 
-  const content = `
-    <table>
-        <thead>
-            <tr>
-                <th width="40">#</th>
-                <th>Nome</th>
-                <th>Matrícula</th>
-                <th>Turma</th>
-                <th>Telefone</th>
-            </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-    </table>
-  `
-  
-  const html = getModernTemplate(content, "Relatório Geral de Alunos", hubName)
-  const win = existingWin || window.open("", "_blank")
-  if (win) { win.document.write(html); win.document.close(); }
+    const rows = list.map((s, i) => {
+      const cls = clsList.find(c => c.id === s.class_id)
+      return `<tr>
+          <td>${i + 1}</td>
+          <td class="row-accent">${s?.name || '—'}</td>
+          <td>${s?.enrollment_number || "—"}</td>
+          <td>${cls?.name || "Sem Turma"}</td>
+          <td>${s?.phone || "—"}</td>
+      </tr>`
+    }).join('')
+
+    const content = `
+      <table>
+          <thead>
+              <tr>
+                  <th width="40">#</th>
+                  <th>Nome</th>
+                  <th>Matrícula</th>
+                  <th>Turma</th>
+                  <th>Telefone</th>
+              </tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="5" style="text-align:center;">Nenhum aluno encontrado</td></tr>'}</tbody>
+      </table>
+    `
+    
+    safePrint(getModernTemplate(content, "Relatório Geral de Alunos", hubName), existingWin)
+  } catch (err) {
+    console.error("Erro em printStudentListPDF:", err)
+    throw err
+  }
 }
 
 export function printGradesReportPDF(grades: StudentGrade[], disciplineName: string, hubName?: string, existingWin?: Window | null): void {
-  const rows = grades.map(g => {
-    const final = (g.examGrade + g.worksGrade + g.seminarGrade + (g.participationBonus || 0)) / (g.customDivisor || 3)
-    const status = final >= 7 ? 'APROVADO' : 'REPROVADO'
-    const statusClass = final >= 7 ? 'badge-success' : 'badge-danger'
-    
-    return `<tr>
-        <td class="row-accent">${g.studentName}</td>
-        <td>${g.examGrade.toFixed(1)}</td>
-        <td>${g.worksGrade.toFixed(1)}</td>
-        <td>${g.seminarGrade.toFixed(1)}</td>
-        <td class="row-accent">${final.toFixed(1)}</td>
-        <td><span class="badge ${statusClass}">${status}</span></td>
-    </tr>`
-  }).join('')
+  try {
+    const list = Array.isArray(grades) ? grades : []
+    const rows = list.map(g => {
+      const final = ((g?.examGrade || 0) + (g?.worksGrade || 0) + (g?.seminarGrade || 0) + (g?.participationBonus || 0)) / (g?.customDivisor || 4)
+      const status = final >= 7 ? 'APROVADO' : 'REPROVADO'
+      const statusClass = final >= 7 ? 'badge-success' : 'badge-danger'
+      
+      return `<tr>
+          <td class="row-accent">${g?.studentName || '—'}</td>
+          <td>${(g?.examGrade || 0).toFixed(1)}</td>
+          <td>${(g?.worksGrade || 0).toFixed(1)}</td>
+          <td>${(g?.seminarGrade || 0).toFixed(1)}</td>
+          <td class="row-accent">${final.toFixed(1)}</td>
+          <td><span class="badge ${statusClass}">${status}</span></td>
+      </tr>`
+    }).join('')
 
-  const content = `
-    <h2>Disciplina: ${disciplineName}</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Nome do Aluno</th>
-                <th>Prova</th>
-                <th>Trabalho</th>
-                <th>Seminário</th>
-                <th>Média</th>
-                <th>Situação</th>
-            </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-    </table>
-  `
+    const content = `
+      <h2>Disciplina: ${disciplineName || '—'}</h2>
+      <table>
+          <thead>
+              <tr>
+                  <th>Nome do Aluno</th>
+                  <th>Prova</th>
+                  <th>Trabalho</th>
+                  <th>Seminário</th>
+                  <th>Média</th>
+                  <th>Situação</th>
+              </tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="6" style="text-align:center;">Nenhuma nota lançada</td></tr>'}</tbody>
+      </table>
+    `
 
-  const html = getModernTemplate(content, "Diário de Notas", hubName)
-  const win = existingWin || window.open("", "_blank")
-  if (win) { win.document.write(html); win.document.close(); }
+    safePrint(getModernTemplate(content, "Diário de Notas", hubName), existingWin)
+  } catch (err) {
+    console.error("Erro em printGradesReportPDF:", err)
+    throw err
+  }
 }
 
 export function printReceiptPDF(tuition: StudentTuition, student: StudentProfile, discipline: Discipline, hubName?: string, existingWin?: Window | null): void {
+    if (!tuition || !student || !discipline) return;
+    
     const content = `
         <div style="border: 2px solid #1e3a5f; padding: 30px; border-radius: 12px; background: #fff; position: relative; overflow: hidden;">
-            <div style="position: absolute; top: -20px; right: -20px; font-size: 100px; color: #f8fafc; font-weight: 900; z-index: 0;">RECIBO</div>
+            <div style="position: absolute; top: -20px; right: -20px; font-size: 80px; color: #f8fafc; font-weight: 900; z-index: 0; pointer-events:none;">RECIBO</div>
             
             <div style="position: relative; z-index: 1;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px;">
                     <div>
                         <p style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Recibo de Pagamento</p>
-                        <h2 style="margin: 0; border: none; padding: 0;">Nº ${tuition.id.slice(0, 8).toUpperCase()}</h2>
+                        <h2 style="margin: 0; border: none; padding: 0;">Nº ${(tuition.id || "").slice(0, 8).toUpperCase()}</h2>
                     </div>
                     <div style="text-align: right;">
                         <p style="font-size: 11px; color: #64748b;">Data do Pagamento</p>
@@ -278,33 +320,32 @@ export function printReceiptPDF(tuition: StudentTuition, student: StudentProfile
                     <p style="font-size: 12px; color: #64748b; font-style: italic;">Referente ao investimento da disciplina: <strong>${discipline.name}</strong></p>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 80px;">
-                    <div style="text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px;">
-                        <p style="font-size: 11px; color: #64748b;">Assinatura Institucional</p>
-                        <p style="font-weight: 700; color: #1e3a5f; margin-top: 5px;">${hubName || "Administração IBAD"}</p>
+                <div class="signature-box">
+                    <div class="signature-line">
+                        <p style="font-weight: 700; color: #1e3a5f;">${hubName || "Administração IBAD"}</p>
+                        Assinatura Institucional
                     </div>
-                    <div style="text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px;">
-                        <p style="font-size: 11px; color: #64748b;">Assinatura do Aluno</p>
-                        <p style="font-weight: 700; color: #1e3a5f; margin-top: 5px;">${student.name}</p>
+                    <div class="signature-line">
+                        <p style="font-weight: 700; color: #1e3a5f;">${student.name}</p>
+                        Assinatura do Aluno
                     </div>
                 </div>
             </div>
         </div>
     `
-    const html = getModernTemplate(content, "Recibo de Pagamento", hubName)
-    const win = existingWin || window.open("", "_blank")
-    if (win) { win.document.write(html); win.document.close(); }
+    safePrint(getModernTemplate(content, "Recibo de Pagamento", hubName), existingWin)
 }
 
 export function printFinancialDRE_PDF(transactions: FinancialTransaction[], competencia: string, hubName?: string, existingWin?: Window | null): void {
-    const incomes = transactions.filter(t => t.type === 'income' && t.status === 'realized')
-    const expenses = transactions.filter(t => t.type === 'expense' && t.status === 'realized')
-    const totalIncome = incomes.reduce((acc, t) => acc + t.amount, 0)
-    const totalExpense = expenses.reduce((acc, t) => acc + t.amount, 0)
+    const list = Array.isArray(transactions) ? transactions : []
+    const incomes = list.filter(t => t.type === 'income' && t.status === 'realized')
+    const expenses = list.filter(t => t.type === 'expense' && t.status === 'realized')
+    const totalIncome = incomes.reduce((acc, t) => acc + (t.amount || 0), 0)
+    const totalExpense = expenses.reduce((acc, t) => acc + (t.amount || 0), 0)
     const result = totalIncome - totalExpense
 
     const categorySummary = expenses.reduce((acc: any, t) => {
-        acc[t.category] = (acc[t.category] || 0) + t.amount
+        acc[t.category] = (acc[t.category] || 0) + (t.amount || 0)
         return acc
     }, {})
 
@@ -313,13 +354,13 @@ export function printFinancialDRE_PDF(transactions: FinancialTransaction[], comp
     `).join('')
 
     const content = `
-        <div style="background: #f8fafc; padding: 25px; border-radius: 12px; margin-bottom: 30px;">
+        <div style="background: #f8fafc; padding: 25px; border-radius: 12px; margin-bottom: 30px; border:1px solid #e2e8f0;">
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
                 <div style="text-align: center;">
                     <p style="font-size: 10px; color: #64748b; text-transform: uppercase;">Receita Total</p>
                     <p style="font-size: 18px; font-weight: 800; color: #16a34a;">${formatCurrency(totalIncome)}</p>
                 </div>
-                <div style="text-align: center;">
+                <div style="text-align: center; border-left:1px solid #e2e8f0; border-right:1px solid #e2e8f0;">
                     <p style="font-size: 10px; color: #64748b; text-transform: uppercase;">Despesa Total</p>
                     <p style="font-size: 18px; font-weight: 800; color: #dc2626;">${formatCurrency(totalExpense)}</p>
                 </div>
@@ -335,17 +376,18 @@ export function printFinancialDRE_PDF(transactions: FinancialTransaction[], comp
             <thead>
                 <tr><th>Categoria</th><th style="text-align:right;">Total Gasto</th></tr>
             </thead>
-            <tbody>${expenseRows}</tbody>
+            <tbody>${expenseRows || '<tr><td colspan="2" style="text-align:center;">Nenhuma despesa registrada</td></tr>'}</tbody>
         </table>
     `
-    const html = getModernTemplate(content, `DRE - Competência ${competencia}`, hubName)
-    const win = existingWin || window.open("", "_blank")
-    if (win) { win.document.write(html); win.document.close(); }
+    safePrint(getModernTemplate(content, `DRE - Competência ${competencia}`, hubName), existingWin)
 }
 
 export function printTuitionReportPDF(tuitions: StudentTuition[], students: StudentProfile[], hubName?: string, existingWin?: Window | null): void {
-    const rows = tuitions.map(t => {
-        const student = students.find(s => s.id === t.studentId)
+    const tList = Array.isArray(tuitions) ? tuitions : []
+    const sList = Array.isArray(students) ? students : []
+
+    const rows = tList.map(t => {
+        const student = sList.find(s => s.id === t.studentId)
         const statusClass = t.status === 'paid' ? 'badge-success' : (t.status === 'overdue' ? 'badge-danger' : 'badge-warning')
         const statusLabel = t.status === 'paid' ? 'PAGO' : (t.status === 'overdue' ? 'ATRASADO' : 'PENDENTE')
         
@@ -362,17 +404,18 @@ export function printTuitionReportPDF(tuitions: StudentTuition[], students: Stud
             <thead>
                 <tr><th>Aluno</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr>
             </thead>
-            <tbody>${rows}</tbody>
+            <tbody>${rows || '<tr><td colspan="4" style="text-align:center;">Nenhuma mensalidade encontrada</td></tr>'}</tbody>
         </table>
     `
-    const html = getModernTemplate(content, "Relatório de Recebíveis", hubName)
-    const win = existingWin || window.open("", "_blank")
-    if (win) { win.document.write(html); win.document.close(); }
+    safePrint(getModernTemplate(content, "Relatório de Recebíveis", hubName), existingWin)
 }
 
 export function printAttendanceReportPDF(attendances: Attendance[], students: StudentProfile[], disciplineName: string, hubName?: string, existingWin?: Window | null): void {
-  const logs = students.map(s => {
-    const sAtt = attendances.filter(a => a.studentId === s.id)
+  const attList = Array.isArray(attendances) ? attendances : []
+  const sList = Array.isArray(students) ? students : []
+
+  const logs = sList.map(s => {
+    const sAtt = attList.filter(a => a.studentId === s.id)
     const presents = sAtt.filter(a => a.isPresent).length
     const total = sAtt.length
     const pct = total > 0 ? (presents/total)*100 : 0
@@ -386,7 +429,7 @@ export function printAttendanceReportPDF(attendances: Attendance[], students: St
   </tr>`).join('')
 
   const content = `
-    <h2>Frequência: ${disciplineName}</h2>
+    <h2>Frequência: ${disciplineName || '—'}</h2>
     <table>
         <thead>
             <tr>
@@ -395,39 +438,41 @@ export function printAttendanceReportPDF(attendances: Attendance[], students: St
                 <th style="text-align:right;">% Presença</th>
             </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows || '<tr><td colspan="3" style="text-align:center;">Nenhum registro de frequência</td></tr>'}</tbody>
     </table>
   `
-  const html = getModernTemplate(content, "Relatório de Frequência", hubName)
-  const win = existingWin || window.open("", "_blank")
-  if (win) { win.document.write(html); win.document.close(); }
+  safePrint(getModernTemplate(content, "Relatório de Frequência", hubName), existingWin)
 }
 
 export function printCurriculumPDF(semesters: Semester[], disciplines: Discipline[], hubName?: string, existingWin?: Window | null): void {
-  const semestersHtml = semesters.sort((a,b) => a.order - b.order).map(s => {
-    const sDisciplines = disciplines.filter(d => d.semesterId === s.id).sort((a,b) => a.order - b.order)
+  const semList = Array.isArray(semesters) ? semesters : []
+  const discList = Array.isArray(disciplines) ? disciplines : []
+
+  const semestersHtml = semList.sort((a,b) => (a.order || 0) - (b.order || 0)).map(s => {
+    const sDisciplines = discList.filter(d => d.semesterId === s.id).sort((a,b) => (a.order || 0) - (b.order || 0))
     const rows = sDisciplines.map(d => `<tr><td class="row-accent">${d.name}</td><td>${d.professorName || 'Mestre a definir'}</td></tr>`).join('')
     return `
       <h2>${s.name}</h2>
       <table>
         <thead><tr><th>Disciplina</th><th>Mestre Responsável</th></tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows || '<tr><td colspan="2" style="text-align:center;">Nenhuma disciplina neste semestre</td></tr>'}</tbody>
       </table>`
   }).join('')
 
-  const html = getModernTemplate(semestersHtml, "Grade Curricular do Curso", hubName)
-  const win = existingWin || window.open("", "_blank")
-  if (win) { win.document.write(html); win.document.close(); }
+  safePrint(getModernTemplate(semestersHtml || '<p>Nenhuma grade curricular definida.</p>', "Grade Curricular do Curso", hubName), existingWin)
 }
 
 export function printStudentPDF({ submission, assessment, questions }: { submission: StudentSubmission, assessment: Assessment, questions: Question[] }, hubName?: string, existingWin?: Window | null): void {
-  const orderedQuestions = assessment.questionIds
-    .map((id) => questions.find((q) => q.id === id))
+  const qList = Array.isArray(questions) ? questions : []
+  const subAnswers = Array.isArray(submission?.answers) ? submission.answers : []
+
+  const orderedQuestions = (assessment?.questionIds || [])
+    .map((id) => qList.find((q) => q.id === id))
     .filter(Boolean) as Question[]
 
   const rows = orderedQuestions
     .map((q, i) => {
-      const studentAns = submission.answers.find((a) => a.questionId === q.id)
+      const studentAns = subAnswers.find((a) => a.questionId === q.id)
       const studentLabel = studentAns ? getAnswerLabel(studentAns.answer, q) : "—"
       const correctLabel = getCorrectLabel(q)
       const isDiscursive = q.type === "discursive"
@@ -438,7 +483,7 @@ export function printStudentPDF({ submission, assessment, questions }: { submiss
       const choicesHTML =
         q.type === "multiple-choice"
           ? `<ul style="margin:8px 0;padding:0;list-style:none;font-size:12px;">
-              ${q.choices
+              ${(q.choices || [])
             .map(
               (c) =>
                 `<li style="margin:4px 0;padding:6px 12px;border-radius:6px;
@@ -491,32 +536,32 @@ export function printStudentPDF({ submission, assessment, questions }: { submiss
     <div style="display:flex;gap:20px;margin-bottom:30px;background:#f8fafc;padding:20px;border-radius:12px;border:1px solid #e2e8f0;">
         <div style="flex:1;">
             <p style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Aluno</p>
-            <p style="font-size:16px;font-weight:800;color:#1e3a5f;">${submission.studentName}</p>
-            <p style="font-size:12px;color:#64748b;">${submission.studentEmail}</p>
+            <p style="font-size:16px;font-weight:800;color:#1e3a5f;">${submission?.studentName || '—'}</p>
+            <p style="font-size:12px;color:#64748b;">${submission?.studentEmail || '—'}</p>
         </div>
         <div style="text-align:center;padding:0 20px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
             <p style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Nota Final</p>
-            <p style="font-size:24px;font-weight:800;color:#1e3a5f;">${submission.score.toFixed(1)} <span style="font-size:14px;color:#64748b;font-weight:400;">/ ${submission.totalPoints.toFixed(1)}</span></p>
+            <p style="font-size:24px;font-weight:800;color:#1e3a5f;">${(submission?.score || 0).toFixed(1)} <span style="font-size:14px;color:#64748b;font-weight:400;">/ ${(submission?.totalPoints || 0).toFixed(1)}</span></p>
         </div>
         <div style="text-align:right;">
             <p style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Desempenho</p>
-            <p style="font-size:24px;font-weight:800;color:#f97316;">${submission.percentage}%</p>
+            <p style="font-size:24px;font-weight:800;color:#f97316;">${submission?.percentage || 0}%</p>
         </div>
     </div>
     <div style="font-size:11px;color:#64748b;margin-bottom:20px;">
-        Entrega: ${formatDate(submission.submittedAt)} • Tempo: ${formatTime(submission.timeElapsedSeconds)}
+        Entrega: ${formatDate(submission?.submittedAt)} • Tempo: ${formatTime(submission?.timeElapsedSeconds || 0)}
     </div>
     <h2>Revisão das Questões</h2>
-    ${rows}
+    ${rows || '<p>Nenhuma questão respondida.</p>'}
   `
 
-  const html = getModernTemplate(statsHTML, `Revisão de Prova - ${submission.studentName}`, hubName)
-  const win = existingWin || window.open("", "_blank")
-  if (win) { win.document.write(html); win.document.close(); }
+  safePrint(getModernTemplate(statsHTML, `Revisão de Prova - ${submission?.studentName || 'Aluno'}`, hubName), existingWin)
 }
 
 export function printAnswerKeyPDF({ assessment, questions }: { assessment: Assessment, questions: Question[] }, hubName?: string, existingWin?: Window | null): void {
-  const orderedQuestions = assessment.questionIds.map((id) => questions.find((q) => q.id === id)).filter(Boolean) as Question[]
+  const qList = Array.isArray(questions) ? questions : []
+  const orderedQuestions = (assessment?.questionIds || []).map((id) => qList.find((q) => q.id === id)).filter(Boolean) as Question[]
+  
   const rows = orderedQuestions.map((q, i) => {
     const correctLabel = getCorrectLabel(q)
     return `
@@ -532,52 +577,63 @@ export function printAnswerKeyPDF({ assessment, questions }: { assessment: Asses
   const content = `
     <div style="margin-bottom:25px;padding:20px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;">
         <p style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:700;">Prova</p>
-        <p style="font-size:18px;font-weight:800;color:#1e3a5f;">${assessment.title}</p>
+        <p style="font-size:18px;font-weight:800;color:#1e3a5f;">${assessment?.title || '—'}</p>
     </div>
     <h2>Chave de Respostas</h2>
-    ${rows}
+    ${rows || '<p>Nenhuma questão na prova.</p>'}
   `
   
-  const html = getModernTemplate(content, `Gabarito - ${assessment.title}`, hubName)
-  const win = existingWin || window.open("", "_blank")
-  if (win) { win.document.write(html); win.document.close(); }
+  safePrint(getModernTemplate(content, `Gabarito - ${assessment?.title || 'Prova'}`, hubName), existingWin)
 }
 
 export function printProfessorsPDF(professors: ProfessorAccount[], assignments: ProfessorDiscipline[], disciplines: Discipline[], hubName?: string, existingWin?: Window | null): void {
-  const rows = professors.map(p => {
-    const pDisciplines = assignments.filter(a => a.professorId === p.id).map(a => disciplines.find(d => d.id === a.disciplineId)?.name).filter(Boolean).join(', ')
-    return `<tr>
-        <td class="row-accent">${p.name}</td>
-        <td>${p.email}</td>
-        <td><span class="badge ${p.active ? 'badge-success' : 'badge-danger'}">${p.active ? 'Ativo' : 'Inativo'}</span></td>
-        <td>${pDisciplines || 'Sem disciplinas'}</td>
-    </tr>`
-  }).join('')
+  try {
+    const safeProfessors = Array.isArray(professors) ? professors : []
+    const safeAssignments = Array.isArray(assignments) ? assignments : []
+    const safeDisciplines = Array.isArray(disciplines) ? disciplines : []
 
-  const content = `
-    <table>
-        <thead>
-            <tr>
-                <th>Nome</th>
-                <th>E-mail</th>
-                <th>Status</th>
-                <th>Disciplinas Atribuídas</th>
-            </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-    </table>
-  `
-  
-  const html = getModernTemplate(content, "Corpo Docente e Mestres", hubName)
-  const win = existingWin || window.open("", "_blank")
-  if (win) { win.document.write(html); win.document.close(); }
+    const rows = safeProfessors.map(p => {
+      const pDisciplines = safeAssignments
+        .filter(a => a?.professorId === p?.id)
+        .map(a => safeDisciplines.find(d => d?.id === a?.disciplineId)?.name)
+        .filter(Boolean)
+        .join(', ')
+      
+      return `<tr>
+          <td class="row-accent">${p?.name || '—'}</td>
+          <td>${p?.email || '—'}</td>
+          <td><span class="badge ${p?.active ? 'badge-success' : 'badge-danger'}">${p?.active ? 'Ativo' : 'Inativo'}</span></td>
+          <td>${pDisciplines || 'Sem disciplinas'}</td>
+      </tr>`
+    }).join('')
+
+    const content = `
+      <table>
+          <thead>
+              <tr>
+                  <th>Nome</th>
+                  <th>E-mail</th>
+                  <th>Status</th>
+                  <th>Disciplinas Atribuídas</th>
+              </tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="4" style="text-align:center;">Nenhum professor registrado</td></tr>'}</tbody>
+      </table>
+    `
+    safePrint(getModernTemplate(content, "Corpo Docente e Mestres", hubName), existingWin)
+  } catch (error) {
+    console.error("Erro crítico em printProfessorsPDF:", error)
+    throw error
+  }
 }
 
 export function printBlankAssessmentPDF({ assessment, questions }: { assessment: Assessment, questions: Question[] }, hubName?: string, existingWin?: Window | null): void {
-    const orderedQuestions = assessment.questionIds.map(id => questions.find(q => q.id === id)).filter(Boolean) as Question[]
+    const qList = Array.isArray(questions) ? questions : []
+    const orderedQuestions = (assessment?.questionIds || []).map(id => qList.find(q => q.id === id)).filter(Boolean) as Question[]
+    
     const rows = orderedQuestions.map((q, i) => {
         const optionsHtml = q.type === "multiple-choice" ? 
-          q.choices.map((c, ci) => `<div style="margin:8px 0;display:flex;gap:10px;"><div style="width:20px;height:20px;border:1.5px solid #cbd5e1;border-radius:4px;flex-shrink:0;"></div> <span style="font-size:13px;">(${String.fromCharCode(65 + ci)}) ${c.text}</span></div>`).join('') :
+          (q.choices || []).map((c, ci) => `<div style="margin:8px 0;display:flex;gap:10px;"><div style="width:20px;height:20px;border:1.5px solid #cbd5e1;border-radius:4px;flex-shrink:0;"></div> <span style="font-size:13px;">(${String.fromCharCode(65 + ci)}) ${c.text}</span></div>`).join('') :
           (q.type === "true-false" ? "<div style=\"margin:12px 0;display:flex;gap:20px;\"><div style='display:flex;gap:8px;align-items:center;'><div style='width:18px;height:18px;border:1.5px solid #cbd5e1;border-radius:50%;'></div> <span>Verdadeiro</span></div> <div style='display:flex;gap:8px;align-items:center;'><div style='width:18px;height:18px;border:1.5px solid #cbd5e1;border-radius:50%;'></div> <span>Falso</span></div></div>" : "<div style='height:150px;border:1px solid #e2e8f0;margin-top:10px;border-radius:8px;background:#fcfcfc;'></div>")
         
         return `
@@ -598,42 +654,43 @@ export function printBlankAssessmentPDF({ assessment, questions }: { assessment:
             <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#64748b;">
                 <span>DATA: ____/____/2026</span>
                 <span>DATA DA PROVA: ${new Date().toLocaleDateString('pt-BR')}</span>
-                <span>NOTA: _________ / ${assessment.totalPoints}</span>
+                <span>NOTA: _________ / ${assessment?.totalPoints || 0}</span>
             </div>
           </div>
       </div>
       <h2>Avaliação Acadêmica</h2>
-      ${rows}
+      ${rows || '<p>Nenhuma questão na avaliação.</p>'}
     `
-    
-    const html = getModernTemplate(headerHtml, assessment.title, hubName)
-    const win = existingWin || window.open("", "_blank")
-    if (win) { win.document.write(html); win.document.close(); }
+    safePrint(getModernTemplate(headerHtml, assessment?.title || "Avaliação", hubName), existingWin)
 }
 
 export function printOverviewPDF({ assessments, submissions, questions }: { assessments: Assessment[], submissions: StudentSubmission[], questions: Question[] }, hubName?: string, existingWin?: Window | null): void {
-    const avgScore = submissions.length > 0 ? (submissions.reduce((acc, s) => acc + (s?.score || 0), 0) / submissions.length) : 0
+    const subList = Array.isArray(submissions) ? submissions : []
+    const qList = Array.isArray(questions) ? questions : []
+    const aList = Array.isArray(assessments) ? assessments : []
+
+    const avgScore = subList.length > 0 ? (subList.reduce((acc, s) => acc + (s?.score || 0), 0) / subList.length) : 0
     
-    const rows = (submissions || []).map((s, i) => `
+    const rows = subList.map((s, i) => `
         <tr>
             <td width="40">${i+1}</td>
-            <td class="row-accent">${s.studentName}</td>
-            <td style="font-weight:700; color:#1e3a5f;">${s.score.toFixed(1)}</td>
-            <td style="text-align:right;"><span class="badge ${s.percentage >= 70 ? 'badge-success' : 'badge-danger'}">${s.percentage}%</span></td>
+            <td class="row-accent">${s?.studentName || '—'}</td>
+            <td style="font-weight:700; color:#1e3a5f;">${(s?.score || 0).toFixed(1)}</td>
+            <td style="text-align:right;"><span class="badge ${s?.percentage >= 70 ? 'badge-success' : 'badge-danger'}">${s?.percentage || 0}%</span></td>
         </tr>
     `).join('')
 
-    const assessmentsList = assessments.map(a => `<div style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;background:#fcfcfc;"><strong>${a.title}</strong><br/>${a.questionIds.length} questões • ${a.totalPoints} pts</div>`).join('')
+    const assessmentsList = aList.map(a => `<div style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;background:#fcfcfc;"><strong>${a.title}</strong><br/>${(a.questionIds || []).length} questões • ${a.totalPoints} pts</div>`).join('')
 
     const content = `
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px;">
           <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center;">
             <p style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Participações</p>
-            <p style="font-size: 22px; font-weight: 800; color: #1e3a5f;">${submissions.length}</p>
+            <p style="font-size: 22px; font-weight: 800; color: #1e3a5f;">${subList.length}</p>
           </div>
           <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center;">
             <p style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Questões Totais</p>
-            <p style="font-size: 22px; font-weight: 800; color: #16a34a;">${questions.length}</p>
+            <p style="font-size: 22px; font-weight: 800; color: #16a34a;">${qList.length}</p>
           </div>
           <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center;">
             <p style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Média Global</p>
@@ -643,7 +700,7 @@ export function printOverviewPDF({ assessments, submissions, questions }: { asse
 
       <h2>Relação de Provas</h2>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:30px;">
-          ${assessmentsList}
+          ${assessmentsList || '<p>Nenhuma prova vinculada.</p>'}
       </div>
 
       <h2>Desempenho por Aluno</h2>
@@ -656,10 +713,8 @@ export function printOverviewPDF({ assessments, submissions, questions }: { asse
                 <th style="text-align:right;">% Acerto</th>
             </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows || '<tr><td colspan="4" style="text-align:center;">Nenhuma submissão encontrada</td></tr>'}</tbody>
       </table>
     `
-    const html = getModernTemplate(content, "Relatório Geral de Avaliações", hubName)
-    const win = existingWin || window.open("", "_blank")
-    if (win) { win.document.write(html); win.document.close(); }
+    safePrint(getModernTemplate(content, "Relatório Geral de Avaliações", hubName), existingWin)
 }

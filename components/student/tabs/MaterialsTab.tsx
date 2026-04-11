@@ -16,7 +16,7 @@ export function MaterialsTab({ filteredMaterials, disciplines }: MaterialsTabPro
                 <div className="bg-white border-2 border-border border-dashed rounded-3xl p-20 text-center flex flex-col items-center max-w-2xl mx-auto shadow-sm">
                     <Library className="h-20 w-20 text-muted-foreground opacity-15 mb-6" />
                     <h3 className="text-2xl font-bold text-foreground mb-2">Biblioteca Vazia</h3>
-                    <p className="text-muted-foreground text-sm max-w-sm leading-relaxed">No momento não há apostilas ou materiais relacionados às suas disciplinas.</p>
+                    <p className="text-muted-foreground text-sm max-w-sm leading-relaxed">No momento não há apostilas ou materiais disponíveis nesta biblioteca.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

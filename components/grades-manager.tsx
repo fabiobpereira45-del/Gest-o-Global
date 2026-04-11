@@ -1,8 +1,6 @@
-"use client"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, memo } from "react"
 import {
-    Plus, Pencil, Trash2, GraduationCap, Calculator, Loader2, Save, X, Download, Eye, EyeOff, CheckCheck, RefreshCw
+    Plus, Pencil, Trash2, GraduationCap, Calculator, Loader2, Save, X, Download, Eye, EyeOff, CheckCheck, RefreshCw, Search
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,12 +10,120 @@ import {
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-    StudentGrade, getStudentGrades, saveStudentGrade, deleteStudentGrade,
+    StudentGrade, getStudentGrades, saveStudentGrade, deleteStudentGrade, saveBatchGrades,
     StudentProfile, getStudents, Discipline, getDisciplines, releaseAllGrades, syncGradesForDiscipline
 } from "@/lib/store"
 import { printGradesReportPDF } from "@/lib/pdf"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Switch } from "@/components/ui/switch"
+
+// --- Sub-componente Memoizado para cada Linha de Nota (Expansível) ---
+const GradeCard = memo(({ 
+    grade, 
+    disciplines, 
+    isMaster, 
+    onEdit, 
+    onDelete,
+    calculateAverage 
+}: { 
+    grade: StudentGrade, 
+    disciplines: Discipline[], 
+    isMaster: boolean, 
+    onEdit: (g: StudentGrade) => void, 
+    onDelete: (id: string) => void,
+    calculateAverage: (g: StudentGrade) => string
+}) => {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const discipline = disciplines.find(d => d.id === grade.disciplineId)
+    const average = calculateAverage(grade)
+    const isApproved = parseFloat(average) >= 7
+
+    return (
+        <div className={`overflow-hidden transition-all duration-300 border-l-4 ${isExpanded ? 'bg-slate-50/80 border-primary' : 'hover:bg-slate-50/50 border-transparent bg-white'}`}>
+            {/* Cabeçalho do Card (Sempre Visível) */}
+            <div 
+                className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <div className="flex-1 flex items-center gap-4">
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-black text-sm shadow-sm border ${isApproved ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                        {grade.studentName.charAt(0)}
+                    </div>
+                    <div>
+                        <div className="flex items-center flex-wrap gap-2 mb-0.5">
+                            <h4 className="font-bold text-foreground text-base tracking-tight">{grade.studentName}</h4>
+                            {discipline && (
+                                <span className="bg-primary/5 text-primary text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
+                                    {discipline.name}
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground font-mono opacity-60">ID: {grade.studentIdentifier}</p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                    <div className="text-right hidden sm:block">
+                        <div className="text-[9px] text-muted-foreground uppercase font-black tracking-widest mb-0.5">Média</div>
+                        <div className={`text-xl font-black tabular-nums ${isApproved ? 'text-green-600' : 'text-amber-600'}`}>
+                            {average}
+                        </div>
+                    </div>
+                    <div className={`p-2 rounded-full transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-primary/10 text-primary' : 'bg-slate-100 text-slate-400'}`}>
+                        <Plus className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-45' : ''}`} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Conteúdo Detalhado (Expansível) */}
+            {isExpanded && (
+                <div className="px-5 pb-6 pt-2 animate-in slide-in-from-top-2 duration-300">
+                    <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+                            {[
+                                { label: 'Prova Online', val: grade.examGrade, color: 'text-blue-600' },
+                                { label: 'Leitura Livro', val: grade.worksGrade, color: 'text-slate-600' },
+                                { label: 'Quest. Livro', val: grade.seminarGrade, color: 'text-slate-600' },
+                                { label: 'Vídeo Aula', val: grade.participationBonus, color: 'text-purple-600' },
+                                { label: 'Frequência', val: grade.attendanceScore, color: 'text-green-600' },
+                            ].map(tag => (
+                                <div key={tag.label} className="flex flex-col gap-1">
+                                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">{tag.label}</span>
+                                    <span className={`text-sm font-black tabular-nums ${tag.color}`}>{tag.val}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-slate-50">
+                            <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black border uppercase tracking-wider ${grade.isReleased ? 'bg-green-500 text-white border-green-600 shadow-lg shadow-green-500/20' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                                    {grade.isReleased ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                                    {grade.isReleased ? 'Liberada para o Aluno' : 'Oculta no Boletim'}
+                                </span>
+                                <span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-full border ${isApproved ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                    {isApproved ? 'Aprovado' : 'Reprovado / Pendente'}
+                                </span>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" className="h-10 px-5 font-bold border-slate-200 hover:bg-primary/5 hover:text-primary transition-all rounded-xl" onClick={(e) => { e.stopPropagation(); onEdit(grade); }}>
+                                    <Pencil className="h-3.5 w-3.5 mr-2" /> Editar Notas
+                                </Button>
+                                {isMaster && (
+                                    <Button variant="ghost" size="sm" className="h-10 px-5 font-bold text-red-400 hover:text-red-600 hover:bg-red-50 transition-all rounded-xl" onClick={(e) => { e.stopPropagation(); onDelete(grade.id); }}>
+                                        <Trash2 className="h-3.5 w-3.5 mr-2" /> Remover
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+})
+
+GradeCard.displayName = "GradeCard"
 
 export function GradesManager({ isMaster }: { isMaster: boolean }) {
     const [grades, setGrades] = useState<StudentGrade[]>([])
@@ -30,6 +136,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
     const [bulkReleaseConfirm, setBulkReleaseConfirm] = useState(false)
     const [selectedDiscipline, setSelectedDiscipline] = useState<string>("")
+    const [searchName, setSearchName] = useState("")
     const [isSyncing, setIsSyncing] = useState(false)
 
     // Form State
@@ -43,7 +150,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
         seminarGrade: "",
         participationBonus: "",
         attendanceScore: "",
-        customDivisor: "4",
+        customDivisor: "2",
         isReleased: true
     })
 
@@ -51,7 +158,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
         try {
             setLoading(true)
             const [fetchedGrades, fetchedStudents, fetchedDisciplines] = await Promise.all([
-                getStudentGrades(),
+                getStudentGrades(selectedDiscipline || undefined),
                 getStudents(),
                 getDisciplines()
             ])
@@ -68,11 +175,14 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
 
     useEffect(() => {
         loadData()
-    }, [])
+    }, [selectedDiscipline])
 
     const handleCreateOrUpdate = async () => {
         try {
-            if (!formData.studentName || !formData.studentIdentifier) {
+            const studentName = formData.studentName?.trim()
+            const studentIdentifier = formData.studentIdentifier?.trim()
+
+            if (!studentName || !studentIdentifier) {
                 throw new Error("O nome e identificador do aluno são obrigatórios.")
             }
             
@@ -87,8 +197,8 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
             }
 
             const gradeToSave = {
-                studentIdentifier: formData.studentIdentifier,
-                studentName: formData.studentName,
+                studentIdentifier,
+                studentName,
                 disciplineId: formData.disciplineId,
                 isPublic: formData.isPublic || false,
                 examGrade: parseFloat(formData.examGrade) || 0,
@@ -137,7 +247,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
         }
     }
 
+    const [statusFilter, setStatusFilter] = useState<"all" | "released" | "hidden">("all")
+
     const handleSync = async () => {
+
         if (!selectedDiscipline) {
             alert("Selecione uma disciplina no filtro abaixo para sincronizar.")
             return
@@ -149,41 +262,34 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
             
             if ((syncData as any).reason) {
                 alert((syncData as any).reason)
+                setIsSyncing(false)
                 return
             }
 
-            // Converter os resultados em promessas de salvamento
-            const savePromises = Object.entries(syncData).map(([identifier, data]) => {
-                const existingGrade = grades.find(g => 
+            // Converter os resultados em um ÚNICO lote de salvamento (Muito mais rápido)
+            const recordsToSave = Object.entries(syncData).map(([identifier, data]) => {
+                const existing = grades.find(g => 
                     g.studentIdentifier.toLowerCase().trim() === identifier && 
                     g.disciplineId === selectedDiscipline
                 )
 
-                // Só atualizamos nota se for maior que a atual ou se não existir nota
-                if (existingGrade) {
-                    return saveStudentGrade({
-                        ...existingGrade,
-                        examGrade: Math.max(existingGrade.examGrade, (data as any).examGrade),
-                        attendanceScore: Math.max(existingGrade.attendanceScore, (data as any).attendanceScore)
-                    }, existingGrade.id)
-                } else {
-                    return saveStudentGrade({
-                        studentIdentifier: identifier,
-                        studentName: (data as any).name,
-                        disciplineId: selectedDiscipline,
-                        isPublic: false,
-                        examGrade: (data as any).examGrade,
-                        worksGrade: 0,
-                        seminarGrade: 0,
-                        participationBonus: 0,
-                        attendanceScore: (data as any).attendanceScore,
-                        customDivisor: 4,
-                        isReleased: true
-                    })
+                return {
+                    studentIdentifier: identifier,
+                    studentName: (data as any).name,
+                    disciplineId: selectedDiscipline as string,
+                    isPublic: false,
+                    examGrade: (data as any).examGrade,
+                    worksGrade: existing?.worksGrade || 0,
+                    seminarGrade: existing?.seminarGrade || 0,
+                    participationBonus: existing?.participationBonus || 0,
+                    attendanceScore: (data as any).attendanceScore,
+                    customDivisor: existing?.customDivisor || 4,
+                    isReleased: true,
+                    id: existing?.id
                 }
             })
 
-            await Promise.all(savePromises)
+            await saveBatchGrades(recordsToSave)
             alert("Sincronização concluída com sucesso!")
             loadData()
         } catch (err: any) {
@@ -214,31 +320,75 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
     }
 
     const calculateAverage = (grade: StudentGrade) => {
-        const total =
-            (parseFloat(grade.examGrade as any) || 0) +
+        const notaAtividades = 
             (parseFloat(grade.worksGrade as any) || 0) +
             (parseFloat(grade.seminarGrade as any) || 0) +
             (parseFloat(grade.participationBonus as any) || 0) +
             (parseFloat(grade.attendanceScore as any) || 0)
 
-        const divisor = grade.customDivisor > 0 ? grade.customDivisor : 1;
-        return (total / divisor).toFixed(2)
+        const provaOnline = parseFloat(grade.examGrade as any) || 0
+        const media = (notaAtividades + provaOnline) / 2
+        return media.toFixed(2)
     }
+
+    // --- Listas Memoizadas para Performance ---
+    const filteredGrades = useMemo(() => {
+        const raw = grades
+            .filter(g => {
+                const matchDiscipline = !selectedDiscipline || g.disciplineId === selectedDiscipline
+                const matchName = !searchName || g.studentName.toLowerCase().includes(searchName.toLowerCase()) || g.studentIdentifier.toLowerCase().includes(searchName.toLowerCase())
+                const matchStatus = statusFilter === "all" || (statusFilter === "released" ? g.isReleased : !g.isReleased)
+                return matchDiscipline && matchName && matchStatus
+            })
+            .sort((a, b) => a.studentName.localeCompare(b.studentName))
+
+        // DEDUPLICAÇÃO: Agrupar por estudante + disciplina para evitar duplicidade visual
+        const uniqueGradesMap = new Map<string, StudentGrade>();
+        raw.forEach(g => {
+            const key = `${String(g.studentIdentifier || "").trim().toLowerCase()}-${g.disciplineId || 'geral'}`;
+            const existing = uniqueGradesMap.get(key);
+            
+            if (!existing) {
+                uniqueGradesMap.set(key, g);
+            } else {
+                // Se o novo registro tiver mais notas (ex: examGrade > 0), ele substitui o "vazio"
+                const existingPoints = (existing.examGrade || 0) + (existing.attendanceScore || 0);
+                const newPoints = (g.examGrade || 0) + (g.attendanceScore || 0);
+                if (newPoints > existingPoints) {
+                    uniqueGradesMap.set(key, g);
+                }
+            }
+        });
+
+        return Array.from(uniqueGradesMap.values());
+    }, [grades, selectedDiscipline, searchName, statusFilter])
+
+    const listMatriculados = useMemo(() => filteredGrades.filter(g => !g.isPublic), [filteredGrades])
+    const listPublicos = useMemo(() => filteredGrades.filter(g => g.isPublic), [filteredGrades])
 
     if (loading) {
         return (
-            <div className="flex h-64 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="flex flex-col h-96 items-center justify-center gap-4">
+                <div className="relative">
+                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                   <div className="absolute inset-0 flex items-center justify-center">
+                       <div className="h-6 w-6 rounded-full bg-primary/20 blur-sm animate-pulse"></div>
+                   </div>
+                </div>
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-primary/60 animate-pulse">Carregando Diários...</p>
             </div>
         )
     }
 
     if (error) {
         return (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-600 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
-                <p className="font-semibold">Erro ao carregar notas</p>
-                <p className="text-sm">{error}</p>
-                <Button variant="outline" size="sm" onClick={loadData} className="mt-4">
+            <div className="rounded-2xl border-2 border-red-100 bg-red-50/50 p-8 text-red-600 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400 text-center">
+                <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <X className="h-6 w-6" />
+                </div>
+                <p className="font-bold text-xl mb-2">Erro ao carregar notas</p>
+                <p className="text-sm opacity-80 mb-6 max-w-md mx-auto">{error}</p>
+                <Button variant="outline" onClick={loadData} className="border-red-200 hover:bg-red-100 transition-all font-bold">
                     Tentar Novamente
                 </Button>
             </div>
@@ -247,34 +397,41 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
 
     return (
         <ErrorBoundary>
-            <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                     <div>
-                        <h2 className="text-2xl flex items-center gap-2 font-bold tracking-tight text-foreground">
-                            <GraduationCap className="h-6 w-6 text-primary" />
+                        <h2 className="text-3xl flex items-center gap-3 font-black tracking-tighter text-foreground">
+                            <GraduationCap className="h-8 w-8 text-primary p-1.5 bg-primary/10 rounded-xl" />
                             Gestão de Notas e Diários
                         </h2>
-                        <p className="text-muted-foreground mt-1">Gere as notas de alunos matriculados e alunos de prova pública.</p>
+                        <p className="text-muted-foreground mt-1 text-sm font-medium">Controle acadêmico de alunos matriculados e inscrições de prova pública.</p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-3 w-full lg:w-auto">
                         {isMaster && (
-                            <Button variant="outline" onClick={() => printGradesReportPDF(grades, "Relatório Geral de Notas", "Cosme de Farias")} className="border-primary text-primary hover:bg-primary/10">
+                            <Button variant="outline" onClick={() => printGradesReportPDF(grades, "Relatório Geral de Notas", "Cosme de Farias")} className="flex-1 lg:flex-none border-slate-200 text-slate-600 hover:bg-slate-50 font-bold h-11">
                                 <Download className="h-4 w-4 mr-2" />
                                 Exportar PDF
                             </Button>
                         )}
-                        <Button 
-                            variant="secondary" 
-                            onClick={handleSync} 
-                            disabled={isSyncing || !selectedDiscipline}
-                            className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200"
-                        >
-                            {isSyncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                            Sincronizar Diário
-                        </Button>
-                        <Button variant="outline" onClick={() => setBulkReleaseConfirm(true)} className="border-green-600 text-green-600 hover:bg-green-50">
+                        <div className="relative group flex-1 lg:flex-none">
+                            <Button 
+                                variant="secondary" 
+                                onClick={handleSync} 
+                                disabled={isSyncing || !selectedDiscipline}
+                                className="w-full bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20 font-black h-11 px-6 uppercase text-[10px] tracking-widest disabled:opacity-30 disabled:bg-slate-300 disabled:text-slate-500 transition-all"
+                            >
+                                {isSyncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                                Sincronizar Diário
+                            </Button>
+                            {!selectedDiscipline && !isSyncing && (
+                                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-xl font-bold">
+                                    Selecione uma disciplina para sincronizar
+                                </div>
+                            )}
+                        </div>
+                        <Button variant="outline" onClick={() => setBulkReleaseConfirm(true)} className="flex-1 lg:flex-none border-green-600 text-green-600 hover:bg-green-500 hover:text-white font-black h-11 px-6 uppercase text-[10px] tracking-widest transition-all">
                             <CheckCheck className="h-4 w-4 mr-2" />
-                            Liberar para Todos
+                            Liberar Tudo
                         </Button>
                         <Button onClick={() => {
                             setFormData({
@@ -283,19 +440,20 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                             })
                             setIsCreating(true)
                             setIsEditing(null)
-                        }}>
-                            <Plus className="h-4 w-4 mr-2" />
+                            window.scrollTo({ top: 0, behavior: 'smooth' })
+                        }} className="flex-1 lg:flex-none bg-primary text-white hover:bg-primary/90 shadow-xl shadow-primary/20 font-black h-11 px-8 uppercase text-[10px] tracking-widest transition-all hover:scale-105 active:scale-95 group">
+                            <Plus className="h-5 w-5 mr-1 group-hover:rotate-90 transition-transform" />
                             Lançar Notas
                         </Button>
                     </div>
                 </div>
 
-                {/* Filtro por Disciplina e Ações Rápidas */}
-                <div className="bg-muted/30 p-4 rounded-xl border border-border flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                        <Label className="whitespace-nowrap font-bold">Filtrar por Disciplina:</Label>
+                {/* Filtro e Pesquisa Otimizados */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center bg-white p-5 rounded-3xl border border-slate-100 shadow-sm relative z-20">
+                    <div className="md:col-span-4 flex flex-col gap-1.5">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Disciplina Base</Label>
                         <select
-                            className="flex h-10 w-full md:min-w-[300px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            className="flex h-12 w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
                             value={selectedDiscipline}
                             onChange={(e) => setSelectedDiscipline(e.target.value)}
                         >
@@ -303,65 +461,108 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                             {disciplines.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                     </div>
-                    
-                    {selectedDiscipline && (
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => handlePublishFiltered(true)} className="text-green-600 border-green-200 hover:bg-green-50">
-                                <Eye className="h-4 w-4 mr-2" /> Liberar Disciplina
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => handlePublishFiltered(false)} className="text-amber-600 border-amber-200 hover:bg-amber-50">
-                                <EyeOff className="h-4 w-4 mr-2" /> Ocultar Disciplina
-                            </Button>
+
+                    <div className="md:col-span-2 flex flex-col gap-1.5">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Situação</Label>
+                        <select
+                            className="flex h-12 w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as any)}
+                        >
+                            <option value="all">Todas</option>
+                            <option value="released">Liberadas</option>
+                            <option value="hidden">Ocultas</option>
+                        </select>
+                    </div>
+
+                    <div className="md:col-span-6 flex flex-col gap-1.5">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Localizar Aluno</Label>
+                        <div className="relative group">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                            <Input 
+                                placeholder="Nome, matrícula ou CPF..." 
+                                value={searchName}
+                                onChange={(e) => setSearchName(e.target.value)}
+                                className="pl-11 h-12 bg-slate-50 border-slate-200 rounded-2xl focus:ring-primary/20 transition-all font-medium"
+                            />
                         </div>
-                    )}
+                    </div>
+                    
+                    <div className="md:col-span-3 flex items-end justify-end h-full py-0.5">
+                        {selectedDiscipline && (
+                            <div className="flex gap-2 w-full sm:w-auto">
+                                <Button variant="ghost" size="sm" onClick={() => handlePublishFiltered(true)} className="flex-1 text-green-600 font-bold hover:bg-green-50 rounded-xl h-11 border border-transparent hover:border-green-100">
+                                    <Eye className="h-4 w-4 mr-2" /> Liberar
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => handlePublishFiltered(false)} className="flex-1 text-amber-600 font-bold hover:bg-amber-50 rounded-xl h-11 border border-transparent hover:border-amber-100">
+                                    <EyeOff className="h-4 w-4 mr-2" /> Ocultar
+                                </Button>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Lançamento / Edição de Notas */}
+                {/* Formulário (Lançamento / Edição) */}
                 {(isCreating || isEditing) && (
-                    <div className="bg-card border border-border shadow-sm rounded-xl p-6 mb-8">
-                        <h3 className="text-lg font-semibold mb-4 border-b border-border pb-3 flex items-center gap-2">
-                            <Calculator className="h-5 w-5 text-primary" />
-                            {isEditing ? "Editar Notas" : "Novo Lançamento"}
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Nome do Aluno</Label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        value={formData.studentName || ""}
-                                        onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
-                                        placeholder="Nome"
-                                    />
+                    <div className="bg-white border border-slate-100 shadow-2xl rounded-[2rem] p-8 mb-8 animate-in zoom-in-95 duration-300">
+                        <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
+                            <h3 className="text-xl font-black flex items-center gap-3 tracking-tight">
+                                <Calculator className="h-6 w-6 text-primary" />
+                                {isEditing ? "Editar Registro de Notas" : "Lançar Novo Boletim Individual"}
+                            </h3>
+                            <Button variant="ghost" size="icon" onClick={() => { setIsCreating(false); setIsEditing(null); }} className="rounded-full hover:bg-red-50 hover:text-red-500">
+                                <X className="h-6 w-6" />
+                            </Button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            <div className="space-y-2 lg:col-span-2">
+                                <Label className="font-bold text-slate-700">Aluno</Label>
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <div className="flex-1 group relative">
+                                        <Input
+                                            value={formData.studentName || ""}
+                                            onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
+                                            placeholder="Nome completo..."
+                                            className="h-12 bg-slate-50 border-slate-200 rounded-xl focus:ring-primary/20 pl-10"
+                                        />
+                                        <Plus className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                    </div>
                                     {!formData.isPublic && (
                                         <select
-                                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                            className="h-12 w-full sm:w-[300px] rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold shadow-sm focus:ring-2 focus:ring-primary/20"
+                                            value={students.find(s => (s.cpf === formData.studentIdentifier || s.enrollment_number === formData.studentIdentifier))?.id || ""}
                                             onChange={(e) => {
                                                 const std = students.find(s => s.id === e.target.value)
                                                 if (std) {
                                                     setFormData({ ...formData, studentName: std.name, studentIdentifier: std.cpf || std.enrollment_number || "" })
+                                                } else {
+                                                    // Se selecionar "Localizar...", não limpa necessariamente o que o user digitou à esquerda
+                                                    // mas o ideal é deixar o user escolher.
                                                 }
                                             }}
                                         >
-                                            <option value="">Buscar Aluno Matriculado...</option>
-                                            {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                            <option value="">Selecione um aluno da lista...</option>
+                                            {students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.enrollment_number})</option>)}
                                         </select>
                                     )}
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Identificador (Email, CPF ou Matrícula)</Label>
+                                <Label className="font-bold text-slate-700">Identificador Único</Label>
                                 <Input
                                     value={formData.studentIdentifier || ""}
                                     onChange={(e) => setFormData({ ...formData, studentIdentifier: e.target.value })}
-                                    placeholder="Para alunos públicos informe um email ou doc único"
+                                    placeholder="CPF, Matrícula ou Email"
+                                    className="h-12 bg-slate-50 border-slate-200 rounded-xl"
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Disciplina / Referência</Label>
+                                <Label className="font-bold text-slate-700">Disciplina / Módulo</Label>
                                 <select
-                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold transition-all focus:ring-2 focus:ring-primary/20"
                                     value={formData.disciplineId || ""}
                                     onChange={(e) => setFormData({ ...formData, disciplineId: e.target.value })}
                                 >
@@ -370,10 +571,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                 </select>
                             </div>
 
-                            <div className="space-y-2 flex items-center justify-between border rounded-md p-3">
+                            <div className="space-y-2 flex items-center justify-between border border-primary/10 bg-primary/5 rounded-2xl p-4">
                                 <div>
-                                    <Label>Prova Pública?</Label>
-                                    <p className="text-xs text-muted-foreground">Marque sim se o aluno não estiver matriculado formalmente.</p>
+                                    <Label className="font-black text-primary uppercase text-[10px] tracking-widest">Prova Pública?</Label>
+                                    <p className="text-[10px] text-primary/60 max-w-[150px] leading-tight mt-1">Marque se o aluno não for matriculado regular.</p>
                                 </div>
                                 <Switch
                                     checked={formData.isPublic}
@@ -381,40 +582,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                 />
                             </div>
 
-                            <div className="space-y-2">
-                                <Label>Nota de Prova (Automático)</Label>
-                                <Input type="number" step="0.1" value={formData.examGrade} disabled title="Nota gerada automaticamente pela Prova Online" />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Atividade no Livro</Label>
-                                <Input type="number" step="0.1" value={formData.worksGrade} onChange={(e) => setFormData({ ...formData, worksGrade: e.target.value })} />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Nota de Seminários / Apresentações</Label>
-                                <Input type="number" step="0.1" value={formData.seminarGrade} onChange={(e) => setFormData({ ...formData, seminarGrade: e.target.value })} />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Interação (Bônus de Participação)</Label>
-                                <Input type="number" step="0.1" value={formData.participationBonus} onChange={(e) => setFormData({ ...formData, participationBonus: e.target.value })} />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Nota de Presença (Automático)</Label>
-                                <Input type="number" step="0.1" value={formData.attendanceScore} disabled title="Soma calculada pelo Diário de Classe" />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Divisor para Cálculo de Média</Label>
-                                <Input type="number" step="1" min="1" value={formData.customDivisor} onChange={(e) => setFormData({ ...formData, customDivisor: e.target.value })} />
-                            </div>
-
-                            <div className="space-y-2 flex items-center justify-between border rounded-md p-3 bg-blue-50/30 border-blue-100">
+                            <div className="space-y-2 flex items-center justify-between border border-blue-100 bg-blue-50/30 rounded-2xl p-4">
                                 <div>
-                                    <Label className="text-blue-700">Liberar para o Aluno?</Label>
-                                    <p className="text-xs text-blue-600/70">Se marcado, o aluno poderá ver esta nota em seu boletim.</p>
+                                    <Label className="font-black text-blue-700 uppercase text-[10px] tracking-widest">Liberar Boletim?</Label>
+                                    <p className="text-[10px] text-blue-600/60 max-w-[150px] leading-tight mt-1">Se ativo, o aluno vê o resultado no portal.</p>
                                 </div>
                                 <Switch
                                     checked={formData.isReleased}
@@ -422,94 +593,78 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                 />
                             </div>
 
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 lg:col-span-3 pt-4">
+                               <div className="space-y-2">
+                                   <Label className="text-xs font-bold text-blue-500 uppercase tracking-widest">📝 Prova Online</Label>
+                                   <Input type="number" step="0.1" value={formData.examGrade} disabled className="h-11 bg-blue-50 border-blue-100 rounded-lg font-mono font-bold text-blue-700" />
+                                   <p className="text-[10px] text-muted-foreground">Sincronizada automaticamente das avaliações.</p>
+                               </div>
+                               <div className="space-y-2">
+                                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">📚 Leitura do Livro (máx 3)</Label>
+                                   <Input type="number" step="0.1" min="0" max="3" value={formData.worksGrade} onChange={(e) => setFormData({ ...formData, worksGrade: e.target.value })} className="h-11 bg-white border-slate-200 rounded-lg font-mono font-bold" />
+                               </div>
+                               <div className="space-y-2">
+                                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">❓ Quest. Livro (máx 1)</Label>
+                                   <Input type="number" step="0.1" min="0" max="1" value={formData.seminarGrade} onChange={(e) => setFormData({ ...formData, seminarGrade: e.target.value })} className="h-11 bg-white border-slate-200 rounded-lg font-mono font-bold" />
+                               </div>
+                               <div className="space-y-2">
+                                   <Label className="text-xs font-bold text-purple-500 uppercase tracking-widest">🎬 Vídeo Aula (máx 1)</Label>
+                                   <Input type="number" step="0.1" min="0" max="1" value={formData.participationBonus} onChange={(e) => setFormData({ ...formData, participationBonus: e.target.value })} className="h-11 bg-white border-slate-200 rounded-lg font-mono font-bold" />
+                               </div>
+                               <div className="space-y-2">
+                                   <Label className="text-xs font-bold text-green-500 uppercase tracking-widest">📊 Frequência (auto)</Label>
+                                   <Input type="number" step="0.1" value={formData.attendanceScore} disabled className="h-11 bg-green-50 border-green-100 rounded-lg font-mono font-bold text-green-700" />
+                                   <p className="text-[10px] text-muted-foreground">Calculada das chamadas (Presencial + Online).</p>
+                               </div>
+                               <div className="space-y-2">
+                                   <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">÷ Divisor</Label>
+                                   <Input type="number" value={2} disabled className="h-11 bg-slate-100 border-none rounded-lg font-mono font-bold text-slate-400" />
+                                   <p className="text-[10px] text-muted-foreground">Fixo: (Atividades + Prova) / 2</p>
+                               </div>
+                            </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 mt-6">
-                            <Button variant="outline" onClick={() => { setIsCreating(false); setIsEditing(null); }}>
-                                <X className="h-4 w-4 mr-2" /> Cancelar
+                        <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-slate-100">
+                            <Button variant="ghost" onClick={() => { setIsCreating(false); setIsEditing(null); }} className="px-8 font-bold uppercase text-xs tracking-widest text-slate-400 hover:text-slate-600">
+                                <X className="h-4 w-4 mr-2" /> Descartar
                             </Button>
-                            <Button onClick={handleCreateOrUpdate}>
-                                <Save className="h-4 w-4 mr-2" /> Salvar Notas
+                            <Button onClick={handleCreateOrUpdate} className="px-12 h-12 bg-primary hover:bg-primary/90 text-white shadow-xl shadow-primary/20 font-black uppercase text-xs tracking-widest transition-all hover:scale-105 active:scale-95">
+                                <Save className="h-5 w-5 mr-3" /> Confirmar Lançamento
                             </Button>
                         </div>
                     </div>
                 )}
 
-                {/* Listagem de Notas */}
-                <div className="space-y-8">
+                {/* Listagem de Notas com Virtualização de Lógica (Memo) */}
+                <div className="space-y-10 pb-20">
                     {['matriculados', 'publicos'].map((tipo) => {
-                        const list = grades
-                            .filter(g => tipo === 'publicos' ? g.isPublic : !g.isPublic)
-                            .filter(g => !selectedDiscipline || g.disciplineId === selectedDiscipline)
+                        const list = tipo === 'matriculados' ? listMatriculados : listPublicos
                         if (list.length === 0) return null
 
                         return (
-                            <div key={tipo} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-                                <div className="bg-muted/50 px-6 py-4 border-b border-border">
-                                    <h3 className="font-semibold text-foreground">
-                                        {tipo === 'publicos' ? 'Alunos de Prova Pública' : 'Alunos Matriculados'} ({list.length})
+                            <div key={tipo} className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 transition-all">
+                                <div className="bg-slate-50/50 px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+                                    <h3 className="font-black text-slate-800 flex items-center gap-3">
+                                        <div className={`w-2 h-6 rounded-full ${tipo === 'publicos' ? 'bg-amber-400' : 'bg-primary'}`}></div>
+                                        {tipo === 'publicos' ? 'Alunos de Prova Pública' : 'Alunos Matriculados'} 
+                                        <span className="bg-slate-200 text-slate-600 px-3 py-1 rounded-full text-xs font-bold tabular-nums">{list.length}</span>
                                     </h3>
                                 </div>
-                                <div className="divide-y divide-border">
+                                <div className="divide-y divide-slate-100">
                                     {list.map((grade) => (
-                                        <div key={grade.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <h4 className="font-bold text-foreground text-lg">{grade.studentName}</h4>
-                                                    {grade.disciplineId && (
-                                                        <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border border-primary/20">
-                                                            {disciplines.find(d => d.id === grade.disciplineId)?.name}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className="text-sm text-muted-foreground font-mono mb-2">ID: {grade.studentIdentifier}</p>
-                                                <div className="flex flex-wrap gap-2 mt-2">
-                                                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-secondary text-secondary-foreground border border-border">
-                                                        Prova: {grade.examGrade}
-                                                    </span>
-                                                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-secondary text-secondary-foreground border border-border">
-                                                        Trabalhos: {grade.worksGrade}
-                                                    </span>
-                                                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-secondary text-secondary-foreground border border-border">
-                                                        Seminário: {grade.seminarGrade}
-                                                    </span>
-                                                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-secondary text-secondary-foreground border border-border">
-                                                        Partic.: {grade.participationBonus}
-                                                    </span>
-                                                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-secondary text-secondary-foreground border border-border">
-                                                        Presença: {grade.attendanceScore}
-                                                    </span>
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold border ${grade.isReleased ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                                                        {grade.isReleased ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                                                        {grade.isReleased ? 'Liberada' : 'Oculta'}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-6">
-                                                <div className="text-center bg-muted px-4 py-2 rounded-lg border border-border min-w-[100px]">
-                                                    <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Média (/{grade.customDivisor})</div>
-                                                    <div className={`text-2xl font-black ${parseFloat(calculateAverage(grade)) >= 7 ? 'text-green-600' : 'text-amber-600'}`}>
-                                                        {calculateAverage(grade)}
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex flex-col gap-2">
-                                                    <Button variant="outline" size="sm" onClick={() => {
-                                                        setFormData(grade)
-                                                        setIsEditing(grade.id)
-                                                        window.scrollTo({ top: 0, behavior: 'smooth' })
-                                                    }}>
-                                                        <Pencil className="h-4 w-4 mr-2" /> Editar
-                                                    </Button>
-                                                    {isMaster && (
-                                                        <Button variant="destructive" size="sm" onClick={() => setDeleteConfirm(grade.id)}>
-                                                            <Trash2 className="h-4 w-4 mr-2" /> Excluir
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <GradeCard 
+                                            key={grade.id} 
+                                            grade={grade} 
+                                            disciplines={disciplines}
+                                            isMaster={isMaster}
+                                            calculateAverage={calculateAverage}
+                                            onEdit={(g) => {
+                                                setFormData(g)
+                                                setIsEditing(g.id)
+                                                window.scrollTo({ top: 0, behavior: 'smooth' })
+                                            }}
+                                            onDelete={(id) => setDeleteConfirm(id)}
+                                        />
                                     ))}
                                 </div>
                             </div>
@@ -517,46 +672,53 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                     })}
 
                     {grades.length === 0 && !isCreating && (
-                        <div className="bg-card border border-border border-dashed rounded-xl p-12 text-center text-muted-foreground">
-                            <Calculator className="h-12 w-12 mx-auto opacity-20 mb-4" />
-                            <h3 className="text-lg font-semibold text-foreground mb-2">Nenhuma nota lançada.</h3>
-                            <p className="text-sm">Clique em "Lançar Notas" para iniciar.</p>
+                        <div className="bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-[3rem] p-24 text-center">
+                            <div className="bg-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-slate-100">
+                                <Calculator className="h-8 w-8 text-slate-300" />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-800 mb-2">Sem registros para exibir</h3>
+                            <p className="text-sm text-slate-400 max-w-sm mx-auto">Não encontramos nenhuma nota lançada com os filtros atuais. Selecione outra disciplina ou inicie um novo lançamento.</p>
+                            <Button variant="link" className="mt-4 text-primary font-bold" onClick={() => { setSelectedDiscipline(""); setSearchName(""); }}>Limpar Filtros</Button>
                         </div>
                     )}
                 </div>
 
+                {/* Diálogos de Confirmação */}
                 <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-                    <AlertDialogContent>
+                    <AlertDialogContent className="rounded-3xl border-none shadow-2xl p-8">
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir Notas</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Tem certeza que deseja excluir o boletim deste aluno permanentemente?
+                            <AlertDialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
+                                <Trash2 className="h-7 w-7 text-red-500" />
+                                Excluir Registro Permanente?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-slate-500 font-medium py-4 text-base">
+                                Você está prestes a remover o boletim deste aluno. Esta ação é irreversível e afetará o acesso do aluno no portal.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteConfirm && handleDelete(deleteConfirm)} className="bg-red-600 hover:bg-red-700">
-                                Confirmar Exclusão
+                        <AlertDialogFooter className="gap-3">
+                            <AlertDialogCancel className="rounded-xl border-slate-200 font-bold h-12 uppercase text-xs tracking-widest">Não, cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteConfirm && handleDelete(deleteConfirm)} className="bg-red-500 hover:bg-red-600 rounded-xl h-12 font-black uppercase text-xs tracking-widest shadow-lg shadow-red-500/20 px-8">
+                                Sim, excluir agora
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
 
                 <AlertDialog open={bulkReleaseConfirm} onOpenChange={setBulkReleaseConfirm}>
-                    <AlertDialogContent>
+                    <AlertDialogContent className="rounded-3xl border-none shadow-2xl p-8">
                         <AlertDialogHeader>
-                            <AlertDialogTitle className="flex items-center gap-2">
-                                <CheckCheck className="h-5 w-5 text-green-600" />
-                                Liberar Todas as Notas?
+                            <AlertDialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
+                                <CheckCheck className="h-7 w-7 text-green-600" />
+                                Liberar Visibilidade de Notas?
                             </AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Esta ação tornará **todas as notas lançadas** (matriculados e públicos) visíveis nos boletins dos alunos imediatamente.
+                            <AlertDialogDescription className="text-slate-500 font-medium py-4 text-base">
+                                Esta ação tornará **todas as notas lançadas** (matriculados e públicos) visíveis imediatamente para os alunos em seus respectivos boletins.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleBulkRelease} className="bg-green-600 hover:bg-green-700">
-                                Sim, Liberar Tudo
+                        <AlertDialogFooter className="gap-3">
+                            <AlertDialogCancel className="rounded-xl border-slate-200 font-bold h-12 uppercase text-xs tracking-widest">Voltar</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleBulkRelease} className="bg-green-600 hover:bg-green-700 rounded-xl h-12 font-black uppercase text-xs tracking-widest shadow-lg shadow-green-600/20 px-8">
+                                Confirmar Liberação
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>

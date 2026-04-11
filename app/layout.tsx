@@ -39,6 +39,7 @@ export const metadata: Metadata = {
 }
 
 import { ErrorBoundary } from "@/components/error-boundary"
+import { CursorReset } from "@/components/cursor-reset"
 
 export default function RootLayout({
   children,
@@ -48,6 +49,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${inter.variable} ${merriweather.variable}`}>
       <body className="font-sans antialiased bg-background text-foreground" suppressHydrationWarning>
+        <CursorReset />
         <ErrorBoundary>
           {children}
         </ErrorBoundary>

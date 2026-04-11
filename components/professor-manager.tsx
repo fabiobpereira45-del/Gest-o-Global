@@ -284,13 +284,28 @@ export function ProfessorManager() {
               if (win) {
                 win.document.write("<html><head><title>Carregando...</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666;}</style></head><body><div>Gerando PDF, aguarde...</div></body></html>")
               }
+              const log = (msg: string) => {
+                if (win && !win.closed) {
+                  win.document.body.innerHTML += `<div style="font-size:12px; color:#888; margin-top:5px;">${msg}</div>`
+                }
+              }
+              
               try {
-                const [p, a, d] = await Promise.all([getProfessorAccounts(), getAllProfessorDisciplines(), getDisciplines()])
-                printProfessorsPDF(p, a, d, win)
-              } catch (e) {
+                log("Conectando ao banco de dados...")
+                const p = await getProfessorAccounts()
+                log("Professores carregados. Buscando disciplinas...")
+                const a = await getAllProfessorDisciplines()
+                log("Vínculos carregados. Buscando lista mestra...")
+                const d = await getDisciplines()
+                log("Processando template PDF...")
+                printProfessorsPDF(p, a, d, undefined, win)
+              } catch (e: any) {
                 console.error("Erro ao gerar PDF:", e)
-                if (win) win.close()
-                alert("Erro ao gerar PDF. Verifique o console.")
+                if (win && !win.closed) {
+                  win.document.body.innerHTML = `<div style="color:red; font-weight:bold;">ERRO: ${e.message}</div><p>Verifique se as tabelas existem no Supabase.</p>`
+                } else {
+                  alert(`Erro ao gerar PDF: ${e.message}`)
+                }
               }
             }} className="border-primary text-primary hover:bg-primary/10">
               <Download className="h-4 w-4 mr-1.5" /> Exportar PDF

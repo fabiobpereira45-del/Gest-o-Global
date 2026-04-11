@@ -59,8 +59,8 @@ export function StudentAuth({ onSuccess }: Props) {
                 onSuccess()
             }
         } catch (err: any) {
-            console.error('[StudentAuth] Erro crítico no login/registro:', err)
-            setError(err.message || "Erro ao entrar no sistema.")
+            console.error('[StudentAuth] Erro no login/registro:', err)
+            setError(err.message || "Credenciais inválidas. Verifique seu CPF e senha.")
         } finally {
             setLoading(false)
         }

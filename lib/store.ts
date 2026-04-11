@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/client"
 import { triggerN8nWebhook } from "@/lib/n8n"
 export { triggerN8nWebhook }
 
-// â€”â€”â€” Types â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// ——— Types ——————————————————————————————————————————————————————————————————————
 export type QuestionType = "multiple-choice" | "true-false" | "discursive" | "incorrect-alternative" | "fill-in-the-blank" | "matching"
 export interface Choice { id: string; text: string }
 export interface MatchingPair { id: string; left: string; right: string }
@@ -109,7 +109,7 @@ export function uid(): string {
   );
 }
 
-// â€”â€”â€” Auth / Session â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// ——— Auth / Session ————————————————————————————————————————————————————————————
 
 export function getProfessorSession(): ProfessorSession | null {
   const s = readLocal<ProfessorSession | null>(KEYS.PROFESSOR_SESSION, null)
@@ -122,7 +122,7 @@ export function saveProfessorSession(professorId: string, role: "master" | "prof
     const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
     writeLocal<ProfessorSession>(KEYS.PROFESSOR_SESSION, { loggedIn: true, professorId, role, avatar_url, expiresAt })
   } catch (err) {
-    console.error("Erro ao salvar sessÃ£o do professor:", err)
+    console.error("Erro ao salvar sessão do professor:", err)
   }
 }
 export function clearProfessorSession(): void {
@@ -134,26 +134,59 @@ export async function registerStudentAuth(name: string, cpf: string, password: s
   const cleanCpf = cpf.replace(/\D/g, '')
   const email = `${cleanCpf}@student.ibad.com`
 
+  // 1. Verificar se o aluno já existe na tabela de estudantes (mas sem Auth)
+  const { data: existingStudent } = await supabase
+    .from('students')
+    .select('id, auth_user_id')
+    .eq('cpf', cleanCpf)
+    .maybeSingle()
+
+  if (existingStudent?.auth_user_id) {
+    throw new Error("Este CPF já possui uma matrícula ativa e acesso ao Portal. Por favor, faça login.")
+  }
+
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { name, type: 'student' } }
-  })
-  if (authError) throw new Error(authError.message)
-  if (!authData.user) throw new Error("Erro ao criar usuÃ¡rio na base de dados.")
-
-  const matricula = `2026${Math.floor(1000 + Math.random() * 9000)}`
-
-  const { error: dbError } = await supabase.from('students').insert({
-    auth_user_id: authData.user.id,
-    name,
-    cpf: cleanCpf,
-    email,
-    enrollment_number: matricula
+    options: { data: { name: name.toUpperCase(), type: 'student' } }
   })
 
-  if (dbError) throw new Error(dbError.message)
-  return { matricula, name }
+  if (authError) {
+    if (authError.message.includes("already registered")) {
+      throw new Error("Este e-mail/CPF já está registrado. Tente recuperar sua senha.")
+    }
+    throw new Error(authError.message)
+  }
+  if (!authData.user) throw new Error("Erro ao criar usuário na base de dados.")
+
+  let matricula = ""
+
+  if (existingStudent) {
+    // 2. Se o aluno já existia (vínculo manual ou importação), apenas vincula o auth_user_id
+    await supabase.from('students').update({
+      auth_user_id: authData.user.id,
+      name: name.toUpperCase(),
+      email // Garante que o e-mail bate com o Auth
+    }).eq('id', existingStudent.id)
+    
+    // Recupera a matrícula para informar ao usuário
+    const { data: fullProfile } = await supabase.from('students').select('enrollment_number').eq('id', existingStudent.id).single()
+    matricula = fullProfile?.enrollment_number || "Matrícula Vinculada"
+  } else {
+    // 3. Caso contrário, cria um novo registro completo
+    matricula = `2026${Math.floor(1000 + Math.random() * 9000)}`
+    const { error: dbError } = await supabase.from('students').insert({
+      auth_user_id: authData.user.id,
+      name: name.toUpperCase(),
+      cpf: cleanCpf,
+      email,
+      enrollment_number: matricula,
+      status: 'active'
+    })
+    if (dbError) throw new Error(dbError.message)
+  }
+
+  return { matricula, name: name.toUpperCase() }
 }
 
 export async function registerStudentByAdmin(data: any): Promise<void> {
@@ -163,7 +196,7 @@ export async function registerStudentByAdmin(data: any): Promise<void> {
     if (cls) {
       const { count } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('class_id', data.classId)
       if (count !== null && count >= cls.max_students) {
-        throw new Error("Esta turma jÃ¡ estÃ¡ com as vagas esgotadas.")
+        throw new Error("Esta turma já está com as vagas esgotadas.")
       }
     }
   }
@@ -178,7 +211,7 @@ export async function registerStudentByAdmin(data: any): Promise<void> {
     options: { data: { name: nameUC, type: 'student' } }
   })
   if (authError) throw new Error(authError.message)
-  if (!authData.user) throw new Error("Erro ao criar usuÃ¡rio na base de dados (Auth).")
+  if (!authData.user) throw new Error("Erro ao criar usuário na base de dados (Auth).")
 
   const matricula = `2026${Math.floor(1000 + Math.random() * 9000)}`
 
@@ -241,6 +274,17 @@ export async function loginStudentAuth(identifier: string, password: string) {
   let { data, error } = await supabase.auth.signInWithPassword({ email: finalEmail, password: cleanPass })
   
   if (error) {
+    // Diagnóstico inteligente: verifica se o estudante existe no Banco mas não tem Auth
+    const { data: dbStudent } = await supabase
+      .from('students')
+      .select('id, name, auth_user_id')
+      .eq('email', finalEmail)
+      .maybeSingle()
+
+    if (dbStudent && !dbStudent.auth_user_id) {
+        throw new Error(`Olá ${dbStudent.name.split(' ')[0]}, sua matrícula foi encontrada, mas o acesso ao Portal ainda não foi ativado. Por favor, clique em 'Realizar Matrícula' abaixo para criar sua senha.`)
+    }
+
     // FALLBACK: Se falhou e a senha parece um CPF pontuado (14 chars), tenta limpar a senha e tentar de novo
     const digitsOnlyPass = cleanPass.replace(/\D/g, '')
     if (digitsOnlyPass !== cleanPass && digitsOnlyPass.length === 11) {
@@ -322,7 +366,7 @@ export async function hasStudentSubmitted(email: string, assessmentId: string): 
 export function getDraftAnswers(): StudentAnswer[] { return readLocal<StudentAnswer[]>(KEYS.DRAFT_ANSWERS, []) }
 export function saveDraftAnswers(answers: StudentAnswer[]): void { writeLocal(KEYS.DRAFT_ANSWERS, answers) }
 
-// â€”â€”â€” DB Mappers â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// ——— DB Mappers —————————————————————————————————————————————————————————————————
 function mapSemester(row: any): Semester { return { id: row.id, name: row.name, order: row.order, shift: row.shift || undefined, is_completed: row.is_completed || false, createdAt: row.created_at } }
 function mapStudyMaterial(row: any): StudyMaterial { return { id: row.id, disciplineId: row.discipline_id, title: row.title, description: row.description || undefined, fileUrl: row.file_url, createdAt: row.created_at } }
 function mapDiscipline(row: any): Discipline { 
@@ -392,13 +436,13 @@ function mapStudentTuition(row: any): StudentTuition {
   return { id: row.id, studentId: row.student_id, disciplineId: row.discipline_id, amount: Number(row.amount), dueDate: row.due_date, status: row.status, paidAt: row.paid_at, transactionId: row.transaction_id, createdAt: row.created_at }
 }
 
-// â€”â€”â€” Core Functions â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// ——— Core Functions —————————————————————————————————————————————————————————————
 
 export async function getGradingSettings(): Promise<GradingSettings> {
   const supabase = createClient()
   const { data } = await supabase.from('grading_settings').select('*').limit(1).maybeSingle()
   if (data) return mapGradingSettings(data)
-  return { id: 'default', pointsPerPresence: 10, onlinePresencePoints: 10, interactionPoints: 10, bookActivityPoints: 10, passingAverage: 70, totalDivisor: 4, updatedAt: new Date().toISOString() }
+  return { id: 'default', pointsPerPresence: 3, onlinePresencePoints: 2, interactionPoints: 1, bookActivityPoints: 3, passingAverage: 7, totalDivisor: 2, updatedAt: new Date().toISOString() }
 }
 
 export async function updateGradingSettings(settings: Omit<GradingSettings, "id" | "updatedAt">): Promise<void> {
@@ -562,9 +606,11 @@ export async function deleteStudyMaterial(id: string): Promise<void> {
   await supabase.from('study_materials').delete().eq('id', id)
 }
 
-export async function getQuestions(): Promise<Question[]> {
+export async function getQuestions(limit?: number): Promise<Question[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('questions').select('*')
+  let query = supabase.from('questions').select('*')
+  if (limit) query = query.limit(limit)
+  const { data } = await query
   return (data || []).map(mapQuestion)
 }
 
@@ -589,7 +635,7 @@ export async function addQuestion(data: Omit<Question, "id" | "createdAt">): Pro
   const q: any = { discipline_id: data.disciplineId, type: data.type, text: data.text, choices: data.choices, correct_answer: data.correctAnswer, points: data.points, created_at: new Date().toISOString() }
   if (data.pairs && data.pairs.length > 0) q.choices = { options: data.choices || [], matchingPairs: data.pairs }
   const { error } = await supabase.from('questions').insert(q)
-  if (error) throw new Error(`Erro ao salvar questÃ£o: ${error.message}`)
+  if (error) throw new Error(`Erro ao salvar questão: ${error.message}`)
   return mapQuestion(q)
 }
 
@@ -662,9 +708,12 @@ export async function deleteAssessment(id: string): Promise<void> {
   await supabase.from('assessments').delete().eq('id', id)
 }
 
-export async function getSubmissions(): Promise<StudentSubmission[]> {
+export async function getSubmissions(limit: number = 500): Promise<StudentSubmission[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('student_submissions').select('*')
+  const { data } = await supabase.from('student_submissions')
+    .select('*')
+    .order('submitted_at', { ascending: false })
+    .limit(limit)
   return (data || []).map(mapSubmission)
 }
 
@@ -716,21 +765,21 @@ export function calculateScore(answers: StudentAnswer[], questions: Question[], 
 export async function getProfessorAccounts(): Promise<ProfessorAccount[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from('professor_accounts').select('*')
-  if (error) throw new Error(error.message)
+  if (error) { console.warn('[getProfessorAccounts] Erro:', error.message); return [] }
   return (data || []).map(mapProfessor)
 }
 
 export async function getProfessorDisciplines(professorId: string): Promise<ProfessorDiscipline[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from('professor_disciplines').select('*').eq('professor_id', professorId)
-  if (error) throw new Error(error.message)
+  if (error) { console.warn('[getProfessorDisciplines] Erro:', error.message); return [] }
   return (data || []).map(mapProfessorDiscipline)
 }
 
 export async function getAllProfessorDisciplines(): Promise<ProfessorDiscipline[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from('professor_disciplines').select('*')
-  if (error) throw new Error(error.message)
+  if (error) { console.warn('[getAllProfessorDisciplines] Erro (tabela pode não existir):', error.message); return [] }
   return (data || []).map(mapProfessorDiscipline)
 }
 
@@ -859,15 +908,55 @@ export async function markChatAsRead(studentId: string, disciplineId: string): P
 
 export async function getAttendances(disciplineId: string): Promise<Attendance[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('attendances').select('*').eq('discipline_id', disciplineId).order('date', { ascending: false })
+  const { data } = await supabase.from('attendance').select('*').eq('discipline_id', disciplineId).order('date', { ascending: false })
+  return (data || []).map(mapAttendance)
+}
+
+export async function getAttendancesByStudent(studentId: string): Promise<Attendance[]> {
+  const supabase = createClient()
+  const { data } = await supabase.from('attendance').select('*').eq('student_id', studentId)
   return (data || []).map(mapAttendance)
 }
 
 export async function saveAttendance(studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial" | "ead" = "presencial"): Promise<void> {
   const supabase = createClient()
-  const { data: existing } = await supabase.from('attendances').select('id').match({ student_id: studentId, discipline_id: disciplineId, date }).maybeSingle()
-  if (existing) await supabase.from('attendances').update({ is_present: isPresent, type }).eq('id', existing.id)
-  else await supabase.from('attendances').insert({ student_id: studentId, discipline_id: disciplineId, date, is_present: isPresent, type, created_at: new Date().toISOString() })
+  
+  // Tenta o Upsert de Alta Performance primeiro (requer constraint UNIQUE)
+  const { error } = await supabase.from('attendance').upsert({
+    student_id: studentId,
+    discipline_id: disciplineId,
+    date,
+    is_present: isPresent,
+    type,
+    created_at: new Date().toISOString()
+  }, { 
+    onConflict: 'student_id,discipline_id,date' 
+  })
+  
+  // Se falhar por falta de constraint (ON CONFLICT error), usa o modo tradicional (Lento mas seguro)
+  if (error && (error.message.includes("ON CONFLICT") || error.code === "PGRST204")) {
+    console.warn("Constraint ausente. Usando modo tradicional de salvamento para presença.")
+    const { data: existing } = await supabase
+      .from('attendance')
+      .select('id')
+      .match({ student_id: studentId, discipline_id: disciplineId, date })
+      .maybeSingle()
+
+    if (existing) {
+      await supabase.from('attendance').update({ is_present: isPresent, type }).eq('id', existing.id)
+    } else {
+      await supabase.from('attendance').insert({ 
+        student_id: studentId, 
+        discipline_id: disciplineId, 
+        date, 
+        is_present: isPresent, 
+        type, 
+        created_at: new Date().toISOString() 
+      })
+    }
+  } else if (error) {
+    throw error
+  }
 }
 
 export async function saveBatchAttendances(data: Array<{studentId: string, disciplineId: string, date: string, isPresent: boolean, type: "presencial"|"ead"}>, onProgress?: (current: number, total: number) => void): Promise<void> {
@@ -883,16 +972,44 @@ export async function saveBatchAttendances(data: Array<{studentId: string, disci
       }
     }
   } catch (e: any) {
-    // If table doesn't exist in cache yet, allow saving (it's definitely not locked yet)
-    console.warn("Finalization check bypassed:", e.message)
     if (e.message?.includes("trancada")) throw e
   }
 
-  let count = 0
-  for (const a of data) {
-    await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
-    count++
-    if (onProgress) onProgress(count, data.length)
+  const supabase = createClient()
+  const records = data.map(a => ({
+    student_id: a.studentId,
+    discipline_id: a.disciplineId,
+    date: a.date,
+    is_present: a.isPresent,
+    type: a.type,
+    created_at: new Date().toISOString()
+  }))
+
+  // Otimização Massiva: Upsert em bloco ÚNICO
+  const { error } = await supabase.from('attendance').upsert(records, {
+    onConflict: 'student_id,discipline_id,date'
+  })
+
+  if (error) {
+    console.warn("Upsert em massa falhou (provavelmente falta a constraint SQL). Usando fallback PARALELO...")
+    
+    // Fallback: Tentativa em LOTES (chunking) para evitar o travamento do cursor e sobrecarga de rede
+    let count = 0
+    const chunkSize = 5
+    for (let i = 0; i < data.length; i += chunkSize) {
+      const chunk = data.slice(i, i + chunkSize)
+      await Promise.all(chunk.map(async (a) => {
+        try {
+          await saveAttendance(a.studentId, a.disciplineId, a.date, a.isPresent, a.type)
+          count++
+          if (onProgress) onProgress(count, data.length)
+        } catch (e) {
+          console.error("Falha ao salvar presença individual no lote:", e)
+        }
+      }))
+    }
+  } else if (onProgress) {
+    onProgress(data.length, data.length)
   }
 }
 
@@ -915,12 +1032,16 @@ export async function getAttendanceFinalization(disciplineId: string, date: stri
   }
 }
 
-export async function getAttendancesByDate(disciplineId: string, date: string): Promise<Attendance[]> {
+export async function getAttendancesByDate(disciplineId: string, date: string, type?: "presencial" | "ead"): Promise<Attendance[]> {
   try {
     const supabase = createClient()
-    const { data, error } = await supabase.from('attendances')
+    let query = supabase.from('attendance')
       .select('*')
       .match({ discipline_id: disciplineId, date })
+    
+    if (type) query = query.eq('type', type)
+    
+    const { data, error } = await query
     
     if (error) {
       console.error("Erro ao buscar presenças por data:", error)
@@ -976,6 +1097,9 @@ export async function finalizeAttendance(disciplineId: string, date: string, fin
         }
         throw new Error(error.message)
     }
+
+    // Auto-sync grades after finalization
+    await syncGradesForDiscipline(disciplineId)
   } catch (err: any) {
     throw err
   }
@@ -992,6 +1116,12 @@ export async function unfinalizeAttendance(disciplineId: string, date: string): 
             return // Ignore if table doesn't exist, as it's definitely not finalized
         }
         throw new Error(error.message)
+    }
+    
+    // Auto-sync grades after unfinalization (to reflect changes if any)
+    const { data: remains } = await supabase.from('attendance_finalizations').select('discipline_id').eq('discipline_id', disciplineId).limit(1)
+    if (remains) {
+        await syncGradesForDiscipline(disciplineId)
     }
   } catch (err) {
     // Ignore errors for unfinalizing
@@ -1041,18 +1171,67 @@ export async function getClassmates(classId: string): Promise<StudentProfile[]> 
   return (data || []).map(mapStudentProfile)
 }
 
-export async function getStudentGrades(): Promise<StudentGrade[]> {
+export async function getStudentGrades(disciplineId?: string, limit: number = 1000): Promise<StudentGrade[]> {
   const supabase = createClient()
-  const { data, error } = await supabase.from('student_grades').select('*').order('created_at', { ascending: false })
+  let query = supabase.from('student_grades').select('*').order('created_at', { ascending: false }).limit(limit)
+  
+  if (disciplineId) {
+    query = query.eq('discipline_id', disciplineId)
+  }
+
+  const { data, error } = await query
   if (error) throw new Error(error.message)
   return (data || []).map(mapStudentGrade)
 }
 
-export async function saveStudentGrade(grade: Omit<StudentGrade, 'id' | 'createdAt'>, id?: string): Promise<void> {
+export async function saveStudentGrade(grade: Omit<StudentGrade, "id" | "createdAt">, id?: string): Promise<void> {
   const supabase = createClient()
-  const dbData = { student_identifier: grade.studentIdentifier, student_name: grade.studentName, discipline_id: grade.disciplineId || null, is_public: grade.isPublic, exam_grade: grade.examGrade, works_grade: grade.worksGrade, seminar_grade: grade.seminarGrade, participation_bonus: grade.participationBonus, attendance_score: grade.attendanceScore, custom_divisor: grade.customDivisor, is_released: grade.isReleased }
-  if (id) await supabase.from('student_grades').update(dbData).eq('id', id)
-  else await supabase.from('student_grades').insert({ ...dbData, created_at: new Date().toISOString() })
+  const cleanIdentifier = String(grade.studentIdentifier || "").trim().toLowerCase()
+  const dbData = { 
+    student_identifier: cleanIdentifier, 
+    student_name: grade.studentName, 
+    discipline_id: grade.disciplineId || null, 
+    is_public: grade.isPublic, 
+    exam_grade: grade.examGrade, 
+    works_grade: grade.worksGrade, 
+    seminar_grade: grade.seminarGrade, 
+    participation_bonus: grade.participationBonus, 
+    attendance_score: grade.attendanceScore, 
+    custom_divisor: grade.customDivisor, 
+    is_released: grade.isReleased 
+  }
+
+  // Tenta upsert primeiro
+  const { error } = await supabase.from('student_grades').upsert({
+    ...(id ? { id } : {}),
+    ...dbData,
+    created_at: new Date().toISOString()
+  }, {
+    onConflict: 'student_identifier,discipline_id'
+  })
+
+  // Fallback se faltar constraint
+  if (error && error.message.includes("ON CONFLICT")) {
+    console.warn("Constraint de notas ausente. Usando modo tradicional.")
+    if (id) {
+        await supabase.from('student_grades').update(dbData).eq('id', id)
+    } else {
+        // Verifica se já existe manualmente para evitar erro
+        const { data: existing } = await supabase
+            .from('student_grades')
+            .select('id')
+            .match({ student_identifier: cleanIdentifier, discipline_id: grade.disciplineId || null })
+            .maybeSingle()
+
+        if (existing) {
+            await supabase.from('student_grades').update(dbData).eq('id', existing.id)
+        } else {
+            await supabase.from('student_grades').insert({ ...dbData, created_at: new Date().toISOString() })
+        }
+    }
+  } else if (error) {
+    throw error
+  }
 }
 
 export async function deleteStudentGrade(id: string): Promise<void> {
@@ -1070,60 +1249,141 @@ export async function releaseAllGrades(isReleased: boolean = true): Promise<void
   if (error) throw new Error(error.message)
 }
 
-/** Sincroniza notas de submissÃµes e frequÃªncia para uma disciplina e aluno. */
+export async function saveBatchGrades(grades: Array<Omit<StudentGrade, "id" | "createdAt"> & { id?: string }>): Promise<void> {
+  const supabase = createClient()
+  if (grades.length === 0) return
+
+  const records = grades.map(g => ({
+    ...(g.id ? { id: g.id } : {}),
+    student_identifier: String(g.studentIdentifier || "").trim().toLowerCase(),
+    student_name: g.studentName,
+    discipline_id: g.disciplineId || null,
+    is_public: (g as any).is_public ?? g.isPublic, // Handle both snake_case and camelCase from UI safely
+    exam_grade: g.examGrade,
+    works_grade: g.worksGrade,
+    seminar_grade: g.seminarGrade,
+    participation_bonus: g.participationBonus,
+    attendance_score: g.attendanceScore,
+    custom_divisor: g.customDivisor,
+    is_released: g.isReleased,
+    created_at: new Date().toISOString()
+  }))
+
+  const { error } = await supabase.from('student_grades').upsert(records, {
+    onConflict: 'student_identifier,discipline_id'
+  })
+
+  if (error && (error.message.includes("ON CONFLICT") || error.code === "PGRST204")) {
+    console.warn("Falta constraint de notas ou erro de upsert. Usando modo de salvamento controlado...")
+    // Processamento em lotes pequenos para não derrubar o navegador/machine
+    const chunkSize = 10
+    for (let i = 0; i < grades.length; i += chunkSize) {
+      const chunk = grades.slice(i, i + chunkSize)
+      await Promise.all(chunk.map(g => saveStudentGrade(g, g.id)))
+    }
+  } else if (error) {
+    throw error
+  }
+}
+
+/** Sincroniza notas de submissões e frequência para uma disciplina e aluno. */
+/** Sincroniza notas de submissões e frequência para uma disciplina. */
 export async function syncGradesForDiscipline(disciplineId: string) {
   const supabase = createClient()
 
-  // 1. Buscar AvaliaÃ§Ãµes da Disciplina
+  // 1. Buscar IDs das Avaliações da Disciplina (mais rápido que buscar tudo)
   const { data: assessments } = await supabase
     .from('assessments')
-    .select('id, points_per_question, question_ids')
+    .select('id')
     .eq('discipline_id', disciplineId)
   
   const assessmentIds = (assessments || []).map((a: any) => a.id) || []
-  if (assessmentIds.length === 0) return { updated: 0, reason: "Nenhuma prova encontrada para esta disciplina." }
-
-  // 2. Buscar SubmissÃµes destas AvaliaÃ§Ãµes
-  const { data: submissions } = await supabase
+  
+  // 2. Buscar Submissões (apenas se houver avaliações)
+  const { data: submissions } = assessmentIds.length > 0 ? await supabase
     .from('student_submissions')
-    .select('student_email, student_name, score, assessment_id')
-    .in('assessment_id', assessmentIds)
+    .select('student_email, student_name, score')
+    .in('assessment_id', assessmentIds) : { data: [] }
 
-  // 3. Buscar FrequÃªncia da Disciplina
+  // 3. Buscar Frequência da Disciplina COM TIPO (otimizado com índice)
   const { data: attendances } = await supabase
-    .from('attendances')
-    .select('student_id, is_present, date')
+    .from('attendance')
+    .select('student_id, is_present, date, type')
     .eq('discipline_id', disciplineId)
 
-  // 4. Calcular Total de Aulas (Datas Ãšnicas)
-  const totalClasses = new Set((attendances || []).map((a: any) => a.date)).size
+  // 4. Buscar Configurações de Pesos
+  const gradingSettings = await getGradingSettings()
+  const maxPresencial = gradingSettings.pointsPerPresence || 3  // Max 3 pts
+  const maxOnline = gradingSettings.onlinePresencePoints || 2    // Max 2 pts
 
-  // 5. Buscar Estudantes para vincular ID -> Email
-  const { data: studentProfiles } = await supabase.from('students').select('id, email, name, cpf')
+  // 5. Calcular Total de Aulas por Tipo
+  const presencialDates = new Set((attendances || []).filter((a: any) => (a.type || 'presencial') === 'presencial').map((a: any) => a.date))
+  const onlineDates = new Set((attendances || []).filter((a: any) => a.type === 'ead').map((a: any) => a.date))
+  const totalPresencial = presencialDates.size
+  const totalOnline = onlineDates.size
 
-  // Agrupar Resultados por Aluno (Email Ã© o identificador comum)
+  // 6. Mapear Estudantes envolvidos (Otimizado: Buscar apenas o estritamente necessário)
+  const involvedStudentIds = Array.from(new Set((attendances || []).map((a: any) => a.student_id)))
+  const involvedStudentEmails = Array.from(new Set((submissions || []).map((s: any) => (s.student_email || "").toLowerCase().trim()))).filter(Boolean)
+
+  let studentProfiles: any[] = []
+  
+  // Busca em lotes de estudantes para evitar estouro de URL (máximo 100 por vez ou OR complexo)
+  if (involvedStudentIds.length > 0 || involvedStudentEmails.length > 0) {
+    const { data } = await supabase.from('students')
+      .select('id, email, name')
+      .or(`id.in.(${involvedStudentIds.join(',')}),email.in.(${involvedStudentEmails.map(e => `"${e}"`).join(',')})`)
+    studentProfiles = data || []
+  }
+
   const syncResults: Record<string, { examGrade: number; attendanceScore: number; name: string }> = {};
 
-  // Processar Notas de Prova
-  (submissions || []).forEach((sub: any) => {
-    const key = (sub.student_email || "").toLowerCase().trim();
+  // Inicializar mapa de resultados
+  studentProfiles.forEach((p: any) => {
+    const key = (p.email || "").toLowerCase().trim();
     if (!key) return;
-    if (!syncResults[key]) syncResults[key] = { examGrade: 0, attendanceScore: 0, name: sub.student_name };
-    syncResults[key].examGrade += Number(sub.score || 0);
+    syncResults[key] = { examGrade: 0, attendanceScore: 0, name: p.name };
   });
 
-  // Processar FrequÃªncia
-  if (totalClasses > 0) {
-    (attendances || []).forEach((att: any) => {
-      const profile = (studentProfiles || []).find((p: any) => p.id === att.student_id)
-      if (profile) {
-        const key = (profile.email || "").toLowerCase().trim()
-        if (!key) return
-        if (!syncResults[key]) syncResults[key] = { examGrade: 0, attendanceScore: 0, name: profile.name }
-        if (att.is_present) syncResults[key].attendanceScore += (10 / totalClasses)
-      }
-    })
-  }
+  // Processar Notas de Prova (Pega a maior nota por aluno)
+  (submissions || []).forEach((sub: any) => {
+    const key = (sub.student_email || "").toLowerCase().trim();
+    if (!key || !syncResults[key]) return;
+    syncResults[key].examGrade = Math.max(syncResults[key].examGrade, Number(sub.score || 0));
+  });
+
+  // Processar Frequência com PESOS por tipo
+  const profileById = new Map(studentProfiles.map(p => [p.id, p]))
+  const studentPresencial: Record<string, number> = {}
+  const studentOnline: Record<string, number> = {}
+
+  ;(attendances || []).forEach((att: any) => {
+    const profile = profileById.get(att.student_id)
+    if (!profile || !att.is_present) return
+    const key = (profile.email || "").toLowerCase().trim()
+    if (!key || !syncResults[key]) return
+
+    const attType = att.type || 'presencial'
+    if (attType === 'presencial') {
+      studentPresencial[key] = (studentPresencial[key] || 0) + 1
+    } else if (attType === 'ead') {
+      studentOnline[key] = (studentOnline[key] || 0) + 1
+    }
+  })
+
+  // Calcular nota de frequência ponderada: (presenças/total) * max
+  Object.keys(syncResults).forEach(key => {
+    let score = 0
+    if (totalPresencial > 0) {
+      const ratio = (studentPresencial[key] || 0) / totalPresencial
+      score += ratio * maxPresencial
+    }
+    if (totalOnline > 0) {
+      const ratio = (studentOnline[key] || 0) / totalOnline
+      score += ratio * maxOnline
+    }
+    syncResults[key].attendanceScore = Math.round(score * 100) / 100
+  })
 
   return syncResults
 }
@@ -1145,12 +1405,12 @@ export async function updateProfileAvatar(userId: string, avatarUrl: string, typ
 
 export async function insertIBADDisciplines(): Promise<void> {
   const officialNames = [
-    "HermenÃªutica", "IntroduÃ§Ã£o BÃ­blica", "Teologia SistemÃ¡tica", "Pentateuco",
-    "Livros HistÃ³ricos", "Livros PoÃ©ticos", "Profetas", "HistÃ³ria da Igreja",
-    "Maneiras e Costumes", "Cristologia", "Geografia BÃ­blica", "IntroduÃ§Ã£o ao Novo Testamento",
-    "Evangelhos e Atos", "EpÃ­stolas PaulÃ­neas", "Hebreus e EpÃ­stolas Gerais", "Escatologia",
-    "ReligiÃµes Comparadas", "Missiologia", "Evangelismo", "Fundamentos da Psicologia e do Aconselhamento",
-    "Teologia Pastoral", "HomilÃ©tica", "Escola BÃ­blica Dominical", "EvidÃªncia CristÃ£", "PortuguÃªs"
+    "Hermenêutica", "Introdução Bíblica", "Teologia Sistemática", "Pentateuco",
+    "Livros Históricos", "Livros Poéticos", "Profetas", "História da Igreja",
+    "Maneiras e Costumes", "Cristologia", "Geografia Bíblica", "Introdução ao Novo Testamento",
+    "Evangelhos e Atos", "Epístolas Paulíneas", "Hebreus e Epístolas Gerais", "Escatologia",
+    "Religiões Comparadas", "Missiologia", "Evangelismo", "Fundamentos da Psicologia e do Aconselhamento",
+    "Teologia Pastoral", "Homilética", "Escola Bíblica Dominical", "Evidência Cristã", "Português"
   ]
   const supabase = createClient()
   const norm = (s: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim()
@@ -1185,7 +1445,7 @@ export async function insertIBADDisciplines(): Promise<void> {
   for (const up of updates) await supabase.from('disciplines').update({ name: up.name, order: up.order }).eq('id', up.id)
 }
 
-// â€”â€”â€” Financial 2.0 Functions â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// ——— Financial 2.0 Functions ————————————————————————————————————————————————————
 
 export async function getFinancialTransactions(filters?: { competencia?: string; type?: "income" | "expense"; status?: "planned" | "realized" }): Promise<FinancialTransaction[]> {
   const supabase = createClient()

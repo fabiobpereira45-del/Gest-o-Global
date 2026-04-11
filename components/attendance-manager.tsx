@@ -41,33 +41,40 @@ export function AttendanceManager() {
     useEffect(() => {
         async function loadData() {
             setLoading(true)
-            const session = getProfessorSession()
-            let d: Discipline[] = []
-            
-            if (session?.role === 'master') {
-                setIsMaster(true)
-                d = await getDisciplines()
-            } else if (session?.professorId) {
-                setIsMaster(false)
-                d = await getDisciplinesByProfessor(session.professorId)
-            }
-            
-            const c = await getClasses()
-            const s = await getStudents()
-            
-            // Pre-load all attendances for the report modal
-            let allAtt: Attendance[] = []
-            if (d.length > 0) {
-               // Limit to first few disciplines or optimize in production
-               const results = await Promise.all(d.map(disc => getAttendances(disc.id)))
-               allAtt = results.flat()
-            }
+            try {
+                const session = getProfessorSession()
+                let d: Discipline[] = []
+                
+                if (session?.role === 'master') {
+                    setIsMaster(true)
+                    d = await getDisciplines()
+                } else if (session?.professorId) {
+                    setIsMaster(false)
+                    d = await getDisciplinesByProfessor(session.professorId)
+                }
+                
+                const [c, s] = await Promise.all([getClasses(), getStudents()])
+                
+                // Pre-load all attendances for the report modal - USANDO CHUNKING PARA EVITAR TRAVAMENTO
+                let allAtt: Attendance[] = []
+                if (d.length > 0) {
+                    const chunkSize = 5
+                    for (let i = 0; i < d.length; i += chunkSize) {
+                        const chunk = d.slice(i, i + chunkSize)
+                        const results = await Promise.all(chunk.map(disc => getAttendances(disc.id)))
+                        allAtt = [...allAtt, ...results.flat()]
+                    }
+                }
 
-            setDisciplines(d)
-            setClasses(c)
-            setStudents(s)
-            setAllAttendances(allAtt)
-            setLoading(false)
+                setDisciplines(d)
+                setClasses(c)
+                setStudents(s)
+                setAllAttendances(allAtt)
+            } catch (err) {
+                console.error("Erro ao carregar dados iniciais do AttendanceManager:", err)
+            } finally {
+                setLoading(false)
+            }
         }
         loadData()
     }, [])
@@ -83,7 +90,7 @@ export function AttendanceManager() {
             setLoading(true)
             try {
                 const [data, finalized] = await Promise.all([
-                    getAttendancesByDate(selectedDisciplineId, selectedDate),
+                    getAttendancesByDate(selectedDisciplineId, selectedDate, lessonType),
                     getAttendanceFinalization(selectedDisciplineId, selectedDate)
                 ])
 
@@ -100,7 +107,7 @@ export function AttendanceManager() {
             }
         }
         fetchAttendances()
-    }, [selectedDisciplineId, selectedDate])
+    }, [selectedDisciplineId, selectedDate, lessonType])
 
     async function handleSave() {
         if (selectedDisciplineId === "none" || !selectedDate) return
@@ -117,7 +124,7 @@ export function AttendanceManager() {
                 type: lessonType
             }))
 
-            // Save all at once with progress tracking
+            // Save with progress tracking (compatible loop)
             await saveBatchAttendances(batchData, (current: number, total: number) => {
                 setProgress({ current, total })
             })
@@ -164,7 +171,7 @@ export function AttendanceManager() {
             if (session?.professorId) {
                 await finalizeAttendance(selectedDisciplineId, selectedDate, session.professorId)
                 setIsFinalized(true)
-                alert("Chamada GRAVADA e trancada com sucesso!")
+                alert("Chamada GRAVADA e trancada com sucesso! As notas dos alunos já foram atualizadas automaticamente.")
             }
         } catch (e: any) {
             if (e.message === "RLS_ERROR" && isMaster) {
@@ -247,7 +254,7 @@ export function AttendanceManager() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 border border-border rounded-xl p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 bg-muted/30 border border-border rounded-xl p-4">
                 <div className="flex flex-col gap-1.5 align-bottom">
                     <Label>Disciplina *</Label>
                     <Select value={selectedDisciplineId} onValueChange={setSelectedDisciplineId}>
@@ -264,16 +271,14 @@ export function AttendanceManager() {
                 </div>
                 
                 <div className="flex flex-col gap-1.5 align-bottom">
-                    <Label>Turma (Opcional)</Label>
-                    <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                    <Label>Tipo de Aula *</Label>
+                    <Select value={lessonType} onValueChange={(val) => setLessonType(val as "presencial" | "ead")}>
                         <SelectTrigger>
-                            <SelectValue placeholder="Todos os Núcleos" />
+                            <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Todos os Núcleos</SelectItem>
-                            {classes.map(c => (
-                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                            ))}
+                            <SelectItem value="presencial">📍 Presencial</SelectItem>
+                            <SelectItem value="ead">💻 Online</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -289,6 +294,21 @@ export function AttendanceManager() {
                             className="pl-10"
                         />
                     </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 align-bottom">
+                    <Label>Turma (Opcional)</Label>
+                    <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Todos os Núcleos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos os Núcleos</SelectItem>
+                            {classes.map(c => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 <div className="flex flex-col gap-1.5 align-bottom">

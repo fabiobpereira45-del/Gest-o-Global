@@ -63,32 +63,35 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
 
     async function checkAuth() {
         setLoading(true)
-        const p = await getStudentProfileAuth()
-        setProfile(p)
-        if (p) {
-            setDataLoading(true)
-            const [s, d, m, cls, sch] = await Promise.all([
-                getSemesters(), getDisciplines(), getStudyMaterials(),
-                getClasses(), getClassSchedules()
-            ])
-            setSemesters(s)
-            setDisciplines(d)
-            setMaterials(m)
-            if (p.class_id) {
-                const foundClass = cls.find(cl => cl.id === p.class_id)
-                if (foundClass) setMyClass(foundClass)
-                setMySchedules(sch.filter(sh => sh.classId === p.class_id))
-                
-                const [members, grades] = await Promise.all([
-                    getClassmates(p.class_id),
-                    getStudentGrades()
-                ])
-                setClassmates(members.filter(m => m.id !== p.id))
-                setOfficialGrades(grades.filter(g => g.studentIdentifier === p.cpf || g.studentIdentifier === p.id))
+        try {
+            const p = await getStudentProfileAuth()
+            setProfile(p)
+            if (p) {
+                setDataLoading(true)
+                try {
+                    const [s, d, m, cls, sch] = await Promise.all([
+                        getSemesters(), getDisciplines(), getStudyMaterials(),
+                        getClasses(), getClassSchedules()
+                    ])
+                    setSemesters(s)
+                    setDisciplines(d)
+                    setMaterials(m)
+                    if (p.class_id) {
+                        const foundClass = cls.find(cl => cl.id === p.class_id)
+                        if (foundClass) setMyClass(foundClass)
+                        setMySchedules(sch.filter(sh => sh.classId === p.class_id))
+                    }
+                } catch (err) {
+                    console.error("Erro ao carregar dados acadêmicos:", err)
+                } finally {
+                    setDataLoading(false)
+                }
             }
-            setDataLoading(false)
+        } catch (err) {
+            console.error("Erro na autenticação do aluno:", err)
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }
 
     useEffect(() => {
@@ -135,8 +138,7 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
         { id: "perfil", label: "Meu Perfil", icon: User },
     ]
 
-    const myDisciplineIds = new Set(mySchedules.map(s => s.disciplineId))
-    const filteredMaterials = materials.filter(m => !m.disciplineId || myDisciplineIds.has(m.disciplineId))
+    const filteredMaterials = materials
 
     const renderSidebar = () => (
         <div className="flex flex-col h-[100dvh] text-slate-100 pt-[env(safe-area-inset-top,0px)]" style={{ backgroundColor: '#0f172a' }}>
