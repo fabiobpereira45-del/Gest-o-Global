@@ -179,7 +179,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
 
     const handleCreateOrUpdate = async () => {
         try {
-            if (!formData.studentName || !formData.studentIdentifier) {
+            const studentName = formData.studentName?.trim()
+            const studentIdentifier = formData.studentIdentifier?.trim()
+
+            if (!studentName || !studentIdentifier) {
                 throw new Error("O nome e identificador do aluno são obrigatórios.")
             }
             
@@ -194,8 +197,8 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
             }
 
             const gradeToSave = {
-                studentIdentifier: formData.studentIdentifier,
-                studentName: formData.studentName,
+                studentIdentifier,
+                studentName,
                 disciplineId: formData.disciplineId,
                 isPublic: formData.isPublic || false,
                 examGrade: parseFloat(formData.examGrade) || 0,
@@ -528,14 +531,18 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                     {!formData.isPublic && (
                                         <select
                                             className="h-12 w-full sm:w-[300px] rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold shadow-sm focus:ring-2 focus:ring-primary/20"
+                                            value={students.find(s => (s.cpf === formData.studentIdentifier || s.enrollment_number === formData.studentIdentifier))?.id || ""}
                                             onChange={(e) => {
                                                 const std = students.find(s => s.id === e.target.value)
                                                 if (std) {
                                                     setFormData({ ...formData, studentName: std.name, studentIdentifier: std.cpf || std.enrollment_number || "" })
+                                                } else {
+                                                    // Se selecionar "Localizar...", não limpa necessariamente o que o user digitou à esquerda
+                                                    // mas o ideal é deixar o user escolher.
                                                 }
                                             }}
                                         >
-                                            <option value="">Localizar Matriculado...</option>
+                                            <option value="">Selecione um aluno da lista...</option>
                                             {students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.enrollment_number})</option>)}
                                         </select>
                                     )}

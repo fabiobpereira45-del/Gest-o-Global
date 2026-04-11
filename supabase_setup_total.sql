@@ -208,7 +208,7 @@ INSERT INTO public.grading_settings (id) VALUES ('default') ON CONFLICT DO NOTHI
 INSERT INTO public.disciplines (name, "order") VALUES 
 ('Hermenêutica', 1), ('Introdução Bíblica', 2), ('Teologia Sistemática', 3), ('Pentateuco', 4),
 ('Livros Históricos', 5), ('Livros Poéticos', 6), ('Profetas', 7), ('História da Igreja', 8),
-('Maneiras e Costumes', 9), ('Cristologia', 10), ('Geografia Bíblica', 11), ('Introdução ao Novo Testament', 12),
+('Maneiras e Costumes', 9), ('Cristologia', 10), ('Geografia Bíblica', 11), ('Introdução ao Novo Testamento', 12),
 ('Evangelhos e Atos', 13), ('Epístolas Paulíneas', 14), ('Hebreus e Epístolas Gerais', 15), ('Escatologia', 16),
 ('Religiões Comparadas', 17), ('Missiologia', 18), ('Evangelismo', 19), ('Fundamentos da Psicologia e do Aconselhamento', 20),
 ('Teologia Pastoral', 21), ('Homilética', 22), ('Escola Bíblica Dominical', 23), ('Evidência Cristã', 24), ('Português', 25)
@@ -232,3 +232,8 @@ CREATE POLICY "Allow all for authenticated" ON public.assessments FOR ALL USING 
 CREATE POLICY "Allow all for authenticated" ON public.questions FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow all for authenticated" ON public.financial_transactions FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow all for authenticated" ON public.student_tuition FOR ALL USING (auth.role() = 'authenticated');
+
+-- 6. CONFIGURAÇÃO DE STORAGE (IMPORTANTE)
+-- Para que o upload de arquivos funcione, você deve executar o script 'storage_setup.sql' 
+-- no seu SQL Editor ou criar manualmente os buckets 'materials' e 'avatars' no console do Supabase.
+

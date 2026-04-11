@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/client"
 import { triggerN8nWebhook } from "@/lib/n8n"
 export { triggerN8nWebhook }
 
-// â€”â€”â€” Types â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// ——— Types ——————————————————————————————————————————————————————————————————————
 export type QuestionType = "multiple-choice" | "true-false" | "discursive" | "incorrect-alternative" | "fill-in-the-blank" | "matching"
 export interface Choice { id: string; text: string }
 export interface MatchingPair { id: string; left: string; right: string }
@@ -109,7 +109,7 @@ export function uid(): string {
   );
 }
 
-// â€”â€”â€” Auth / Session â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// ——— Auth / Session ————————————————————————————————————————————————————————————
 
 export function getProfessorSession(): ProfessorSession | null {
   const s = readLocal<ProfessorSession | null>(KEYS.PROFESSOR_SESSION, null)
@@ -122,7 +122,7 @@ export function saveProfessorSession(professorId: string, role: "master" | "prof
     const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
     writeLocal<ProfessorSession>(KEYS.PROFESSOR_SESSION, { loggedIn: true, professorId, role, avatar_url, expiresAt })
   } catch (err) {
-    console.error("Erro ao salvar sessÃ£o do professor:", err)
+    console.error("Erro ao salvar sessão do professor:", err)
   }
 }
 export function clearProfessorSession(): void {
@@ -196,7 +196,7 @@ export async function registerStudentByAdmin(data: any): Promise<void> {
     if (cls) {
       const { count } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('class_id', data.classId)
       if (count !== null && count >= cls.max_students) {
-        throw new Error("Esta turma jÃ¡ estÃ¡ com as vagas esgotadas.")
+        throw new Error("Esta turma já está com as vagas esgotadas.")
       }
     }
   }
@@ -211,7 +211,7 @@ export async function registerStudentByAdmin(data: any): Promise<void> {
     options: { data: { name: nameUC, type: 'student' } }
   })
   if (authError) throw new Error(authError.message)
-  if (!authData.user) throw new Error("Erro ao criar usuÃ¡rio na base de dados (Auth).")
+  if (!authData.user) throw new Error("Erro ao criar usuário na base de dados (Auth).")
 
   const matricula = `2026${Math.floor(1000 + Math.random() * 9000)}`
 
@@ -366,7 +366,7 @@ export async function hasStudentSubmitted(email: string, assessmentId: string): 
 export function getDraftAnswers(): StudentAnswer[] { return readLocal<StudentAnswer[]>(KEYS.DRAFT_ANSWERS, []) }
 export function saveDraftAnswers(answers: StudentAnswer[]): void { writeLocal(KEYS.DRAFT_ANSWERS, answers) }
 
-// â€”â€”â€” DB Mappers â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// ——— DB Mappers —————————————————————————————————————————————————————————————————
 function mapSemester(row: any): Semester { return { id: row.id, name: row.name, order: row.order, shift: row.shift || undefined, is_completed: row.is_completed || false, createdAt: row.created_at } }
 function mapStudyMaterial(row: any): StudyMaterial { return { id: row.id, disciplineId: row.discipline_id, title: row.title, description: row.description || undefined, fileUrl: row.file_url, createdAt: row.created_at } }
 function mapDiscipline(row: any): Discipline { 
@@ -435,7 +435,7 @@ function mapStudentTuition(row: any): StudentTuition {
   return { id: row.id, studentId: row.student_id, disciplineId: row.discipline_id, amount: Number(row.amount), dueDate: row.due_date, status: row.status, paidAt: row.paid_at, transactionId: row.transaction_id, createdAt: row.created_at }
 }
 
-// â€”â€”â€” Core Functions â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// ——— Core Functions —————————————————————————————————————————————————————————————
 
 export async function getGradingSettings(): Promise<GradingSettings> {
   const supabase = createClient()
@@ -633,7 +633,7 @@ export async function addQuestion(data: Omit<Question, "id" | "createdAt">): Pro
   const q: any = { discipline_id: data.disciplineId, type: data.type, text: data.text, choices: data.choices, correct_answer: data.correctAnswer, points: data.points, created_at: new Date().toISOString() }
   if (data.pairs && data.pairs.length > 0) q.choices = { options: data.choices || [], matchingPairs: data.pairs }
   const { error } = await supabase.from('questions').insert(q)
-  if (error) throw new Error(`Erro ao salvar questÃ£o: ${error.message}`)
+  if (error) throw new Error(`Erro ao salvar questão: ${error.message}`)
   return mapQuestion(q)
 }
 
@@ -1373,12 +1373,12 @@ export async function updateProfileAvatar(userId: string, avatarUrl: string, typ
 
 export async function insertIBADDisciplines(): Promise<void> {
   const officialNames = [
-    "HermenÃªutica", "IntroduÃ§Ã£o BÃ­blica", "Teologia SistemÃ¡tica", "Pentateuco",
-    "Livros HistÃ³ricos", "Livros PoÃ©ticos", "Profetas", "HistÃ³ria da Igreja",
-    "Maneiras e Costumes", "Cristologia", "Geografia BÃ­blica", "IntroduÃ§Ã£o ao Novo Testamento",
-    "Evangelhos e Atos", "EpÃ­stolas PaulÃ­neas", "Hebreus e EpÃ­stolas Gerais", "Escatologia",
-    "ReligiÃµes Comparadas", "Missiologia", "Evangelismo", "Fundamentos da Psicologia e do Aconselhamento",
-    "Teologia Pastoral", "HomilÃ©tica", "Escola BÃ­blica Dominical", "EvidÃªncia CristÃ£", "PortuguÃªs"
+    "Hermenêutica", "Introdução Bíblica", "Teologia Sistemática", "Pentateuco",
+    "Livros Históricos", "Livros Poéticos", "Profetas", "História da Igreja",
+    "Maneiras e Costumes", "Cristologia", "Geografia Bíblica", "Introdução ao Novo Testamento",
+    "Evangelhos e Atos", "Epístolas Paulíneas", "Hebreus e Epístolas Gerais", "Escatologia",
+    "Religiões Comparadas", "Missiologia", "Evangelismo", "Fundamentos da Psicologia e do Aconselhamento",
+    "Teologia Pastoral", "Homilética", "Escola Bíblica Dominical", "Evidência Cristã", "Português"
   ]
   const supabase = createClient()
   const norm = (s: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim()
@@ -1413,7 +1413,7 @@ export async function insertIBADDisciplines(): Promise<void> {
   for (const up of updates) await supabase.from('disciplines').update({ name: up.name, order: up.order }).eq('id', up.id)
 }
 
-// â€”â€”â€” Financial 2.0 Functions â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// ——— Financial 2.0 Functions ————————————————————————————————————————————————————
 
 export async function getFinancialTransactions(filters?: { competencia?: string; type?: "income" | "expense"; status?: "planned" | "realized" }): Promise<FinancialTransaction[]> {
   const supabase = createClient()
