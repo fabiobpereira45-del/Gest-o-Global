@@ -763,21 +763,21 @@ export function calculateScore(answers: StudentAnswer[], questions: Question[], 
 export async function getProfessorAccounts(): Promise<ProfessorAccount[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from('professor_accounts').select('*')
-  if (error) throw new Error(error.message)
+  if (error) { console.warn('[getProfessorAccounts] Erro:', error.message); return [] }
   return (data || []).map(mapProfessor)
 }
 
 export async function getProfessorDisciplines(professorId: string): Promise<ProfessorDiscipline[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from('professor_disciplines').select('*').eq('professor_id', professorId)
-  if (error) throw new Error(error.message)
+  if (error) { console.warn('[getProfessorDisciplines] Erro:', error.message); return [] }
   return (data || []).map(mapProfessorDiscipline)
 }
 
 export async function getAllProfessorDisciplines(): Promise<ProfessorDiscipline[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from('professor_disciplines').select('*')
-  if (error) throw new Error(error.message)
+  if (error) { console.warn('[getAllProfessorDisciplines] Erro (tabela pode não existir):', error.message); return [] }
   return (data || []).map(mapProfessorDiscipline)
 }
 
