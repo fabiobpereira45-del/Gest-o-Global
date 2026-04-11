@@ -298,7 +298,7 @@ export function ProfessorManager() {
                 log("Vínculos carregados. Buscando lista mestra...")
                 const d = await getDisciplines()
                 log("Processando template PDF...")
-                printProfessorsPDF(p, a, d, win)
+                printProfessorsPDF(p, a, d, undefined, win)
               } catch (e: any) {
                 console.error("Erro ao gerar PDF:", e)
                 if (win && !win.closed) {
