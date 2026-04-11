@@ -8,7 +8,7 @@ export type QuestionType = "multiple-choice" | "true-false" | "discursive" | "in
 export interface Choice { id: string; text: string }
 export interface MatchingPair { id: string; left: string; right: string }
 export interface Semester { id: string; name: string; order: number; shift?: string; is_completed?: boolean; createdAt: string }
-export interface Discipline { id: string; name: string; description?: string | null; semesterId?: string | null; professorName?: string | null; dayOfWeek?: string | null; shift?: string | null; order: number; is_realized?: boolean; createdAt: string }
+export interface Discipline { id: string; name: string; description?: string | null; semesterId?: string | null; professorName?: string | null; dayOfWeek?: string | null; shift?: string | null; order: number; is_realized?: boolean; executionDate?: string | null; createdAt: string }
 export interface StudyMaterial { id: string; disciplineId: string; title: string; description?: string; fileUrl: string; createdAt: string }
 export interface GradingSettings { id: string; pointsPerPresence: number; onlinePresencePoints: number; interactionPoints: number; bookActivityPoints: number; passingAverage: number; totalDivisor: number; updatedAt: string; }
 export interface Question { id: string; disciplineId: string; type: QuestionType; text: string; choices: Choice[]; pairs?: MatchingPair[]; correctAnswer: string; points: number; createdAt: string }
@@ -336,6 +336,7 @@ function mapDiscipline(row: any): Discipline {
     shift: row.shift || undefined, 
     order: Number(row.order || 0), 
     is_realized: !!row.is_realized,
+    executionDate: row.execution_date || null,
     createdAt: row.created_at 
   } 
 }
@@ -499,14 +500,14 @@ export async function getBoardMembers(): Promise<BoardMember[]> {
   return (data || []).map(mapBoardMember)
 }
 
-export async function addDiscipline(name: string, description?: string | null, semesterId?: string | null, professorName?: string | null, dayOfWeek?: string | null, shift?: string | null, order?: number): Promise<Discipline> {
-  const d = { id: uid(), name, description: description || null, semester_id: semesterId || null, professor_name: professorName || null, day_of_week: dayOfWeek || null, shift: shift || null, "order": order || 0, created_at: new Date().toISOString() }
+export async function addDiscipline(name: string, description?: string | null, semesterId?: string | null, professorName?: string | null, dayOfWeek?: string | null, shift?: string | null, order?: number, executionDate?: string | null): Promise<Discipline> {
+  const d = { id: uid(), name, description: description || null, semester_id: semesterId || null, professor_name: professorName || null, day_of_week: dayOfWeek || null, shift: shift || null, "order": order || 0, execution_date: executionDate || null, created_at: new Date().toISOString() }
   const supabase = createClient()
   await supabase.from('disciplines').insert(d)
   return mapDiscipline(d)
 }
 
-export async function updateDiscipline(id: string, data: Partial<Pick<Discipline, "name" | "description" | "semesterId" | "professorName" | "dayOfWeek" | "shift" | "order" | "is_realized">>): Promise<void> {
+export async function updateDiscipline(id: string, data: Partial<Pick<Discipline, "name" | "description" | "semesterId" | "professorName" | "dayOfWeek" | "shift" | "order" | "is_realized" | "executionDate">>): Promise<void> {
   const updateData: any = {}
   if (data.name !== undefined) updateData.name = data.name
   if (data.description !== undefined) updateData.description = data.description || null
@@ -516,6 +517,7 @@ export async function updateDiscipline(id: string, data: Partial<Pick<Discipline
   if (data.shift !== undefined) updateData.shift = data.shift || null
   if (data.order !== undefined) updateData.order = data.order
   if (data.is_realized !== undefined) updateData.is_realized = data.is_realized
+  if (data.executionDate !== undefined) updateData.execution_date = data.executionDate || null
   const supabase = createClient()
   await supabase.from('disciplines').update(updateData).eq('id', id)
 }

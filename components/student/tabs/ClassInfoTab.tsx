@@ -75,7 +75,9 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                         
                         {mySchedules.filter(s => {
                             const disc = disciplines.find(d => d.id === s.disciplineId)
-                            return disc?.description?.toLowerCase().includes(new Date().toLocaleString('pt-br', { month: 'long' }).toLowerCase())
+                            if (!disc?.executionDate) return false
+                            const now = new Date().toISOString().slice(0, 7) // YYYY-MM
+                            return disc.executionDate === now
                         }).length === 0 ? (
                             <div className="p-8 bg-slate-50 border border-border border-dashed rounded-3xl text-center text-muted-foreground italic text-sm">
                                 Nenhuma disciplina específica destacada para este mês.
@@ -84,7 +86,9 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {mySchedules.filter(s => {
                                     const disc = disciplines.find(d => d.id === s.disciplineId)
-                                    return disc?.description?.toLowerCase().includes(new Date().toLocaleString('pt-br', { month: 'long' }).toLowerCase())
+                                    if (!disc?.executionDate) return false
+                                    const now = new Date().toISOString().slice(0, 7) // YYYY-MM
+                                    return disc.executionDate === now
                                 }).map(sched => {
                                     const disc = disciplines.find(d => d.id === sched.disciplineId)
                                     return (
@@ -138,7 +142,8 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                     const divisor = (grade?.customDivisor && grade.customDivisor > 0) ? grade.customDivisor : 1
                                     const average = grade ? totalGrade / divisor : null
                                     
-                                    const isCurrentMonth = disc?.description?.toLowerCase().includes(new Date().toLocaleString('pt-br', { month: 'long' }).toLowerCase())
+                                    const now = new Date().toISOString().slice(0, 7)
+                                    const isCurrentMonth = disc?.executionDate === now
                                     if (isCurrentMonth) return null // Skip as it's already in the highlight section
 
                                     return (
@@ -195,7 +200,6 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                         )}
                                     </div>
                                     <p className="text-sm font-bold text-foreground line-clamp-1">{student.name}</p>
-                                    <p className="text-[10px] text-muted-foreground uppercase font-semibold mt-1">Acadêmico</p>
                                 </div>
                             ))}
                         </div>

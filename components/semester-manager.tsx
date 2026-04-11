@@ -52,6 +52,7 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
     const [discDesc, setDiscDesc] = useState("")
     const [discSemId, setDiscSemId] = useState("")
     const [discProfName, setDiscProfName] = useState("none")
+    const [discExecDate, setDiscExecDate] = useState("")
 
     // Delete confirmations
     const [unlinkDiscId, setUnlinkDiscId] = useState<string | null>(null)   // unlink from semester (back to pool)
@@ -117,6 +118,7 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
         setEditingDisc(null); setSelectedPoolDisc(null); setDiscSearch("")
         setDiscName(""); setDiscDesc(""); setDiscSemId(semId || semesters[0]?.id || "")
         setDiscProfName("none")
+        setDiscExecDate("")
         setDiscModal(true)
     }
 
@@ -125,6 +127,7 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
         setDiscName(disc.name); setDiscDesc(disc.description || "")
         setDiscSemId(disc.semesterId || "")
         setDiscProfName(disc.professorName || "none")
+        setDiscExecDate(disc.executionDate || "")
         setDiscModal(true)
     }
 
@@ -134,11 +137,12 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
         setDiscName(disc.name)
         setDiscDesc(disc.description || "")
         setDiscProfName(disc.professorName || "none")
+        setDiscExecDate(disc.executionDate || "")
         setDiscSearch("")
     }
 
     function clearPickedDisc() {
-        setSelectedPoolDisc(null); setDiscName(""); setDiscDesc(""); setDiscProfName("none"); setDiscSearch("")
+        setSelectedPoolDisc(null); setDiscName(""); setDiscDesc(""); setDiscProfName("none"); setDiscExecDate(""); setDiscSearch("")
     }
 
     async function handleSaveDisc() {
@@ -148,15 +152,15 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
 
         if (selectedPoolDisc) {
             await updateDiscipline(selectedPoolDisc.id, {
-                semesterId: semId, professorName: prof
+                semesterId: semId, professorName: prof, executionDate: discExecDate || null
             })
         } else if (editingDisc) {
             await updateDiscipline(editingDisc.id, {
                 name: discName.trim(), description: discDesc.trim() || null,
-                semesterId: semId, professorName: prof
+                semesterId: semId, professorName: prof, executionDate: discExecDate || null
             })
         } else {
-            await addDiscipline(discName.trim(), discDesc.trim() || undefined, semId, prof, "", "ead", undefined)
+            await addDiscipline(discName.trim(), discDesc.trim() || undefined, semId, prof, "", "ead", undefined, discExecDate || null)
         }
         setDiscModal(false); load()
     }
@@ -346,6 +350,11 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
                                                             {isDiscCompleted && <span className="text-[10px] font-bold text-green-600 bg-green-200 px-1.5 py-0.5 rounded">Concluída</span>}
                                                         </div>
                                                         {disc.professorName && <p className="text-xs text-primary font-medium mt-1 truncate">Prof. {disc.professorName}</p>}
+                                                        {disc.executionDate && (
+                                                            <p className="text-[10px] text-muted-foreground mt-0.5 font-bold uppercase tracking-wider">
+                                                                🗓️ {new Date(disc.executionDate + "-02").toLocaleString('pt-br', { month: 'long', year: 'numeric' })}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     {disc.description && <div className="mt-3 pt-3 border-t border-border/50">
                                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Carga Horária / Info</span>
@@ -529,6 +538,11 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
                                 <div className="flex flex-col gap-1.5">
                                     <Label>Carga Horária / Avaliações (opcional)</Label>
                                     <Textarea value={discDesc} onChange={e => setDiscDesc(e.target.value)} placeholder="Ex: Carga Horária de 40h. Necessário resumo do material." className="resize-none h-16" />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label>Mês de Execução</Label>
+                                    <Input type="month" value={discExecDate} onChange={e => setDiscExecDate(e.target.value)} />
+                                    <p className="text-[10px] text-muted-foreground">Define quando esta disciplina será destaque no portal do aluno.</p>
                                 </div>
                             </>
                         )}
