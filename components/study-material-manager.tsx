@@ -60,8 +60,8 @@ export function StudyMaterialManager() {
     useEffect(() => { load() }, [])
 
     async function handleUpload() {
-        if (!file || !title.trim() || !fileDiscId) {
-            alert("Preencha todos os campos obrigatórios e selecione um arquivo.")
+        if (!file || !title.trim()) {
+            alert("Preencha o título e selecione um arquivo.")
             return
         }
 
@@ -70,7 +70,8 @@ export function StudyMaterialManager() {
             // 1. Upload to Supabase Storage
             const fileExt = file.name.split('.').pop()
             const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`
-            const filePath = `disciplines/${fileDiscId}/${fileName}`
+            const folderPath = fileDiscId === "geral" ? "general" : fileDiscId
+            const filePath = `disciplines/${folderPath}/${fileName}`
 
             const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('materials')
@@ -85,7 +86,7 @@ export function StudyMaterialManager() {
 
             // 3. Save to Database
             await addStudyMaterial({
-                disciplineId: fileDiscId,
+                disciplineId: fileDiscId === "geral" ? "" : fileDiscId,
                 title: title.trim(),
                 description: description.trim() || undefined,
                 fileUrl: publicUrl
@@ -145,7 +146,7 @@ export function StudyMaterialManager() {
                         setTitle("")
                         setDescription("")
                         setFile(null)
-                        if (disciplines.length > 0) setFileDiscId(disciplines[0].id)
+                        setFileDiscId("geral")
                         setUploadModal(true)
                     }}>
                         <UploadCloud className="h-4 w-4 mr-2" />
@@ -214,6 +215,7 @@ export function StudyMaterialManager() {
                                     <SelectValue placeholder="Selecione a disciplina" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="geral">🌐 Geral / Todos os Alunos</SelectItem>
                                     {disciplines.map(d => (
                                         <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                                     ))}
@@ -252,7 +254,7 @@ export function StudyMaterialManager() {
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setUploadModal(false)} disabled={uploading}>Cancelar</Button>
-                        <Button onClick={handleUpload} disabled={uploading || !file || !title.trim() || !fileDiscId}>
+                        <Button onClick={handleUpload} disabled={uploading || !file || !title.trim()}>
                             {uploading ? "Salvando..." : "Fazer Upload"}
                         </Button>
                     </DialogFooter>

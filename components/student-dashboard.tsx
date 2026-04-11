@@ -138,8 +138,7 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
         { id: "perfil", label: "Meu Perfil", icon: User },
     ]
 
-    const myDisciplineIds = new Set(mySchedules.map(s => s.disciplineId))
-    const filteredMaterials = materials.filter(m => !m.disciplineId || myDisciplineIds.has(m.disciplineId))
+    const filteredMaterials = materials
 
     const renderSidebar = () => (
         <div className="flex flex-col h-[100dvh] text-slate-100 pt-[env(safe-area-inset-top,0px)]" style={{ backgroundColor: '#0f172a' }}>
