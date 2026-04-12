@@ -20,8 +20,13 @@ const formatDateTime = (dateStr?: string) => {
 }
 
 const DAY_LABEL: Record<string, string> = {
-    monday: "Segunda-feira", tuesday: "Terça-feira", wednesday: "Quarta-feira",
-    thursday: "Quinta-feira", friday: "Sexta-feira", saturday: "Sábado", sunday: "Domingo"
+    segunda: "Segunda-feira", 
+    terca: "Terça-feira", 
+    quarta: "Quarta-feira",
+    quinta: "Quinta-feira", 
+    sexta: "Sexta-feira", 
+    sabado: "Sábado", 
+    domingo: "Domingo"
 }
 const SHIFT_LABEL: Record<string, string> = {
     morning: "Manhã", afternoon: "Tarde", evening: "Noite", ead: "EAD/Online"
