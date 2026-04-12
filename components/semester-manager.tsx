@@ -26,6 +26,26 @@ import {
     getProfessorAccounts, MASTER_CREDENTIALS
 } from "@/lib/store"
 import { printCurriculumPDF } from "@/lib/pdf"
+import {
+    SelectContent as SelectContentUI,
+} from "@/components/ui/select"
+
+const MONTHS = [
+    { value: "01", label: "Janeiro" },
+    { value: "02", label: "Fevereiro" },
+    { value: "03", label: "Março" },
+    { value: "04", label: "Abril" },
+    { value: "05", label: "Maio" },
+    { value: "06", label: "Junho" },
+    { value: "07", label: "Julho" },
+    { value: "08", label: "Agosto" },
+    { value: "09", label: "Setembro" },
+    { value: "10", label: "Outubro" },
+    { value: "11", label: "Novembro" },
+    { value: "12", label: "Dezembro" },
+]
+
+const YEARS = Array.from({ length: 7 }, (_, i) => String(2024 + i))
 
 // ─── Componente Removido: Dias e Turnos agora vivem no Quadro de Horários ─────
 
@@ -52,7 +72,8 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
     const [discDesc, setDiscDesc] = useState("")
     const [discSemId, setDiscSemId] = useState("")
     const [discProfName, setDiscProfName] = useState("none")
-    const [discExecDate, setDiscExecDate] = useState("")
+    const [discExecMonth, setDiscExecMonth] = useState("")
+    const [discExecYear, setDiscExecYear] = useState("")
 
     // Delete confirmations
     const [unlinkDiscId, setUnlinkDiscId] = useState<string | null>(null)   // unlink from semester (back to pool)
@@ -118,7 +139,8 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
         setEditingDisc(null); setSelectedPoolDisc(null); setDiscSearch("")
         setDiscName(""); setDiscDesc(""); setDiscSemId(semId || semesters[0]?.id || "")
         setDiscProfName("none")
-        setDiscExecDate("")
+        setDiscExecMonth("")
+        setDiscExecYear("")
         setDiscModal(true)
     }
 
@@ -127,7 +149,14 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
         setDiscName(disc.name); setDiscDesc(disc.description || "")
         setDiscSemId(disc.semesterId || "")
         setDiscProfName(disc.professorName || "none")
-        setDiscExecDate(disc.executionDate || "")
+        if (disc.executionDate) {
+            const [y, m] = disc.executionDate.split("-")
+            setDiscExecYear(y)
+            setDiscExecMonth(m)
+        } else {
+            setDiscExecYear("")
+            setDiscExecMonth("")
+        }
         setDiscModal(true)
     }
 
@@ -137,30 +166,38 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
         setDiscName(disc.name)
         setDiscDesc(disc.description || "")
         setDiscProfName(disc.professorName || "none")
-        setDiscExecDate(disc.executionDate || "")
+        if (disc.executionDate) {
+            const [y, m] = disc.executionDate.split("-")
+            setDiscExecYear(y)
+            setDiscExecMonth(m)
+        } else {
+            setDiscExecYear("")
+            setDiscExecMonth("")
+        }
         setDiscSearch("")
     }
 
     function clearPickedDisc() {
-        setSelectedPoolDisc(null); setDiscName(""); setDiscDesc(""); setDiscProfName("none"); setDiscExecDate(""); setDiscSearch("")
+        setSelectedPoolDisc(null); setDiscName(""); setDiscDesc(""); setDiscProfName("none"); setDiscExecMonth(""); setDiscExecYear(""); setDiscSearch("")
     }
 
     async function handleSaveDisc() {
         if (!discName.trim() && !selectedPoolDisc) return
         const semId = discSemId === "none" ? null : (discSemId || null)
         const prof = discProfName === "none" ? null : discProfName
+        const execDate = (discExecMonth && discExecYear) ? `${discExecYear}-${discExecMonth}-01` : null
 
         if (selectedPoolDisc) {
             await updateDiscipline(selectedPoolDisc.id, {
-                semesterId: semId, professorName: prof, executionDate: discExecDate || null
+                semesterId: semId, professorName: prof, executionDate: execDate
             })
         } else if (editingDisc) {
             await updateDiscipline(editingDisc.id, {
                 name: discName.trim(), description: discDesc.trim() || null,
-                semesterId: semId, professorName: prof, executionDate: discExecDate || null
+                semesterId: semId, professorName: prof, executionDate: execDate
             })
         } else {
-            await addDiscipline(discName.trim(), discDesc.trim() || undefined, semId, prof, "", "ead", undefined, discExecDate || null)
+            await addDiscipline(discName.trim(), discDesc.trim() || undefined, semId, prof, "", "ead", undefined, execDate)
         }
         setDiscModal(false); load()
     }
@@ -352,7 +389,15 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
                                                         {disc.professorName && <p className="text-xs text-primary font-medium mt-1 truncate">Prof. {disc.professorName}</p>}
                                                         {disc.executionDate && (
                                                             <p className="text-[10px] text-muted-foreground mt-0.5 font-bold uppercase tracking-wider">
-                                                                🗓️ {new Date(disc.executionDate + "-02").toLocaleString('pt-br', { month: 'long', year: 'numeric' })}
+                                                                🗓️ {(() => {
+                                                                    try {
+                                                                        const [y, m] = disc.executionDate.split("-")
+                                                                        const monthName = MONTHS.find(mon => mon.value === m)?.label || m
+                                                                        return `${monthName} de ${y}`
+                                                                    } catch {
+                                                                        return "Data Indefinida"
+                                                                    }
+                                                                })()}
                                                             </p>
                                                         )}
                                                     </div>
@@ -541,7 +586,28 @@ export function SemesterManager({ isMaster }: { isMaster?: boolean }) {
                                 </div>
                                 <div className="flex flex-col gap-1.5">
                                     <Label>Mês de Execução</Label>
-                                    <Input type="month" value={discExecDate} onChange={e => setDiscExecDate(e.target.value)} />
+                                    <div className="flex gap-2">
+                                        <Select value={discExecMonth} onValueChange={setDiscExecMonth}>
+                                            <SelectTrigger className="flex-1">
+                                                <SelectValue placeholder="Mês" />
+                                            </SelectTrigger>
+                                            <SelectContentUI>
+                                                {MONTHS.map(m => (
+                                                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                                ))}
+                                            </SelectContentUI>
+                                        </Select>
+                                        <Select value={discExecYear} onValueChange={setDiscExecYear}>
+                                            <SelectTrigger className="w-[100px]">
+                                                <SelectValue placeholder="Ano" />
+                                            </SelectTrigger>
+                                            <SelectContentUI>
+                                                {YEARS.map(y => (
+                                                    <SelectItem key={y} value={y}>{y}</SelectItem>
+                                                ))}
+                                            </SelectContentUI>
+                                        </Select>
+                                    </div>
                                     <p className="text-[10px] text-muted-foreground">Define quando esta disciplina será destaque no portal do aluno.</p>
                                 </div>
                             </>
