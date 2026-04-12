@@ -24,7 +24,23 @@ export interface Attendance { id: string; studentId: string; disciplineId: strin
 export interface BoardMember { id: string; name: string; role: string; category: string; avatar_url?: string | null; createdAt: string; }
 export interface ProfessorDiscipline { id: string; professorId: string; disciplineId: string; createdAt: string; }
 export interface ClassRoom { id: string; name: string; shift: "morning" | "afternoon" | "evening" | "ead" | "hibrido"; dayOfWeek?: string; maxStudents: number; studentCount?: number; createdAt: string; }
-export interface ClassSchedule { id: string; classId: string; disciplineId: string; professorName: string; dayOfWeek: string; timeStart: string; timeEnd: string; lessonsCount: number; workload: number; startDate?: string; endDate?: string; createdAt: string; }
+export interface ClassSchedule { 
+    id: string; 
+    classId: string; 
+    disciplineId: string; 
+    professorName: string; 
+    dayOfWeek: string; 
+    timeStart: string; 
+    timeEnd: string; 
+    lessonsCount: number; 
+    workload: number; 
+    startDate?: string; 
+    endDate?: string; 
+    onlineClassDate?: string;
+    videoLessonDate?: string;
+    examDate?: string;
+    createdAt: string; 
+}
 export interface StudentGrade {
   id: string;
   studentIdentifier: string; // CPF or Email
@@ -425,7 +441,25 @@ function mapStudentProfile(row: any): StudentProfile { return { id: row.id, auth
 function mapChatMessage(row: any): ChatMessage { return { id: row.id, studentId: row.student_id, disciplineId: row.discipline_id, message: row.message, isFromStudent: row.is_from_student, read: row.read, createdAt: row.created_at } }
 function mapAttendance(row: any): Attendance { return { id: row.id, studentId: row.student_id, disciplineId: row.discipline_id, date: row.date, isPresent: row.is_present, type: row.type || "presencial", createdAt: row.created_at } }
 function mapClassRoom(row: any): ClassRoom { return { id: row.id, name: row.name, shift: row.shift as ClassRoom['shift'], dayOfWeek: row.day_of_week || undefined, maxStudents: Number(row.max_students), studentCount: row.student_count !== undefined ? Number(row.student_count) : undefined, createdAt: row.created_at } }
-function mapClassSchedule(row: any): ClassSchedule { return { id: row.id, classId: row.class_id, disciplineId: row.discipline_id, professorName: row.professor_name, dayOfWeek: row.day_of_week, timeStart: row.time_start, timeEnd: row.time_end, lessonsCount: Number(row.lessons_count || 1), workload: Number(row.workload || 0), startDate: row.start_date || undefined, endDate: row.end_date || undefined, createdAt: row.created_at } }
+function mapClassSchedule(row: any): ClassSchedule { 
+    return { 
+        id: row.id, 
+        classId: row.class_id, 
+        disciplineId: row.discipline_id, 
+        professorName: row.professor_name, 
+        dayOfWeek: row.day_of_week, 
+        timeStart: row.time_start, 
+        timeEnd: row.time_end, 
+        lessonsCount: Number(row.lessons_count || 1), 
+        workload: Number(row.workload || 0), 
+        startDate: row.start_date || undefined, 
+        endDate: row.end_date || undefined, 
+        onlineClassDate: row.online_class_date || undefined,
+        videoLessonDate: row.video_lesson_date || undefined,
+        examDate: row.exam_date || undefined,
+        createdAt: row.created_at 
+    } 
+}
 function mapStudentGrade(row: any): StudentGrade { return { id: row.id, studentIdentifier: row.student_identifier, studentName: row.student_name, disciplineId: row.discipline_id || undefined, isPublic: row.is_public, examGrade: Number(row.exam_grade), worksGrade: Number(row.works_grade), seminarGrade: Number(row.seminar_grade), participationBonus: Number(row.participation_bonus), attendanceScore: Number(row.attendance_score), customDivisor: Number(row.custom_divisor), isReleased: !!row.is_released, createdAt: row.created_at } }
 function mapBoardMember(row: any): BoardMember { return { id: row.id, name: row.name, role: row.role, category: row.category, avatar_url: row.avatar_url, createdAt: row.created_at } }
 function mapProfessorDiscipline(row: any): ProfessorDiscipline { return { id: row.id, professorId: row.professor_id, disciplineId: row.discipline_id, createdAt: row.created_at } }
@@ -1140,15 +1174,30 @@ export async function getClassSchedules(): Promise<ClassSchedule[]> {
   return (data || []).map(mapClassSchedule)
 }
 
-export async function addClassSchedule(data: Pick<ClassSchedule, 'classId' | 'disciplineId' | 'professorName' | 'dayOfWeek' | 'timeStart' | 'timeEnd' | 'lessonsCount' | 'workload' | 'startDate' | 'endDate'>): Promise<ClassSchedule> {
+export async function addClassSchedule(data: Pick<ClassSchedule, 'classId' | 'disciplineId' | 'professorName' | 'dayOfWeek' | 'timeStart' | 'timeEnd' | 'lessonsCount' | 'workload' | 'startDate' | 'endDate' | 'onlineClassDate' | 'videoLessonDate' | 'examDate'>): Promise<ClassSchedule> {
   const supabase = createClient()
-  const dbData = { class_id: data.classId, discipline_id: data.disciplineId, professor_name: data.professorName, day_of_week: data.dayOfWeek, time_start: data.timeStart, time_end: data.timeEnd, lessons_count: data.lessonsCount, workload: data.workload, start_date: data.startDate || null, end_date: data.endDate || null, created_at: new Date().toISOString() }
+  const dbData = { 
+    class_id: data.classId, 
+    discipline_id: data.disciplineId, 
+    professor_name: data.professorName, 
+    day_of_week: data.dayOfWeek, 
+    time_start: data.timeStart, 
+    time_end: data.timeEnd, 
+    lessons_count: data.lessonsCount, 
+    workload: data.workload, 
+    start_date: data.startDate || null, 
+    end_date: data.endDate || null,
+    online_class_date: data.onlineClassDate || null,
+    video_lesson_date: data.videoLessonDate || null,
+    exam_date: data.examDate || null,
+    created_at: new Date().toISOString() 
+  }
   const { data: result, error } = await supabase.from('class_schedules').insert(dbData).select().single()
   if (error) throw new Error(error.message)
   return mapClassSchedule(result)
 }
 
-export async function updateClassSchedule(id: string, data: Partial<Pick<ClassSchedule, 'classId' | 'disciplineId' | 'professorName' | 'dayOfWeek' | 'timeStart' | 'timeEnd' | 'lessonsCount' | 'workload' | 'startDate' | 'endDate'>>): Promise<void> {
+export async function updateClassSchedule(id: string, data: Partial<Pick<ClassSchedule, 'classId' | 'disciplineId' | 'professorName' | 'dayOfWeek' | 'timeStart' | 'timeEnd' | 'lessonsCount' | 'workload' | 'startDate' | 'endDate' | 'onlineClassDate' | 'videoLessonDate' | 'examDate'>>): Promise<void> {
   const supabase = createClient()
   const dbData: any = {}
   if (data.classId !== undefined) dbData.class_id = data.classId
@@ -1161,6 +1210,9 @@ export async function updateClassSchedule(id: string, data: Partial<Pick<ClassSc
   if (data.workload !== undefined) dbData.workload = data.workload
   if (data.startDate !== undefined) dbData.start_date = data.startDate || null
   if (data.endDate !== undefined) dbData.end_date = data.endDate || null
+  if (data.onlineClassDate !== undefined) dbData.online_class_date = data.onlineClassDate || null
+  if (data.videoLessonDate !== undefined) dbData.video_lesson_date = data.videoLessonDate || null
+  if (data.examDate !== undefined) dbData.exam_date = data.examDate || null
   await supabase.from('class_schedules').update(dbData).eq('id', id)
 }
 

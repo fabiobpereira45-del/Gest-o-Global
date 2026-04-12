@@ -1,8 +1,23 @@
 "use client"
 
-import { Users, CalendarDays, Clock, BookOpen, GraduationCap } from "lucide-react"
+import { Users, CalendarDays, Clock, BookOpen, GraduationCap, Video, MonitorPlay, FileChecked2 } from "lucide-react"
 import type { ClassRoom, StudentProfile, ClassSchedule, Discipline, StudentGrade } from "@/lib/store"
 import { cn } from "@/lib/utils"
+
+const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return null
+    try {
+        const date = new Date(dateStr)
+        return date.toLocaleString('pt-BR', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        })
+    } catch (e) {
+        return dateStr
+    }
+}
 
 const DAY_LABEL: Record<string, string> = {
     monday: "Segunda-feira", tuesday: "Terça-feira", wednesday: "Quarta-feira",
@@ -103,9 +118,32 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-3 text-muted-foreground font-medium bg-white/50 p-3 rounded-xl border border-amber-100">
-                                                        <GraduationCap className="h-5 w-5 text-amber-500" />
-                                                        <span>Prof. {sched.professorName && sched.professorName !== "Sem Professor" ? sched.professorName : (disc?.professorName || "Docente Central")}</span>
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="flex items-center gap-3 text-muted-foreground font-medium bg-white/50 p-3 rounded-xl border border-amber-100">
+                                                            <GraduationCap className="h-5 w-5 text-amber-500" />
+                                                            <span>Prof. {sched.professorName && sched.professorName !== "Sem Professor" ? sched.professorName : (disc?.professorName || "Docente Central")}</span>
+                                                        </div>
+                                                        
+                                                        {/* Datas Específicas */}
+                                                        {(sched.onlineClassDate || sched.videoLessonDate || sched.examDate) && (
+                                                            <div className="grid grid-cols-1 gap-2 mt-2">
+                                                                {sched.onlineClassDate && (
+                                                                    <div className="flex items-center gap-2 text-[11px] font-bold text-primary bg-primary/5 p-2 rounded-lg border border-primary/10">
+                                                                        <MonitorPlay className="h-3.5 w-3.5" /> Aula Online: {formatDateTime(sched.onlineClassDate)}
+                                                                    </div>
+                                                                )}
+                                                                {sched.videoLessonDate && (
+                                                                    <div className="flex items-center gap-2 text-[11px] font-bold text-secondary bg-secondary/5 p-2 rounded-lg border border-secondary/10">
+                                                                        <Video className="h-3.5 w-3.5" /> Vídeo Aula: {formatDateTime(sched.videoLessonDate)}
+                                                                    </div>
+                                                                )}
+                                                                {sched.examDate && (
+                                                                    <div className="flex items-center gap-2 text-[11px] font-bold text-accent bg-accent/5 p-2 rounded-lg border border-accent/10">
+                                                                        <FileChecked2 className="h-3.5 w-3.5" /> Data da Prova: {formatDateTime(sched.examDate)}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )
@@ -219,6 +257,31 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                 <p className="text-xs text-muted-foreground flex items-center gap-2 mt-2">
                                                     <GraduationCap className="h-3 w-3 opacity-40" /> {disc.professorName || "Docente Central"}
                                                 </p>
+
+                                                {/* Datas Específicas no Histórico/Próximas */}
+                                                {(() => {
+                                                    const sched = mySchedules.find(s => s.disciplineId === disc.id)
+                                                    if (!sched || (!sched.onlineClassDate && !sched.videoLessonDate && !sched.examDate)) return null
+                                                    return (
+                                                        <div className="flex flex-col gap-1.5 mt-4">
+                                                            {sched.onlineClassDate && (
+                                                                <div className="flex items-center gap-2 text-[10px] font-bold text-primary leading-tight">
+                                                                    <MonitorPlay className="h-3 w-3" /> Online: {formatDateTime(sched.onlineClassDate)}
+                                                                </div>
+                                                            )}
+                                                            {sched.videoLessonDate && (
+                                                                <div className="flex items-center gap-2 text-[10px] font-bold text-secondary leading-tight">
+                                                                    <Video className="h-3 w-3" /> Vídeo: {formatDateTime(sched.videoLessonDate)}
+                                                                </div>
+                                                            )}
+                                                            {sched.examDate && (
+                                                                <div className="flex items-center gap-2 text-[10px] font-bold text-accent leading-tight">
+                                                                    <FileChecked2 className="h-3 w-3" /> Prova: {formatDateTime(sched.examDate)}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })()}
 
                                                 <div className="mt-4 pt-4 border-t border-dashed border-border/60">
                                                     {average !== null ? (

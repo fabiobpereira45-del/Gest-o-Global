@@ -53,6 +53,9 @@ export function ClassScheduleManager() {
     const [formWorkload, setFormWorkload] = useState<number>(0)
     const [formStartDate, setFormStartDate] = useState("")
     const [formEndDate, setFormEndDate] = useState("")
+    const [formOnlineDate, setFormOnlineDate] = useState("")
+    const [formVideoDate, setFormVideoDate] = useState("")
+    const [formExamDate, setFormExamDate] = useState("")
 
     // Deletar e Editar
     const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -88,6 +91,9 @@ export function ClassScheduleManager() {
         setFormWorkload(0)
         setFormStartDate("")
         setFormEndDate("")
+        setFormOnlineDate("")
+        setFormVideoDate("")
+        setFormExamDate("")
         setModalOpen(true)
     }
 
@@ -131,7 +137,10 @@ export function ClassScheduleManager() {
                 lessonsCount: formLessonsCount,
                 workload: formWorkload,
                 startDate: formStartDate || undefined,
-                endDate: formEndDate || undefined
+                endDate: formEndDate || undefined,
+                onlineClassDate: formOnlineDate || undefined,
+                videoLessonDate: formVideoDate || undefined,
+                examDate: formExamDate || undefined
             }
 
             if (editId) {
@@ -161,6 +170,9 @@ export function ClassScheduleManager() {
         setFormWorkload(sched.workload)
         setFormStartDate(sched.startDate || "")
         setFormEndDate(sched.endDate || "")
+        setFormOnlineDate(sched.onlineClassDate ? sched.onlineClassDate.slice(0, 16) : "")
+        setFormVideoDate(sched.videoLessonDate ? sched.videoLessonDate.slice(0, 16) : "")
+        setFormExamDate(sched.examDate ? sched.examDate.slice(0, 16) : "")
         setModalOpen(true)
     }
 
@@ -429,6 +441,21 @@ export function ClassScheduleManager() {
                             <div className="flex flex-col gap-1.5">
                                 <Label>Data Final</Label>
                                 <Input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 border-t border-border pt-4">
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-primary font-bold">Data e Hora: Aula Online</Label>
+                                <Input type="datetime-local" value={formOnlineDate} onChange={e => setFormOnlineDate(e.target.value)} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-secondary font-bold">Data e Hora: Vídeo Aula</Label>
+                                <Input type="datetime-local" value={formVideoDate} onChange={e => setFormVideoDate(e.target.value)} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label className="text-accent font-bold">Data e Hora: Prova</Label>
+                                <Input type="datetime-local" value={formExamDate} onChange={e => setFormExamDate(e.target.value)} />
                             </div>
                         </div>
 

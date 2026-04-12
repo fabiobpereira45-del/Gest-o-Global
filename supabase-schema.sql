@@ -224,6 +224,9 @@ CREATE TABLE IF NOT EXISTS public.class_schedules (
   workload      NUMERIC NOT NULL DEFAULT 0,
   start_date    DATE,
   end_date      DATE,
+  online_class_date TIMESTAMPTZ,
+  video_lesson_date TIMESTAMPTZ,
+  exam_date     TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
