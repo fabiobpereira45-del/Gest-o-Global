@@ -347,7 +347,7 @@ export async function getActiveAssessment(): Promise<Assessment | null> {
     .select('*')
     .eq('is_published', true)
     .lte('open_at', now)
-    .gte('close_at', now)
+    .or(`close_at.is.null,close_at.gte.${now}`)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
