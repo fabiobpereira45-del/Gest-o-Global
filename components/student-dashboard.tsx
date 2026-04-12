@@ -69,9 +69,9 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
             if (p) {
                 setDataLoading(true)
                 try {
-                    const [s, d, m, cls, sch] = await Promise.all([
+                    const [s, d, m, cls, sch, allGrades] = await Promise.all([
                         getSemesters(), getDisciplines(), getStudyMaterials(),
-                        getClasses(), getClassSchedules()
+                        getClasses(), getClassSchedules(), getStudentGrades()
                     ])
                     setSemesters(s)
                     setDisciplines(d)
@@ -80,6 +80,12 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
                         const foundClass = cls.find(cl => cl.id === p.class_id)
                         if (foundClass) setMyClass(foundClass)
                         setMySchedules(sch.filter(sh => sh.classId === p.class_id))
+                        
+                        const mates = await getClassmates(p.class_id)
+                        setClassmates(mates)
+                        
+                        const myGrades = allGrades.filter(g => g.studentId === p.id)
+                        setOfficialGrades(myGrades)
                     }
                 } catch (err) {
                     console.error("Erro ao carregar dados acadêmicos:", err)
