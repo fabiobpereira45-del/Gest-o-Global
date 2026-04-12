@@ -99,7 +99,8 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                             // Primeiro, tenta buscar nos horários específicos (schedules)
                             const highlightedFromSchedules = mySchedules.filter(s => {
                                 const disc = disciplines.find(d => d.id === s.disciplineId)
-                                return disc?.executionDate === now
+                                if (!disc?.executionDate) return false
+                                return disc.executionDate.startsWith(now)
                             })
 
                             if (highlightedFromSchedules.length > 0) {
@@ -158,7 +159,10 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                             }
 
                             // Se não houver horário, tenta buscar na grade curricular global
-                            const highlightedFromCurriculum = disciplines.filter(d => d.executionDate === now)
+                            const highlightedFromCurriculum = disciplines.filter(d => {
+                                if (!d.executionDate) return false
+                                return d.executionDate.startsWith(now)
+                            })
                             
                             if (highlightedFromCurriculum.length > 0) {
                                 return (
@@ -175,7 +179,7 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                     <div>
                                                         <p className="text-2xl font-black text-foreground leading-tight">{disc.name}</p>
                                                         <p className="text-sm text-indigo-700 font-bold uppercase tracking-tighter mt-1">
-                                                            Referência: {new Date(disc.executionDate! + "-02").toLocaleString('pt-br', { month: 'long', year: 'numeric' })}
+                                                            Referência: {new Date(disc.executionDate + "T00:00:00").toLocaleString('pt-br', { month: 'long', year: 'numeric' })}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -253,7 +257,7 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                     </div>
                                                     {disc.executionDate && (
                                                         <span className="text-[10px] font-bold text-muted-foreground">
-                                                            {new Date(disc.executionDate + "-02").toLocaleString('pt-br', { month: 'short', year: 'numeric' })}
+                                                            {new Date(disc.executionDate + "T00:00:00").toLocaleString('pt-br', { month: 'short', year: 'numeric' })}
                                                         </span>
                                                     )}
                                                 </div>
