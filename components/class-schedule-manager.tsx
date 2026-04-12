@@ -450,16 +450,16 @@ export function ClassScheduleManager() {
 
                         <div className="grid grid-cols-1 gap-6 border-t border-border pt-6 mt-2">
                             <div className="flex flex-col gap-2">
-                                <Label className="text-primary font-black uppercase text-[10px] tracking-widest">Data e Hora: Aula Online</Label>
-                                <Input type="datetime-local" value={formOnlineDate} onChange={e => setFormOnlineDate(e.target.value)} className="focus-visible:ring-primary" />
+                                <Label className="text-blue-600 font-black uppercase text-[10px] tracking-widest">Data e Hora: Aula Online</Label>
+                                <Input type="datetime-local" value={formOnlineDate} onChange={e => setFormOnlineDate(e.target.value)} className="focus-visible:ring-blue-600" />
                             </div>
                             <div className="flex flex-col gap-2">
                                 <Label className="text-indigo-600 font-black uppercase text-[10px] tracking-widest">Data e Hora: Vídeo Aula</Label>
                                 <Input type="datetime-local" value={formVideoDate} onChange={e => setFormVideoDate(e.target.value)} className="focus-visible:ring-indigo-600" />
                             </div>
                             <div className="flex flex-col gap-2">
-                                <Label className="text-secondary font-black uppercase text-[10px] tracking-widest">Data e Hora: Prova</Label>
-                                <Input type="datetime-local" value={formExamDate} onChange={e => setFormExamDate(e.target.value)} className="focus-visible:ring-secondary" />
+                                <Label className="text-rose-600 font-black uppercase text-[10px] tracking-widest">Data e Hora: Prova</Label>
+                                <Input type="datetime-local" value={formExamDate} onChange={e => setFormExamDate(e.target.value)} className="focus-visible:ring-rose-600" />
                             </div>
                         </div>
 
