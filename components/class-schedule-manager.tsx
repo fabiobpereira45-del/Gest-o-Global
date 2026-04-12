@@ -281,8 +281,8 @@ export function ClassScheduleManager() {
                                             const cls = classes.find(c => c.id === sched.classId)
 
                                             return (
-                                                <div key={sched.id} className="group relative border border-border bg-background rounded-xl p-3 hover:border-primary/40 transition-colors">
-                                                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div key={sched.id} className="group relative border border-border bg-card hover:bg-background rounded-xl p-4 hover:border-primary/40 transition-all hover:shadow-md">
+                                                    <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                                         <button
                                                             onClick={() => openEditModal(sched)}
                                                             className="h-6 w-6 rounded flex items-center justify-center bg-card border border-border hover:bg-muted text-muted-foreground"
@@ -299,8 +299,8 @@ export function ClassScheduleManager() {
                                                         </button>
                                                     </div>
 
-                                                    <div className="flex items-center justify-between gap-1.5 text-xs font-semibold text-primary mb-1">
-                                                        <div className="flex items-center gap-1.5">
+                                                    <div className="flex items-center justify-between gap-1.5 text-[10px] font-bold text-primary/70 uppercase tracking-wider mb-2">
+                                                        <div className="flex items-center gap-1.5 bg-primary/5 px-2 py-0.5 rounded-md">
                                                             <Clock className="h-3.5 w-3.5" />
                                                             {sched.timeStart.substring(0, 5)} - {sched.timeEnd.substring(0, 5)}
                                                         </div>
@@ -313,16 +313,16 @@ export function ClassScheduleManager() {
                                                         )}
                                                     </div>
 
-                                                    <h4 className="font-bold text-sm leading-tight pr-6 mb-1">
+                                                    <h4 className="font-black text-sm leading-tight pr-14 text-foreground group-hover:text-primary transition-colors">
                                                         {disc?.name || "Disciplina Removida"}
                                                     </h4>
 
-                                                    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-2">
-                                                        <span className="flex items-center gap-1.5">
-                                                            <Users className="h-3 w-3" /> Turma: {cls?.name || "Turma Apagada"}
+                                                    <div className="flex flex-col gap-1 text-[11px] text-muted-foreground mt-3">
+                                                        <span className="flex items-center gap-2">
+                                                            <Users className="h-3 w-3 opacity-50" /> <span className="font-medium">Turma:</span> {cls?.name || "Turma Apagada"}
                                                         </span>
-                                                        <span className="flex items-center gap-1.5">
-                                                            <BookOpen className="h-3 w-3" /> Prof: {sched.professorName}
+                                                        <span className="flex items-center gap-2">
+                                                            <BookOpen className="h-3 w-3 opacity-50" /> <span className="font-medium">Prof:</span> {sched.professorName}
                                                         </span>
                                                         <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between">
                                                             <span className="px-2 py-0.5 bg-accent/10 text-accent rounded-md font-bold">
@@ -352,10 +352,14 @@ export function ClassScheduleManager() {
             )}
 
             {/* Modal Nova Aula */}
-            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader><DialogTitle>{editId ? 'Editar Agendamento' : 'Agendar Aula'}</DialogTitle></DialogHeader>
-                    <div className="flex flex-col gap-4 py-2">
+            <Dialog open={modalOpen} onOpenChange={o => { if(!o) setEditId(null); setModalOpen(o); }}>
+                <DialogContent className="sm:max-w-md p-0 overflow-hidden border-none max-h-[90vh]">
+                    <DialogHeader className="p-6 pb-2">
+                        <DialogTitle className="text-xl font-black">{editId ? 'Editar Agendamento' : 'Agendar Aula'}</DialogTitle>
+                    </DialogHeader>
+                    
+                    <div className="overflow-y-auto px-6 py-2 max-h-[calc(90vh-140px)]">
+                        <div className="flex flex-col gap-5 pb-6">
 
                         <div className="flex flex-col gap-1.5">
                             <Label>Turma *</Label>
@@ -459,10 +463,14 @@ export function ClassScheduleManager() {
                             </div>
                         </div>
 
+                        </div>
                     </div>
-                    <DialogFooter>
+                    
+                    <DialogFooter className="p-6 pt-2 bg-muted/30 border-t border-border mt-auto">
                         <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-                        <Button onClick={handleSave} disabled={!formClassId || !formDisciplineId || !formTimeStart || !formTimeEnd}>Salvar</Button>
+                        <Button className="font-bold" onClick={handleSave} disabled={!formClassId || !formDisciplineId || !formTimeStart || !formTimeEnd}>
+                            {editId ? 'Salvar Alterações' : 'Confirmar Agendamento'}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
