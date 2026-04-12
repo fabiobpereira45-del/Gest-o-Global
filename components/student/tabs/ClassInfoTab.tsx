@@ -1,6 +1,6 @@
 "use client"
 
-import { Users, CalendarDays, Clock, BookOpen, GraduationCap, Video, MonitorPlay, FileChecked2 } from "lucide-react"
+import { Users, CalendarDays, Clock, BookOpen, GraduationCap, Video, MonitorPlay, FileCheck2 } from "lucide-react"
 import type { ClassRoom, StudentProfile, ClassSchedule, Discipline, StudentGrade } from "@/lib/store"
 import { cn } from "@/lib/utils"
 
@@ -139,7 +139,7 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                                 )}
                                                                 {sched.examDate && (
                                                                     <div className="flex items-center gap-2 text-[11px] font-bold text-accent bg-accent/5 p-2 rounded-lg border border-accent/10">
-                                                                        <FileChecked2 className="h-3.5 w-3.5" /> Data da Prova: {formatDateTime(sched.examDate)}
+                                                                        <FileCheck2 className="h-3.5 w-3.5" /> Data da Prova: {formatDateTime(sched.examDate)}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -276,7 +276,7 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                             )}
                                                             {sched.examDate && (
                                                                 <div className="flex items-center gap-2 text-[10px] font-bold text-accent leading-tight">
-                                                                    <FileChecked2 className="h-3 w-3" /> Prova: {formatDateTime(sched.examDate)}
+                                                                    <FileCheck2 className="h-3 w-3" /> Prova: {formatDateTime(sched.examDate)}
                                                                 </div>
                                                             )}
                                                         </div>
