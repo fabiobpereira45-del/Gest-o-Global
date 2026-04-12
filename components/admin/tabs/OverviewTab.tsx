@@ -35,13 +35,13 @@ export function OverviewTab({ assessments, submissions, questions, disciplines }
   const activeAssessment = (assessments || []).find(a => a.id === selectedAssessmentId) || null
   const activeSubs = activeAssessment ? (submissions || []).filter(s => s.assessmentId === activeAssessment.id) : []
   const activeQuestions = activeAssessment
-    ? activeAssessment.questionIds.map((id) => (questions || []).find((q) => q.id === id)).filter(Boolean) as Question[]
+    ? (activeAssessment.questionIds || []).map((id) => (questions || []).find((q) => q.id === id)).filter(Boolean) as Question[]
     : []
 
   const questionStats = (activeQuestions as ReturnType<typeof questions.find>[]).map((q) => {
     if (!q) return null
     const total = activeSubs.length
-    const correct = activeSubs.filter((s) => s.answers.find((a) => a.questionId === q.id)?.answer === q.correctAnswer).length
+    const correct = activeSubs.filter((s) => (s.answers || []).find((a) => a.questionId === q.id)?.answer === q.correctAnswer).length
     return {
       text: q.text.slice(0, 40) + (q.text.length > 40 ? "…" : ""),
       fullText: q.text,
@@ -94,8 +94,8 @@ export function OverviewTab({ assessments, submissions, questions, disciplines }
               <SelectValue placeholder="Selecione uma prova" />
             </SelectTrigger>
             <SelectContent>
-              {assessments.map(a => (
-                <SelectItem key={a.id} value={a.id}>{a.title} ({submissions.filter(s => s.assessmentId === a.id).length} entregas)</SelectItem>
+              {(assessments || []).map(a => (
+                <SelectItem key={a.id} value={a.id}>{a.title} ({(submissions || []).filter(s => s.assessmentId === a.id).length} entregas)</SelectItem>
               ))}
             </SelectContent>
           </Select>
