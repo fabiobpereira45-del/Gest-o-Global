@@ -596,8 +596,14 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                             <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 lg:col-span-3 pt-4">
                                <div className="space-y-2">
                                    <Label className="text-xs font-bold text-blue-500 uppercase tracking-widest">📝 Prova Online</Label>
-                                   <Input type="number" step="0.1" value={formData.examGrade} disabled className="h-11 bg-blue-50 border-blue-100 rounded-lg font-mono font-bold text-blue-700" />
-                                   <p className="text-[10px] text-muted-foreground">Sincronizada automaticamente das avaliações.</p>
+                                   <Input 
+                                       type="number" 
+                                       step="0.1" 
+                                       value={formData.examGrade} 
+                                       onChange={(e) => setFormData({ ...formData, examGrade: e.target.value })}
+                                       className="h-11 bg-blue-50 border-blue-100 rounded-lg font-mono font-bold text-blue-700" 
+                                   />
+                                   <p className="text-[10px] text-muted-foreground italic">Sincronizada automaticamente, mas permite ajuste manual.</p>
                                </div>
                                <div className="space-y-2">
                                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">📚 Leitura do Livro (máx 3)</Label>
