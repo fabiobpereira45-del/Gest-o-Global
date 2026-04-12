@@ -26,7 +26,7 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const [editingSubId, setEditingSubId] = useState<string | null>(null)
-  const [editScore, setEditScore] = useState<number>(0)
+  const [editScore, setEditScore] = useState<string>("")
   const [isSavingScore, setIsSavingScore] = useState(false)
 
   const submissions = allSubmissions
@@ -57,16 +57,17 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
 
   function startEditingScore(sub: StudentSubmission) {
     setEditingSubId(sub.id)
-    setEditScore(sub.score)
+    setEditScore(sub.score.toString())
   }
 
   async function saveScore(sub: StudentSubmission) {
-    if (editScore < 0 || editScore > sub.totalPoints) {
-      return alert(`A nota deve estar entre 0 e ${sub.totalPoints}`)
+    const numericScore = parseFloat(editScore)
+    if (isNaN(numericScore) || numericScore < 0 || numericScore > sub.totalPoints) {
+      return alert(`A nota deve ser um número válido entre 0 e ${sub.totalPoints}`)
     }
     setIsSavingScore(true)
     try {
-      await updateSubmissionScore(sub.id, editScore, sub.totalPoints)
+      await updateSubmissionScore(sub.id, numericScore, sub.totalPoints)
       setEditingSubId(null)
       onRefresh()
     } catch (err: any) {
@@ -177,13 +178,10 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
                     {editingSubId === sub.id ? (
                       <div className="flex items-center justify-center gap-2">
                         <input
-                          type="number"
-                          step={0.1}
-                          min={0}
-                          max={sub.totalPoints}
+                          type="text"
                           className="w-16 border border-input rounded px-2 py-1 text-sm text-center"
                           value={editScore}
-                          onChange={(e) => setEditScore(parseFloat(e.target.value) || 0)}
+                          onChange={(e) => setEditScore(e.target.value)}
                           disabled={isSavingScore}
                         />
                         <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100" onClick={() => saveScore(sub)} disabled={isSavingScore}>

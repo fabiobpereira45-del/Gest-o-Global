@@ -742,9 +742,13 @@ export async function deleteSubmission(id: string): Promise<void> {
   await supabase.from('student_submissions').delete().eq('id', id)
 }
 
-export async function updateSubmissionScore(id: string, score: number, percentage: number): Promise<void> {
+export async function updateSubmissionScore(id: string, newScore: number, totalPoints: number): Promise<void> {
   const supabase = createClient()
-  const { error } = await supabase.from('student_submissions').update({ score, percentage }).eq('id', id)
+  const percentage = totalPoints > 0 ? (newScore / totalPoints) * 100 : 0
+  const { error } = await supabase.from('student_submissions').update({ 
+    score: newScore, 
+    percentage 
+  }).eq('id', id)
   if (error) throw new Error(error.message)
 }
 
