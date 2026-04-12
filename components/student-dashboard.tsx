@@ -84,7 +84,14 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
                         const mates = await getClassmates(p.class_id)
                         setClassmates(mates)
                         
-                        const myGrades = allGrades.filter(g => g.studentId === p.id)
+                        const myGrades = allGrades.filter(g => {
+                            const ident = (g.studentIdentifier || "").toLowerCase().trim()
+                            return (
+                                ident === p.cpf?.toLowerCase().trim() ||
+                                ident === p.enrollment_number?.toLowerCase().trim() ||
+                                ident === p.email?.toLowerCase().trim()
+                            )
+                        })
                         setOfficialGrades(myGrades)
                     }
                 } catch (err) {
