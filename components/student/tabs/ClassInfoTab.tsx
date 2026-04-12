@@ -139,7 +139,7 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                                     </div>
                                                                 )}
                                                                 {sched.videoLessonDate && (
-                                                                    <div className="flex items-center gap-2 text-[11px] font-bold text-secondary bg-secondary/5 p-2 rounded-lg border border-secondary/10">
+                                                                    <div className="flex items-center gap-2 text-[11px] font-bold text-indigo-600 bg-indigo-50 p-2 rounded-lg border border-indigo-100">
                                                                         <Video className="h-3.5 w-3.5" /> Vídeo Aula: {formatDateTime(sched.videoLessonDate)}
                                                                     </div>
                                                                 )}
@@ -279,7 +279,7 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                                 </div>
                                                             )}
                                                             {sched.videoLessonDate && (
-                                                                <div className="flex items-center gap-2 text-[10px] font-bold text-secondary leading-tight">
+                                                                <div className="flex items-center gap-2 text-[10px] font-bold text-indigo-600 leading-tight">
                                                                     <Video className="h-3 w-3" /> Vídeo: {formatDateTime(sched.videoLessonDate)}
                                                                 </div>
                                                             )}
