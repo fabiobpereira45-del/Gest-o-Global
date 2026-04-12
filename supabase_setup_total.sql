@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS public.students (
     email TEXT,
     enrollment_number TEXT UNIQUE,
     phone TEXT,
+    address TEXT,
     church TEXT,
     pastor_name TEXT,
     class_id UUID REFERENCES public.classes(id) ON DELETE SET NULL,
