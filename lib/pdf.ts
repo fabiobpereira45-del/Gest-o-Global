@@ -58,7 +58,7 @@ function formatCurrency(value: number): string {
 
 // ——— Modern Template Wrapper ——————————————————————————————————————————————————————
 
-function getModernTemplate(content: string, title: string, hubName?: string): string {
+function getModernTemplate(content: string, title: string, hubName?: string, pageSize: "A4" | "A5 landscape" = "A4"): string {
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -77,7 +77,7 @@ function getModernTemplate(content: string, title: string, hubName?: string): st
         }
         
         @page {
-            size: A4;
+            size: ${pageSize};
             margin: 15mm;
         }
 
@@ -333,7 +333,7 @@ export function printReceiptPDF(tuition: StudentTuition, student: StudentProfile
             </div>
         </div>
     `
-    safePrint(getModernTemplate(content, "Recibo de Pagamento", hubName), existingWin)
+    safePrint(getModernTemplate(content, "Recibo de Pagamento", hubName, "A5 landscape"), existingWin)
 }
 
 export function printProfessorReceiptPDF(transaction: FinancialTransaction, professor: ProfessorAccount, discipline: Discipline, hubName?: string, existingWin?: Window | null): void {
@@ -392,7 +392,7 @@ export function printProfessorReceiptPDF(transaction: FinancialTransaction, prof
             </div>
         </div>
     `
-    safePrint(getModernTemplate(content, "Recibo de Pro-labore", hubName), existingWin)
+    safePrint(getModernTemplate(content, "Recibo de Pro-labore", hubName, "A5 landscape"), existingWin)
 }
 
 export function printFinancialDRE_PDF(transactions: FinancialTransaction[], competencia: string, hubName?: string, existingWin?: Window | null): void {
