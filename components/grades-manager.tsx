@@ -381,10 +381,30 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
 
             // Converter os resultados em um ÚNICO lote de salvamento (Muito mais rápido)
             const recordsToSave = Object.entries(syncData).map(([identifier, data]) => {
-                const existing = grades.find(g => 
-                    g.studentIdentifier.toLowerCase().trim() === identifier && 
-                    g.disciplineId === selectedDiscipline
-                )
+                // Encontra o perfil do aluno para buscar por outros identificadores possíveis
+                const student = students.find(s => {
+                    const id = String(identifier).trim().toLowerCase()
+                    return (
+                        (s.email || "").toLowerCase() === id ||
+                        (s.cpf || "").replace(/\D/g, "") === id.replace(/\D/g, "") ||
+                        (s.enrollment_number || "").toLowerCase() === id
+                    )
+                })
+
+                // Busca registro existente usando qualquer um dos identificadores conhecidos do aluno
+                const existing = grades.find(g => {
+                    if (g.disciplineId !== selectedDiscipline) return false;
+                    const gId = String(g.studentIdentifier || "").trim().toLowerCase();
+                    if (gId === identifier) return true;
+                    if (student) {
+                        return (
+                            gId === (student.email || "").toLowerCase() ||
+                            gId === (student.cpf || "").replace(/\D/g, "") ||
+                            gId === (student.enrollment_number || "").toLowerCase()
+                        );
+                    }
+                    return false;
+                })
 
                 return {
                     studentIdentifier: identifier,
@@ -491,11 +511,22 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
             })
             .sort((a, b) => a.studentName.localeCompare(b.studentName))
 
-        // AGRUPAMENTO: Um card por estudante, com todas as disciplinas dentro
+        // AGRUPAMENTO: Um card por estudante, consolidando múltiplos registros/identificadores
         const groupsMap = new Map<string, { studentName: string; studentIdentifier: string; isPublic: boolean; grades: StudentGrade[] }>();
         
         raw.forEach(g => {
-            const key = String(g.studentIdentifier || "").trim().toLowerCase();
+            // Tenta identificar o aluno pelo perfil para agrupar registros fragmentados (CPF, Matrícula, Email)
+            const student = students.find(s => {
+                const id = String(g.studentIdentifier || "").trim().toLowerCase()
+                return (
+                    (s.email || "").toLowerCase() === id ||
+                    (s.cpf || "").replace(/\D/g, "") === id.replace(/\D/g, "") ||
+                    (s.enrollment_number || "").toLowerCase() === id
+                )
+            })
+
+            // Usa o ID do perfil como chave de agrupamento, ou o identificador literal se não houver perfil
+            const key = student ? student.id : String(g.studentIdentifier || "").trim().toLowerCase();
             const existing = groupsMap.get(key);
             
             if (!existing) {
@@ -506,19 +537,23 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                     grades: [g]
                 });
             } else {
-                // Adiciona a nota de outra disciplina ao mesmo aluno
-                // Nota: se o mesmo aluno+disciplina aparecer (duplicidade no banco), pegamos o que tiver mais dados
+                // Adiciona ou mescla a nota
                 const discId = g.disciplineId || 'geral';
                 const alreadyHasDisc = existing.grades.find(eg => (eg.disciplineId || 'geral') === discId);
                 
                 if (!alreadyHasDisc) {
                     existing.grades.push(g);
                 } else {
-                    // Substitui se o registro atual for mais completo
-                    const existingScore = (alreadyHasDisc.examGrade || 0) + (alreadyHasDisc.attendanceScore || 0);
-                    const newScore = (g.examGrade || 0) + (g.attendanceScore || 0);
-                    if (newScore > existingScore) {
-                        existing.grades = existing.grades.map(eg => eg.id === alreadyHasDisc.id ? g : eg);
+                    // Se houver duplicidade da mesma disciplina para o mesmo aluno (fragmentação),
+                    // mantemos o que tiver o ID original do banco para permitir edição correta, 
+                    // ou o que tiver mais dados preenchidos.
+                    const existingWeight = (alreadyHasDisc.examGrade || 0) + (alreadyHasDisc.worksGrade || 0) + (alreadyHasDisc.attendanceScore || 0);
+                    const newWeight = (g.examGrade || 0) + (g.worksGrade || 0) + (g.attendanceScore || 0);
+                    
+                    if (newWeight > existingWeight) {
+                        existing.grades = existing.grades.map(eg => (eg.disciplineId || 'geral') === discId ? g : eg);
+                        // Atualiza o identificador principal do grupo se necessário
+                        existing.studentIdentifier = g.studentIdentifier;
                     }
                 }
             }

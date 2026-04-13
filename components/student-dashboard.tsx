@@ -84,7 +84,7 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
                         const mates = await getClassmates(p.class_id)
                         setClassmates(mates)
                         
-                        const myGrades = allGrades.filter(g => {
+                        const myGradesRaw = allGrades.filter(g => {
                             const ident = (g.studentIdentifier || "").toLowerCase().trim()
                             return (
                                 ident === p.cpf?.toLowerCase().trim() ||
@@ -92,7 +92,30 @@ export function StudentDashboard({ session, onBack, onLogout }: Props) {
                                 ident === p.email?.toLowerCase().trim()
                             )
                         })
-                        setOfficialGrades(myGrades)
+
+                        // CONSOLIDAÇÃO: Mescla registros fragmentados da mesma disciplina
+                        const consolidatedMap = new Map<string, StudentGrade>();
+                        myGradesRaw.forEach(g => {
+                            const discKey = g.disciplineId || 'geral';
+                            const existing = consolidatedMap.get(discKey);
+                            if (!existing) {
+                                consolidatedMap.set(discKey, { ...g });
+                            } else {
+                                // Pega o melhor valor de cada campo entre os fragmentos
+                                consolidatedMap.set(discKey, {
+                                    ...existing,
+                                    examGrade: Math.max(existing.examGrade || 0, g.examGrade || 0),
+                                    worksGrade: Math.max(existing.worksGrade || 0, g.worksGrade || 0),
+                                    seminarGrade: Math.max(existing.seminarGrade || 0, g.seminarGrade || 0),
+                                    participationBonus: Math.max(existing.participationBonus || 0, g.participationBonus || 0),
+                                    attendanceScore: Math.max(existing.attendanceScore || 0, g.attendanceScore || 0),
+                                    // Se algum estiver liberado, o consolidado também está
+                                    isReleased: existing.isReleased || g.isReleased
+                                });
+                            }
+                        });
+                        
+                        setOfficialGrades(Array.from(consolidatedMap.values()))
                     }
                 } catch (err) {
                     console.error("Erro ao carregar dados acadêmicos:", err)
