@@ -312,7 +312,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                     seminarGrade: existing?.seminarGrade || 0,
                     participationBonus: existing?.participationBonus || 0,
                     attendanceScore: (data as any).attendanceScore,
-                    customDivisor: existing?.customDivisor || 4,
+                    customDivisor: existing?.customDivisor || 2,
                     isReleased: true,
                     id: existing?.id
                 }

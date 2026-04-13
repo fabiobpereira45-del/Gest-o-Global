@@ -1388,26 +1388,58 @@ export async function syncGradesForDiscipline(disciplineId: string) {
   const totalPresencial = presencialDates.size
   const totalOnline = onlineDates.size
 
-  // 6. Mapear Estudantes envolvidos (Otimizado: Buscar apenas o estritamente necessário)
-  const involvedStudentIds = Array.from(new Set((attendances || []).map((a: any) => a.student_id)))
+  // 6. Mapear Estudantes envolvidos — buscamos em lotes para evitar URLs gigantes
+  const involvedStudentIds = Array.from(new Set((attendances || []).map((a: any) => a.student_id))).filter(Boolean)
   const involvedStudentEmails = Array.from(new Set((submissions || []).map((s: any) => (s.student_email || "").toLowerCase().trim()))).filter(Boolean)
 
   let studentProfiles: any[] = []
   
-  // Busca em lotes de estudantes para evitar estouro de URL (máximo 100 por vez ou OR complexo)
-  if (involvedStudentIds.length > 0 || involvedStudentEmails.length > 0) {
-    const { data } = await supabase.from('students')
-      .select('id, email, name')
-      .or(`id.in.(${involvedStudentIds.join(',')}),email.in.(${involvedStudentEmails.map(e => `"${e}"`).join(',')})`)
-    studentProfiles = data || []
+  // Busca em lotes para evitar estouro de URL
+  const BATCH = 50
+  const profilesByEmail = new Map<string, any>()
+  const profilesById = new Map<string, any>()
+
+  // Buscar por email em lotes
+  for (let i = 0; i < involvedStudentEmails.length; i += BATCH) {
+    const chunk = involvedStudentEmails.slice(i, i + BATCH)
+    const { data } = await supabase.from('students').select('id, email, name').in('email', chunk)
+    ;(data || []).forEach((p: any) => {
+      const emailKey = (p.email || "").toLowerCase().trim()
+      if (emailKey) profilesByEmail.set(emailKey, p)
+      if (p.id) profilesById.set(p.id, p)
+    })
   }
+  // Buscar por ID (para alunos de frequência que talvez não tenham submetido)
+  for (let i = 0; i < involvedStudentIds.length; i += BATCH) {
+    const chunk = involvedStudentIds.slice(i, i + BATCH)
+    const { data } = await supabase.from('students').select('id, email, name').in('id', chunk)
+    ;(data || []).forEach((p: any) => {
+      const emailKey = (p.email || "").toLowerCase().trim()
+      if (emailKey) profilesByEmail.set(emailKey, p)
+      if (p.id) profilesById.set(p.id, p)
+    })
+  }
+  studentProfiles = Array.from(new Map([...profilesByEmail.entries()].map(([k, v]) => [v.id || k, v])).values())
 
   const syncResults: Record<string, { examGrade: number; attendanceScore: number; name: string }> = {};
 
-  // Inicializar mapa de resultados
+  // ── INICIALIZAR A PARTIR DAS SUBMISSÕES DIRETAMENTE ──────────────────────
+  // Garante que TODOS os que submeteram aparecem no boletim,
+  // independente de o email estar cadastrado com exatidão na tabela students.
+  ;(submissions || []).forEach((sub: any) => {
+    const key = (sub.student_email || "").toLowerCase().trim()
+    if (!key) return
+    if (!syncResults[key]) {
+      // Usa o nome do perfil se existir, senão usa o nome da submissão
+      const profile = profilesByEmail.get(key)
+      syncResults[key] = { examGrade: 0, attendanceScore: 0, name: profile?.name || sub.student_name || key }
+    }
+  })
+
+  // Também inicializa alunos que têm frequência registrada mas podem não ter submetido
   studentProfiles.forEach((p: any) => {
     const key = (p.email || "").toLowerCase().trim();
-    if (!key) return;
+    if (!key || syncResults[key]) return; // já existe da submissão
     syncResults[key] = { examGrade: 0, attendanceScore: 0, name: p.name };
   });
 
@@ -1434,6 +1466,7 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     }
     syncResults[key].examGrade = Math.max(syncResults[key].examGrade, examGrade);
   });
+
 
   // Processar Frequência com PESOS por tipo
   const profileById = new Map(studentProfiles.map(p => [p.id, p]))
