@@ -541,7 +541,7 @@ export function printStudentPDF({ submission, assessment, questions }: { submiss
         </div>
         <div style="text-align:center;padding:0 20px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
             <p style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Nota Final</p>
-            <p style="font-size:24px;font-weight:800;color:#1e3a5f;">${(submission?.score || 0).toFixed(1)} <span style="font-size:14px;color:#64748b;font-weight:400;">/ ${(submission?.totalPoints || 0).toFixed(1)}</span></p>
+            <p style="font-size:24px;font-weight:800;color:#1e3a5f;">${((submission?.percentage || 0) / 10).toFixed(1)} <span style="font-size:14px;color:#64748b;font-weight:400;">/ 10.0</span></p>
         </div>
         <div style="text-align:right;">
             <p style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Desempenho</p>
@@ -669,13 +669,14 @@ export function printOverviewPDF({ assessments, submissions, questions }: { asse
     const qList = Array.isArray(questions) ? questions : []
     const aList = Array.isArray(assessments) ? assessments : []
 
-    const avgScore = subList.length > 0 ? (subList.reduce((acc, s) => acc + (s?.score || 0), 0) / subList.length) : 0
+    const avgPercentage = subList.length > 0 ? (subList.reduce((acc, s) => acc + (s?.percentage || 0), 0) / subList.length) : 0
+    const avgScore = avgPercentage / 10
     
     const rows = subList.map((s, i) => `
         <tr>
             <td width="40">${i+1}</td>
             <td class="row-accent">${s?.studentName || '—'}</td>
-            <td style="font-weight:700; color:#1e3a5f;">${(s?.score || 0).toFixed(1)}</td>
+            <td style="font-weight:700; color:#1e3a5f;">${((s?.percentage || 0) / 10).toFixed(1)}</td>
             <td style="text-align:right;"><span class="badge ${s?.percentage >= 70 ? 'badge-success' : 'badge-danger'}">${s?.percentage || 0}%</span></td>
         </tr>
     `).join('')
