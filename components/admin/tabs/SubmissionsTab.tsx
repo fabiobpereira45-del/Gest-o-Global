@@ -35,8 +35,8 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
 
   const selectedAssessment = assessments.find((a) => a.id === selectedAssessmentId)
 
-  const averageScore = submissions.length > 0
-    ? submissions.reduce((acc, curr) => acc + curr.score, 0) / submissions.length
+  const averagePercentage = submissions.length > 0
+    ? submissions.reduce((acc, curr) => acc + curr.percentage, 0) / submissions.length
     : 0
 
   function handlePDF(sub: StudentSubmission) {
@@ -134,8 +134,8 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
             <div>
               <p className="text-xs text-muted-foreground uppercase font-medium">Média da Turma</p>
               <div className="flex items-baseline gap-1">
-                <p className="text-2xl font-bold">{averageScore.toFixed(1)}</p>
-                <p className="text-sm text-muted-foreground">/ {selectedAssessment.totalPoints.toFixed(1)} pts</p>
+                <p className="text-2xl font-bold">{(averagePercentage / 10).toFixed(1)}</p>
+                <p className="text-sm text-muted-foreground">/ 10.0</p>
               </div>
             </div>
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
@@ -193,10 +193,11 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
                       </div>
                     ) : (
                       <span className={`px-2 py-0.5 rounded flex items-center justify-center font-bold font-mono text-sm max-w-[80px] mx-auto ` + (sub.percentage >= 70 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
-                        {sub.score.toFixed(1)}
+                        {(sub.percentage / 10).toFixed(1)}
                       </span>
                     )}
                   </td>
+
                   <td className="px-4 py-3 text-center hidden md:table-cell text-muted-foreground">
                     {formatTime(sub.timeElapsedSeconds)}
                   </td>

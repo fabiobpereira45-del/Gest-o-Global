@@ -161,8 +161,8 @@ export function AssessmentResult({ submission, onBack }: Props) {
                 {resultsReleased ? (
                   <>
                     <div className="flex items-baseline justify-center gap-2 mb-2">
-                       <h2 className="text-7xl font-black tracking-tight drop-shadow-lg font-serif">{submission.score.toFixed(1)}</h2>
-                       <span className="text-2xl font-bold opacity-70"> / {submission.totalPoints.toFixed(1)}</span>
+                       <h2 className="text-7xl font-black tracking-tight drop-shadow-lg font-serif">{(submission.percentage / 10).toFixed(1)}</h2>
+                       <span className="text-2xl font-bold opacity-70"> / 10.0</span>
                     </div>
                     
                     <div className="flex items-center justify-center gap-3 mt-4">
