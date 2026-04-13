@@ -52,7 +52,7 @@ import { printFinancialDRE_PDF, printTuitionReportPDF, printReceiptPDF, printPro
 // --- Constants ---
 const CATEGORIES = [
   "Alimento", "Limpeza", "Professores", "Material de Escritório", "Transporte", 
-  "Pessoal", "Aluguel", "Energia/Água", "Internet", "Marketing", "Eventos", "Outros"
+  "Pessoal", "Aluguel", "Energia/Água", "Internet", "Marketing", "Eventos", "Material Didático", "Outros"
 ]
 
 const COLORS = ["#f97316", "#1e3a5f", "#4c1d95", "#16a34a", "#dc2626", "#8b5cf6", "#eab308"]
@@ -351,7 +351,12 @@ export function FinancialManager() {
                                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                                       </Button>
                                     )}
-                                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteFinancialTransaction(t.id)}>
+                                    <Button size="sm" variant="ghost" className="text-destructive" onClick={async () => {
+                                       if (confirm('Deseja excluir permanentemente este lançamento?')) {
+                                          await deleteFinancialTransaction(t.id);
+                                          await loadData();
+                                       }
+                                    }}>
                                        <Trash2 className="h-4 w-4" />
                                     </Button>
                                  </td>
@@ -411,23 +416,44 @@ export function FinancialManager() {
                                 </td>
                                 <td className="p-4 flex gap-2">
                                    {!alreadyPaid && (
-                                     <Button 
-                                       size="sm" 
-                                       variant="default" 
-                                       disabled={!prof}
-                                       onClick={async () => {
-                                          if (!prof) return
-                                          await processProfessorPayment({
-                                            professorId: prof.id,
-                                            disciplineId: d.id,
-                                            amount: settings.proLaboreRate,
-                                            paymentDate: new Date().toISOString().split('T')[0]
-                                          })
-                                          loadData()
-                                       }}
-                                     >
-                                        Dar Baixa
-                                     </Button>
+                                     <>
+                                       <Button 
+                                         size="sm" 
+                                         variant="default" 
+                                         disabled={!prof}
+                                         onClick={async () => {
+                                            if (!prof) return
+                                            await processProfessorPayment({
+                                              professorId: prof.id,
+                                              disciplineId: d.id,
+                                              amount: settings.proLaboreRate,
+                                              paymentDate: new Date().toISOString().split('T')[0]
+                                            })
+                                            loadData()
+                                         }}
+                                       >
+                                          Dar Baixa
+                                       </Button>
+                                       <Button 
+                                         size="sm" 
+                                         variant="outline"
+                                         className="text-muted-foreground hover:text-emerald-700 hover:border-emerald-500/50"
+                                         disabled={!prof}
+                                         title="Baixa isenta de taxa (Voluntário)"
+                                         onClick={async () => {
+                                            if (!prof || !confirm(`Dar baixa administrativa em ${d.name} para o professor voluntário ${prof.name} (R$ 0,00)?\nNenhuma despesa de caixa será gerada.`)) return
+                                            await processProfessorPayment({
+                                              professorId: prof.id,
+                                              disciplineId: d.id,
+                                              amount: 0,
+                                              paymentDate: new Date().toISOString().split('T')[0]
+                                            })
+                                            loadData()
+                                         }}
+                                       >
+                                          Voluntário
+                                       </Button>
+                                     </>
                                    )}
                                    {alreadyPaid && (
                                      <>
