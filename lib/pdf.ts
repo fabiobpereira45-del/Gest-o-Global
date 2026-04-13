@@ -58,7 +58,11 @@ function formatCurrency(value: number): string {
 
 // ——— Modern Template Wrapper ——————————————————————————————————————————————————————
 
-function getModernTemplate(content: string, title: string, hubName?: string, pageSize: "A4" | "A5 landscape" = "A4"): string {
+function getModernTemplate(content: string, title: string, hubName?: string, pageSize: "A4" | "A5 landscape" | "receipt" = "A4"): string {
+  const isReceipt = pageSize === "receipt";
+  const bodyClass = isReceipt ? "receipt-mode" : "";
+  const pageValue = isReceipt ? "A4" : pageSize;
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -73,13 +77,35 @@ function getModernTemplate(content: string, title: string, hubName?: string, pag
             color: #1a202c; 
             background: #fff; 
             line-height: 1.5;
-            padding: 20px;
+            padding: ${isReceipt ? '15px' : '20px'};
         }
         
         @page {
-            size: ${pageSize};
-            margin: 15mm;
+            size: ${pageValue};
+            margin: ${isReceipt ? '10mm' : '15mm'};
         }
+
+        .receipt-mode {
+            max-height: 48vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border-bottom: 1px dashed #cbd5e1;
+            padding-bottom: 20px;
+        }
+        .receipt-mode .header { padding-bottom: 10px; margin-bottom: 15px; border-bottom-width: 1px;}
+        .receipt-mode .header-logo { height: 40px; }
+        .receipt-mode .header-info { margin-left: 10px; }
+        .receipt-mode .institution-name { font-size: 13px; margin-bottom: 0px; }
+        .receipt-mode .hub-name { font-size: 10px; }
+        .receipt-mode h1 { font-size: 14px; margin-bottom: 15px; }
+        .receipt-mode .content p, .receipt-mode .content span { font-size: 11px; }
+        .receipt-mode .content h2, .receipt-mode .content strong { font-size: 12px; }
+        .receipt-mode table { font-size: 10px; margin-bottom: 10px; }
+        .receipt-mode th, .receipt-mode td { padding: 6px 8px; }
+        .receipt-mode .footer { margin-top: auto; padding-top: 10px; font-size: 9px; }
+        .receipt-mode .signature-box { margin-top: 25px; gap: 20px; }
+        .receipt-mode .signature-line { font-size: 9px; }
 
         @media print {
             body { padding: 0; }
@@ -167,7 +193,7 @@ function getModernTemplate(content: string, title: string, hubName?: string, pag
         }
     </style>
 </head>
-<body>
+<body class="${bodyClass}">
     <div class="header">
         <img src="${IBAD_LOGO}" class="header-logo" alt="IBAD Logo" />
         <div class="header-info">
@@ -333,7 +359,7 @@ export function printReceiptPDF(tuition: StudentTuition, student: StudentProfile
             </div>
         </div>
     `
-    safePrint(getModernTemplate(content, "Recibo de Pagamento", hubName, "A5 landscape"), existingWin)
+    safePrint(getModernTemplate(content, "Recibo de Pagamento", hubName, "receipt"), existingWin)
 }
 
 export function printProfessorReceiptPDF(transaction: FinancialTransaction, professor: ProfessorAccount, discipline: Discipline, hubName?: string, existingWin?: Window | null): void {
@@ -392,7 +418,7 @@ export function printProfessorReceiptPDF(transaction: FinancialTransaction, prof
             </div>
         </div>
     `
-    safePrint(getModernTemplate(content, "Recibo de Pro-labore", hubName, "A5 landscape"), existingWin)
+    safePrint(getModernTemplate(content, "Recibo de Pro-labore", hubName, "receipt"), existingWin)
 }
 
 export function printFinancialDRE_PDF(transactions: FinancialTransaction[], competencia: string, hubName?: string, existingWin?: Window | null): void {

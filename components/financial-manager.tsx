@@ -549,6 +549,27 @@ export function FinancialManager() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isSyncOpen} onOpenChange={setIsSyncOpen}>
+        <DialogContent>
+           <DialogHeader><DialogTitle>Sincronizar Mensalidades em Lote</DialogTitle></DialogHeader>
+           <div className="space-y-4 pt-2">
+              <p className="text-sm text-muted-foreground">Esta ação irá verificar o currículo de todos os alunos ativos e gerar faturamentos pendentes para quaisquer disciplinas que ainda não possuam mensalidade lançada. Nenhum pagamento já faturado será duplicado ou afetado.</p>
+              <DialogFooter>
+                 <Button type="button" variant="ghost" onClick={() => setIsSyncOpen(false)}>Cancelar</Button>
+                 <Button onClick={async () => {
+                    setLoading(true)
+                    const activeStudents = students.filter(s => s.status === 'active')
+                    for (const s of activeStudents) {
+                       await syncStudentTuition(s.id)
+                    }
+                    await loadData()
+                    setIsSyncOpen(false)
+                 }}>Confirmar Sincronização</Button>
+              </DialogFooter>
+           </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }
