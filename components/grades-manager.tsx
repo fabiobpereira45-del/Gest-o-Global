@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, memo } from "react"
+import { useState, useEffect, useMemo, memo, useRef } from "react"
 import {
     Plus, Pencil, Trash2, GraduationCap, Calculator, Loader2, Save, X, Download, Eye, EyeOff, CheckCheck, RefreshCw, Search
 } from "lucide-react"
@@ -152,6 +152,8 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
     const [selectedDiscipline, setSelectedDiscipline] = useState<string>("")
     const [searchName, setSearchName] = useState("")
     const [isSyncing, setIsSyncing] = useState(false)
+    // Ref para preservar scroll ao editar/salvar
+    const savedScrollY = useRef(0)
 
     // Form State
     const [formData, setFormData] = useState<any>({
@@ -244,9 +246,31 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                 isEditing || undefined
             )
 
+            // Atualiza localmente sem recarregar (mantém ordem e posição do scroll)
+            setGrades(prev => {
+                const updatedGrade: StudentGrade = {
+                    ...gradeToSave,
+                    id: isEditing || `temp-${Date.now()}`,
+                    createdAt: new Date().toISOString()
+                }
+                if (isEditing) {
+                    // Substituir o registro existente no mesmo índice
+                    return prev.map(g => g.id === isEditing ? updatedGrade : g)
+                } else {
+                    // Inserir novo e manter ordem alfabética
+                    return [...prev, updatedGrade].sort((a, b) =>
+                        a.studentName.localeCompare(b.studentName, 'pt-BR')
+                    )
+                }
+            })
+
             setIsCreating(false)
             setIsEditing(null)
-            loadData()
+
+            // Restaurar scroll para onde o aluno estava antes da edição
+            requestAnimationFrame(() => {
+                window.scrollTo({ top: savedScrollY.current, behavior: 'smooth' })
+            })
         } catch (err: any) {
             alert("Erro ao salvar notas: " + err.message)
         }
@@ -730,9 +754,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                             calculateAverage={calculateAverage}
                                             computeFrequency={computeFrequency}
                                             onEdit={(g) => {
+                                                savedScrollY.current = window.scrollY
                                                 setFormData(g)
                                                 setIsEditing(g.id)
-                                                window.scrollTo({ top: 0, behavior: 'smooth' })
+                                                // Não rola para o topo — mantém o aluno visível
                                             }}
                                             onDelete={(id) => setDeleteConfirm(id)}
                                         />
