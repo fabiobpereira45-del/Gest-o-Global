@@ -78,12 +78,6 @@ const StudentCard = memo(({
                 </div>
 
                 <div className="flex items-center gap-6">
-                    <div className="text-right hidden sm:block">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Média Global</p>
-                        <p className={`text-2xl font-black tabular-nums ${isAnyApproved ? 'text-green-600' : 'text-amber-600'}`}>
-                            {globalAvg}
-                        </p>
-                    </div>
                     <div className={`p-2.5 rounded-xl transition-all duration-300
                         ${isExpanded ? 'rotate-180 bg-primary text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}>
                         <Plus className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-45 text-white' : ''}`} />
