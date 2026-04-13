@@ -1713,6 +1713,12 @@ export async function processTuitionPayment(tuitionId: string, paymentDate: stri
   const { data: tuition } = await supabase.from('student_tuition').select('*').eq('id', tuitionId).single()
   if (!tuition) return
 
+  // Usa o competencia da disciplina (due_date), não do mês de pagamento
+  // Isso garante que a receita aparece no mês correto da grade curricular
+  const competencia = tuition.due_date
+    ? String(tuition.due_date).substring(0, 7)
+    : paymentDate.substring(0, 7)
+
   // 1. Create realized income transaction
   const transaction = await addFinancialTransaction({
     category: 'Mensalidade',
@@ -1721,7 +1727,7 @@ export async function processTuitionPayment(tuitionId: string, paymentDate: stri
     amount: Number(tuition.amount),
     date: paymentDate,
     status: 'realized',
-    competencia: paymentDate.substring(0, 7),
+    competencia,
     studentId: tuition.student_id,
     disciplineId: tuition.discipline_id
   })

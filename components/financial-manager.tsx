@@ -113,14 +113,18 @@ export function FinancialManager() {
 
     const pendingTuition = tuitions.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
     
+    // Projeção de pro-labore: total de disciplinas × taxa configurada
+    const proLaboreProjected = disciplines.length * settings.proLaboreRate
+    
     return {
       plannedIncome, realizedIncome,
       plannedExpense, realizedExpense,
       pendingTuition,
+      proLaboreProjected,
       netPlanned: plannedIncome - plannedExpense,
       netRealized: realizedIncome - realizedExpense
     }
-  }, [transactions, tuitions])
+  }, [transactions, tuitions, disciplines, settings])
 
   const chartData = useMemo(() => [
     { name: "Receitas", Previsto: stats.plannedIncome + stats.realizedIncome, Realizado: stats.realizedIncome },
@@ -193,7 +197,7 @@ export function FinancialManager() {
         <StatCard 
           title="Despesa Realizada" 
           value={stats.realizedExpense} 
-          subtitle={`Previsto: R$ ${stats.plannedExpense.toFixed(2)}`}
+          subtitle={`Previsto: R$ ${stats.plannedExpense.toFixed(2)} · Pro-labore projetado: R$ ${stats.proLaboreProjected.toFixed(2)}`}
           icon={<ArrowDownRight className="text-rose-500" />}
           trend="negative"
         />

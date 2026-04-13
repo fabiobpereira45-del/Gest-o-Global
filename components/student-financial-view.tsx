@@ -57,9 +57,18 @@ export function StudentFinancialView({ studentId }: Props) {
   }, [studentId])
 
   const filteredTuitions = useMemo(() => {
-    if (filter === "all") return tuitions
-    return tuitions.filter(t => t.status === filter || (filter === "pending" && t.status === "overdue"))
-  }, [tuitions, filter])
+    // Filtra por status
+    let list = filter === "all"
+      ? tuitions
+      : tuitions.filter(t => t.status === filter || (filter === "pending" && t.status === "overdue"))
+    
+    // SEMPRE ordena pela posição original da disciplina na grade curricular
+    return [...list].sort((a, b) => {
+      const dA = disciplines.find(d => d.id === a.disciplineId)
+      const dB = disciplines.find(d => d.id === b.disciplineId)
+      return (dA?.order ?? 999) - (dB?.order ?? 999)
+    })
+  }, [tuitions, filter, disciplines])
 
   const totals = useMemo(() => {
     const paid = tuitions.filter(t => t.status === 'paid').reduce((acc, t) => acc + t.amount, 0)
