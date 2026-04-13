@@ -1659,6 +1659,45 @@ export async function syncStudentTuition(studentId: string): Promise<void> {
   }
 }
 
+export async function syncBatchTuitions(studentIds: string[]): Promise<void> {
+    const supabase = createClient()
+    const settings = await getFinancialSettings()
+    const disciplines = await getDisciplines()
+    const sorted = disciplines.sort((a, b) => (a.order || 0) - (b.order || 0))
+    
+    // Busca otimizada de todos os registros existentes dos alunos informados
+    const { data: existing } = await supabase.from('student_tuition')
+       .select('student_id, discipline_id')
+       .in('student_id', studentIds)
+       
+    const existingSet = new Set((existing || []).map((e: any) => `${e.student_id}-${e.discipline_id}`))
+  
+    const toInsert: any[] = []
+    
+    for (const studentId of studentIds) {
+      for (const d of sorted) {
+        if (!existingSet.has(`${studentId}-${d.id}`)) {
+          toInsert.push({
+            student_id: studentId,
+            discipline_id: d.id,
+            amount: settings.tuitionRate,
+            due_date: d.executionDate ? `${d.executionDate}-10` : null,
+            status: 'pending',
+            created_at: new Date().toISOString()
+          })
+        }
+      }
+    }
+  
+    if (toInsert.length > 0) {
+      const chunkSize = 500
+      for (let i = 0; i < toInsert.length; i += chunkSize) {
+         const { error } = await supabase.from('student_tuition').insert(toInsert.slice(i, i + chunkSize))
+         if (error) throw error
+      }
+    }
+  }
+
 export async function updateTuition(id: string, data: Partial<StudentTuition>): Promise<void> {
   const supabase = createClient()
   const dbData: any = {}

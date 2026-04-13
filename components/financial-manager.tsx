@@ -21,6 +21,7 @@ import {
   deleteFinancialTransaction,
   getStudentTuitions,
   syncStudentTuition,
+  syncBatchTuitions,
   updateTuition,
   processTuitionPayment,
   revertTuitionPayment,
@@ -46,6 +47,7 @@ import {
 import { 
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select"
+import { toast } from "sonner"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { printFinancialDRE_PDF, printTuitionReportPDF, printReceiptPDF, printProfessorReceiptPDF } from "@/lib/pdf"
 
@@ -138,8 +140,11 @@ export function FinancialManager() {
 
   async function handleSyncAll() {
     setLoading(true)
-    for (const student of students) {
-      await syncStudentTuition(student.id)
+    try {
+       await syncBatchTuitions(students.filter(s => s.status === 'active').map(s => s.id))
+       toast.success("Sincronização concluída com sucesso!")
+    } catch (e) {
+       toast.error("Erro na sincronização!")
     }
     await loadData()
     setLoading(false)
@@ -585,10 +590,14 @@ export function FinancialManager() {
                  <Button onClick={async () => {
                     setLoading(true)
                     const activeStudents = students.filter(s => s.status === 'active')
-                    for (const s of activeStudents) {
-                       await syncStudentTuition(s.id)
-                    }
-                    await loadData()
+                    toast.promise(
+                      syncBatchTuitions(activeStudents.map(s => s.id)).then(() => loadData()),
+                      {
+                        loading: 'Analisando histórico de todos os alunos ativos...',
+                        success: 'Mensalidades em lote lançadas com sucesso!',
+                        error: 'Ocorreu um erro durante a sincronização.',
+                      }
+                    )
                     setIsSyncOpen(false)
                  }}>Confirmar Sincronização</Button>
               </DialogFooter>
