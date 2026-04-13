@@ -291,6 +291,7 @@ export function FinancialManager() {
         )}
 
         {tab === "income" && (
+          <div className="flex flex-col gap-6">
            <Card className="premium-shadow">
               <CardContent className="p-0">
                  <div className="p-4 border-b flex justify-between items-center bg-muted/20">
@@ -323,6 +324,56 @@ export function FinancialManager() {
                  </div>
               </CardContent>
            </Card>
+
+           {/* Tabela de Entradas Confirmadas - transações income */}
+           <Card className="premium-shadow">
+              <CardContent className="p-0">
+                 <div className="p-4 border-b flex justify-between items-center bg-emerald-50">
+                    <h3 className="font-bold flex items-center gap-2 text-emerald-800"><ArrowUpRight className="h-4 w-4 text-emerald-600" /> Entradas Confirmadas (Receita)</h3>
+                    <span className="text-xs text-emerald-600 font-medium">{transactions.filter(t => t.type === 'income').length} registro(s)</span>
+                 </div>
+                 <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                       <thead className="bg-muted/30 border-b">
+                          <tr>
+                             <th className="p-4 font-bold">Data</th>
+                             <th className="p-4 font-bold">Descrição</th>
+                             <th className="p-4 font-bold">Valor</th>
+                             <th className="p-4 font-bold">Competência</th>
+                             <th className="p-4 font-bold">Status</th>
+                             <th className="p-4">Ação</th>
+                          </tr>
+                       </thead>
+                       <tbody>
+                          {transactions.filter(t => t.type === 'income').length === 0 ? (
+                             <tr><td colSpan={6} className="p-12 text-center text-muted-foreground">Nenhuma entrada de receita registrada. Este painel será preenchido automaticamente quando pagamentos forem confirmados.</td></tr>
+                          ) : (
+                             transactions.filter(t => t.type === 'income').map(t => (
+                               <tr key={t.id} className="border-b hover:bg-muted/10">
+                                 <td className="p-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                                 <td className="p-4 text-xs">{t.description}</td>
+                                 <td className="p-4 text-emerald-600 font-bold">R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                 <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{t.competencia || '---'}</span></td>
+                                 <td className="p-4"><StatusBadge status={t.status} /></td>
+                                 <td className="p-4">
+                                    <Button size="sm" variant="ghost" className="text-destructive" onClick={async () => {
+                                       if (confirm('Deseja excluir permanentemente esta entrada de receita?')) {
+                                          await deleteFinancialTransaction(t.id);
+                                          await loadData();
+                                       }
+                                    }}>
+                                       <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                 </td>
+                               </tr>
+                             ))
+                          )}
+                       </tbody>
+                    </table>
+                 </div>
+              </CardContent>
+           </Card>
+          </div>
         )}
 
         {tab === "expenses" && (
