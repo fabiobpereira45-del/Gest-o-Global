@@ -1627,10 +1627,26 @@ export async function deleteFinancialTransaction(id: string): Promise<void> {
 
 export async function getStudentTuitions(studentId?: string): Promise<StudentTuition[]> {
   const supabase = createClient()
-  let query = supabase.from('student_tuition').select('*').order('created_at', { ascending: true })
-  if (studentId) query = query.eq('student_id', studentId)
-  const { data } = await query
-  return (data || []).map(mapStudentTuition)
+  const allData: any[] = []
+  const pageSize = 1000
+  let from = 0
+  let hasMore = true
+
+  while (hasMore) {
+    let query = supabase.from('student_tuition').select('*').order('created_at', { ascending: true }).range(from, from + pageSize - 1)
+    if (studentId) query = query.eq('student_id', studentId)
+    const { data, error } = await query
+    if (error) { console.error('Erro ao buscar tuitions:', error); break }
+    if (data && data.length > 0) {
+      allData.push(...data)
+      from += pageSize
+      if (data.length < pageSize) hasMore = false
+    } else {
+      hasMore = false
+    }
+  }
+
+  return allData.map(mapStudentTuition)
 }
 
 export async function syncStudentTuition(studentId: string): Promise<void> {
@@ -1655,7 +1671,11 @@ export async function syncStudentTuition(studentId: string): Promise<void> {
     }))
 
   if (toInsert.length > 0) {
-    await supabase.from('student_tuition').insert(toInsert)
+    const { error } = await supabase.from('student_tuition').insert(toInsert)
+    if (error) {
+      console.error(`Erro ao sincronizar aluno ${studentId}:`, error)
+      throw error
+    }
   }
 }
 
