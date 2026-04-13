@@ -226,7 +226,10 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                         {officialGrades.map(grade => {
                             const disc = disciplines.find(d => d.id === grade.disciplineId)
                             const dyn = calculateDynamicGrade(grade)
-                            const passingGrade = gradingSettings?.passingAverage || 7
+                            // Normaliza passingAverage: pode estar em escala 0-100 (ex: 70)
+                            // enquanto dyn.media está em escala 0-10. Divide por 10 se > 10.
+                            const rawPassing = gradingSettings?.passingAverage || 7
+                            const passingGrade = rawPassing > 10 ? rawPassing / 10 : rawPassing
                             const isPassing = dyn.media >= passingGrade
 
                             // Check if exam was released by professor
