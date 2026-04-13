@@ -1649,6 +1649,7 @@ export async function syncStudentTuition(studentId: string): Promise<void> {
       student_id: studentId,
       discipline_id: d.id,
       amount: settings.tuitionRate,
+      due_date: d.executionDate ? `${d.executionDate}-10` : null,
       status: 'pending',
       created_at: new Date().toISOString()
     }))

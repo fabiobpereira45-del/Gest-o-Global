@@ -390,7 +390,7 @@ export function FinancialManager() {
                              
                              return (
                               <tr key={d.id} className="border-b transition-colors hover:bg-muted/10">
-                                <td className="p-4 font-mono text-xs">{competencia}</td>
+                                 <td className="p-4 font-mono text-xs">{d.executionDate || competencia}</td>
                                 <td className="p-4 font-medium"><span className="text-muted-foreground mr-2">{index + 1}.</span> {d.name}</td>
                                 <td className="p-4">
                                    <div className="flex flex-col">
