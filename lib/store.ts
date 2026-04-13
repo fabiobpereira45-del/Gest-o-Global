@@ -362,17 +362,18 @@ export function clearStudentSession(): void {
   }
 }
 
-export async function getActiveAssessment(): Promise<Assessment | null> {
+export async function getActiveAssessment(id?: string): Promise<Assessment | null> {
   const supabase = createClient()
   const now = new Date().toISOString()
-  const { data } = await supabase.from('assessments')
-    .select('*')
-    .eq('is_published', true)
-    .lte('open_at', now)
-    .or(`close_at.is.null,close_at.gte.${now}`)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  let query = supabase.from('assessments').select('*').eq('is_published', true)
+  
+  if (id) {
+    query = query.eq('id', id)
+  } else {
+    query = query.lte('open_at', now).or(`close_at.is.null,close_at.gte.${now}`)
+  }
+
+  const { data } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle()
   return data ? mapAssessment(data) : null
 }
 
@@ -503,25 +504,6 @@ export async function updateGradingSettings(settings: Omit<GradingSettings, "id"
   else await supabase.from('grading_settings').insert({ id: uid(), ...updateData })
 }
 
-export async function getFinancialSettings(): Promise<FinancialSettings> {
-  const supabase = createClient()
-  const { data } = await supabase.from('financial_settings').select('*').limit(1).maybeSingle()
-  if (data) return { tuitionRate: Number(data.tuition_rate), proLaboreRate: Number(data.pro_labore_rate) }
-  return { tuitionRate: 300, proLaboreRate: 300 }
-}
-
-export async function updateFinancialSettings(settings: FinancialSettings): Promise<void> {
-  const supabase = createClient()
-  const dbData = { tuition_rate: settings.tuitionRate, pro_labore_rate: settings.proLaboreRate, updated_at: new Date().toISOString() }
-  const { data: existing } = await supabase.from('financial_settings').select('id').limit(1).maybeSingle()
-  if (existing) await supabase.from('financial_settings').update(dbData).eq('id', existing.id)
-  else await supabase.from('financial_settings').insert({ id: uid(), ...dbData })
-
-  // Atualiza automaticamente todas as mensalidades pendentes com o novo valor
-  await supabase.from('student_tuition')
-    .update({ amount: settings.tuitionRate })
-    .neq('status', 'paid')
-}
 
 export async function getClasses(): Promise<ClassRoom[]> {
   const supabase = createClient()

@@ -4,13 +4,14 @@ import { useState, useRef, useEffect } from "react"
 import { useChat } from "@ai-sdk/react"
 import {
     Send, Bot, User, Loader2, Paperclip, X, FileText, ImageIcon,
-    Check, Sparkles, AlertCircle, Trash2
+    Check, Sparkles, AlertCircle, Trash2, MessageSquare
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
     type Discipline,
+    uid
 } from "@/lib/store"
 
 interface Props {
@@ -151,7 +152,5 @@ Deseja que eu adicione mais detalhes técnicos ou mude o formato das questões?`
                 </form>
             </div>
         </div>
-    )
-}
     )
 }

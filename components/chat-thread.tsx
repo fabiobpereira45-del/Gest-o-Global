@@ -27,9 +27,9 @@ export function ChatThread({ disciplineId, studentId, isStudentView, professorNa
         setMessages(msgs)
 
         // Mark unread messages as read
-        const unread = msgs.filter(m => !m.read && (isStudentView ? !m.isFromStudent : m.isFromStudent))
-        for (const msg of unread) {
-            await markChatAsRead(msg.id)
+        const hasUnread = msgs.some(m => !m.read && (isStudentView ? !m.isFromStudent : m.isFromStudent))
+        if (hasUnread) {
+            await markChatAsRead(studentId, disciplineId)
         }
 
         setLoading(false)

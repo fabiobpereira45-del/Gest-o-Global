@@ -31,8 +31,8 @@ interface FormState {
   password: string
   role: "master" | "professor"
   active?: boolean
-  pix_key?: string
-  bank_info?: string
+  pix_key?: string | null
+  bank_info?: string | null
 }
 
 const EMPTY_FORM: FormState = { name: "", email: "", password: "", role: "professor", pix_key: "", bank_info: "" }
@@ -133,7 +133,7 @@ function ProfessorForm({
         <div className="flex flex-col gap-1.5">
           <Label>Chave PIX</Label>
           <Input
-            value={form.pix_key}
+            value={form.pix_key ?? ""}
             onChange={(e) => set("pix_key", e.target.value)}
             placeholder="CPF, E-mail ou Telefone"
             disabled={isSaving}
@@ -142,7 +142,7 @@ function ProfessorForm({
         <div className="flex flex-col gap-1.5">
           <Label>Dados Bancários (Banco, Agência, Conta)</Label>
           <Input
-            value={form.bank_info}
+            value={form.bank_info ?? ""}
             onChange={(e) => set("bank_info", e.target.value)}
             placeholder="Ex: Nubank - Ag: 0001 - Cc: 123456-7"
             disabled={isSaving}

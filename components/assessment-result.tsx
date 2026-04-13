@@ -87,8 +87,8 @@ export function AssessmentResult({ submission, onBack }: Props) {
         const isDirectMatch = studentAns?.answer === q.correctAnswer
         const studentText = (q.choices?.find(c => c.id === studentAns?.answer)?.text || "").trim()
         const correctText = (q.choices?.find(c => c.id === q.correctAnswer)?.text || "").trim()
-        const isTextMatch = studentText && correctText && studentText === correctText
-        isCorrect = isDirectMatch || isTextMatch
+        const isTextMatch = !!(studentText && correctText && studentText === correctText)
+        isCorrect = !!(isDirectMatch || isTextMatch)
         label = q.type === "true-false"
           ? (q.correctAnswer === "true" ? "Verdadeiro" : "Falso")
           : q.choices?.find((c) => c.id === q.correctAnswer)?.text ?? "—"

@@ -48,7 +48,7 @@ export function StudentAssessmentView({ studentName, studentEmail, studentDoc }:
                     .select('*')
                     .eq('student_email', studentEmail)
 
-                const subs: StudentSubmission[] = (subsData || []).map(row => ({
+                const subs: StudentSubmission[] = (subsData || []).map((row: any) => ({
                     id: row.id,
                     assessmentId: row.assessment_id,
                     studentName: row.student_name,
