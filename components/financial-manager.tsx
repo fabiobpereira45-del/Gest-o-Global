@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { 
   BarChart3, TrendingUp, TrendingDown, DollarSign, Calendar, Filter, Download, Plus, 
   Trash2, CheckCircle2, AlertCircle, PieChart, Wallet, ArrowUpRight, ArrowDownRight,
-  MoreHorizontal, FileText, Printer, Calculator, RefreshCw, X, BookOpen, Briefcase
+  MoreHorizontal, FileText, Printer, Calculator, RefreshCw, X, BookOpen, Briefcase, ChevronDown, ChevronUp
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -286,63 +286,24 @@ export function FinancialManager() {
                        </Button>
                     </div>
                  </div>
-                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                       <thead>
-                          <tr className="bg-muted/30 text-muted-foreground font-bold text-left border-b">
-                             <th className="p-4">Aluno</th>
-                             <th className="p-4">Disciplina</th>
-                             <th className="p-4">Vencimento</th>
-                             <th className="p-4">Valor</th>
-                             <th className="p-4">Status</th>
-                             <th className="p-4">Ação</th>
-                          </tr>
-                       </thead>
-                       <tbody>
-                          {tuitions.length === 0 ? (
-                             <tr><td colSpan={6} className="p-20 text-center text-muted-foreground">Nenhuma cobrança gerada. Clique em sincronizar para aplicar o currículo aos alunos.</td></tr>
-                          ) : (
-                             tuitions.slice(0, 50).map(tu => {
-                                const student = students.find(s => s.id === tu.studentId)
-                                const discipline = disciplines.find(d => d.id === tu.disciplineId)
-                                return (
-                                  <tr key={tu.id} className="border-b hover:bg-muted/10 transition-colors">
-                                     <td className="p-4 font-medium">{student?.name || "Desconhecido"}</td>
-                                     <td className="p-4">{discipline?.name || "---"}</td>
-                                     <td className="p-4">
-                                        <Input 
-                                           type="date" 
-                                           defaultValue={tu.dueDate || ""} 
-                                           className="h-8 text-xs border-none hover:bg-white p-0"
-                                           onBlur={async (e) => await updateTuition(tu.id, { dueDate: e.target.value })}
-                                        />
-                                     </td>
-                                     <td className="p-4">R$ {tu.amount.toFixed(2)}</td>
-                                     <td className="p-4">
-                                        <StatusBadge status={tu.status} />
-                                     </td>
-                                     <td className="p-4 flex gap-2">
-                                        {tu.status === 'paid' && (
-                                          <Button size="sm" variant="outline" onClick={() => {
-                                             const st = students.find(s => s.id === tu.studentId)
-                                             const ds = disciplines.find(d => d.id === tu.disciplineId)
-                                             if (st && ds) printReceiptPDF(tu, st, ds, "Cosme de Farias")
-                                          }}>
-                                             <Printer className="h-4 w-4 mr-2" /> Recibo
-                                          </Button>
-                                        )}
-                                        {tu.status !== 'paid' && (
-                                          <Button size="sm" onClick={() => processTuitionPayment(tu.id, new Date().toISOString().split('T')[0])}>
-                                             Receber
-                                          </Button>
-                                        )}
-                                     </td>
-                                  </tr>
-                                )
-                             })
-                          )}
-                       </tbody>
-                    </table>
+                 <div className="p-4 gap-2 flex flex-col min-h-[400px]">
+                    {students.filter(s => s.status === 'active').sort((a,b) => a.name.localeCompare(b.name)).map(student => (
+                        <StudentTuitionRow 
+                           key={student.id} 
+                           student={student} 
+                           disciplines={disciplines} 
+                           tuitions={tuitions.filter(t => t.studentId === student.id)} 
+                           onSync={async (id) => { await syncStudentTuition(id); await loadData(); }}
+                           onPayment={async (id) => { await processTuitionPayment(id, new Date().toISOString().split('T')[0]); await loadData(); }}
+                           onUpdateDate={async (id, dt) => { await updateTuition(id, { dueDate: dt }); await loadData(); }}
+                           onPrintReceipt={(tu, st, ds) => printReceiptPDF(tu, st, ds, "Cosme de Farias")}
+                        />
+                    ))}
+                    {students.filter(s => s.status === 'active').length === 0 && (
+                        <div className="p-20 text-center text-muted-foreground border rounded-md">
+                            Nenhum aluno ativo encontrado no sistema.
+                        </div>
+                    )}
                  </div>
               </CardContent>
            </Card>
@@ -622,3 +583,120 @@ function StatusBadge({ status }: { status: string }) {
     </span>
   )
 }
+
+function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, onUpdateDate, onPrintReceipt }: {
+  student: StudentProfile;
+  disciplines: Discipline[];
+  tuitions: StudentTuition[];
+  onSync: (studentId: string) => Promise<void>;
+  onPayment: (tuitionId: string) => Promise<void>;
+  onUpdateDate: (tuitionId: string, customDate: string) => Promise<void>;
+  onPrintReceipt: (tuition: StudentTuition, student: StudentProfile, discipline: Discipline) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
+
+  const handleSync = async () => {
+    setIsSyncing(true)
+    await onSync(student.id)
+    setIsSyncing(false)
+  }
+
+  const sortedDisciplines = [...disciplines].sort((a, b) => (a.order || 0) - (b.order || 0))
+  
+  return (
+    <div className="border rounded-lg overflow-hidden bg-white shadow-sm transition-all duration-200">
+       <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between p-4 bg-muted/5 hover:bg-muted/20 transition-colors">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 flex-1">
+             <div className="font-bold text-left text-sm sm:text-base text-navy">{student.name}</div>
+             <div className="text-xs text-muted-foreground mr-4 text-left font-mono">{student.enrollment_number || student.cpf}</div>
+             <div className="flex gap-2 mt-1 sm:mt-0">
+                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 uppercase border border-slate-200 shadow-sm">{tuitions.length} Lançamentos</span>
+                 {tuitions.filter(t => t.status === 'overdue').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-50 text-rose-700 uppercase font-bold border border-rose-200">{tuitions.filter(t => t.status === 'overdue').length} em atraso</span>}
+                 {tuitions.filter(t => t.status === 'paid').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 uppercase font-bold border border-emerald-200">{tuitions.filter(t => t.status === 'paid').length} pagos</span>}
+             </div>
+          </div>
+          <div className="ml-4 p-2 rounded-full bg-muted/50 text-muted-foreground hover:bg-primary hover:text-white transition-colors">
+            {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+       </button>
+       
+       {isOpen && (
+          <div className="p-0 sm:p-4 border-t animate-in slide-in-from-top-2 duration-300">
+             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-0 mb-4 gap-4">
+                <div>
+                   <h4 className="font-bold text-sm text-navy uppercase tracking-widest flex items-center gap-2"><PieChart className="w-4 h-4 text-orange" /> Panorama Financeiro</h4>
+                   <p className="text-xs text-muted-foreground">Visão geral do faturamento disciplinar deste aluno ativo.</p>
+                </div>
+                <Button size="sm" variant="outline" className="w-full sm:w-auto shadow-sm" onClick={handleSync} disabled={isSyncing}>
+                   <RefreshCw className={cn("h-3 w-3 mr-2", isSyncing && "animate-spin")} />
+                   Sincronizar Grade Completa
+                </Button>
+             </div>
+             
+             <div className="overflow-x-auto rounded-lg border bg-white premium-shadow">
+                <table className="w-full text-xs text-left">
+                   <thead className="bg-muted/30">
+                      <tr>
+                         <th className="p-3 font-extrabold uppercase text-navy border-b">Disciplina</th>
+                         <th className="p-3 font-extrabold uppercase text-navy border-b">Vencimento</th>
+                         <th className="p-3 font-extrabold uppercase text-navy border-b">Valor</th>
+                         <th className="p-3 font-extrabold uppercase text-navy border-b">Status</th>
+                         <th className="p-3 font-extrabold uppercase text-navy border-b">Ação</th>
+                      </tr>
+                   </thead>
+                   <tbody>
+                      {sortedDisciplines.length === 0 && (
+                         <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhuma disciplina cadastrada na grade curricular.</td></tr>
+                      )}
+                      {sortedDisciplines.map((d, i) => {
+                         const tuition = tuitions.find(t => t.disciplineId === d.id)
+                         return (
+                           <tr key={d.id} className="border-b last:border-0 hover:bg-orange/5 transition-colors group">
+                              <td className="p-3 font-medium flex items-center gap-2">
+                                 <span className="w-5 h-5 flex items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground group-hover:bg-orange/20 group-hover:text-orange transition-colors">{i+1}</span>
+                                 {d.name}
+                              </td>
+                              {tuition ? (
+                                <>
+                                 <td className="p-3">
+                                     <Input 
+                                        type="date" 
+                                        defaultValue={tuition.dueDate || ""} 
+                                        className="h-8 text-xs border-transparent hover:border-border focus:border-border p-1 w-32 shadow-none bg-transparent hover:bg-white"
+                                        onBlur={(e) => onUpdateDate(tuition.id, e.target.value)}
+                                     />
+                                 </td>
+                                 <td className="p-3 font-bold text-navy">R$ {tuition.amount.toFixed(2)}</td>
+                                 <td className="p-3"><StatusBadge status={tuition.status} /></td>
+                                 <td className="p-3">
+                                     <div className="flex gap-2">
+                                     {tuition.status === 'paid' ? (
+                                        <Button size="sm" variant="outline" className="h-8 shadow-sm hover:shadow-md transition-shadow focus:ring-2 focus:ring-emerald-500/20" onClick={() => onPrintReceipt(tuition, student, d)}>
+                                            <Printer className="h-3 w-3 sm:mr-2" /> <span className="hidden sm:inline">Emissão Recibo</span>
+                                        </Button>
+                                     ) : (
+                                        <Button size="sm" className="h-8 shadow-sm hover:shadow-md transition-shadow bg-blue-600 hover:bg-blue-700" onClick={() => onPayment(tuition.id)}>
+                                            <DollarSign className="h-3 w-3 sm:mr-2" /> <span className="hidden sm:inline">Confirmar Pgto</span>
+                                        </Button>
+                                     )}
+                                     </div>
+                                 </td>
+                                </>
+                              ) : (
+                                <>
+                                 <td className="p-3 text-muted-foreground/70 italic text-[11px]" colSpan={4}>Faturamento não gerado para esta matéria. Sincronize para criar.</td>
+                                </>
+                              )}
+                           </tr>
+                         )
+                      })}
+                   </tbody>
+                </table>
+             </div>
+          </div>
+       )}
+    </div>
+  )
+}
+
