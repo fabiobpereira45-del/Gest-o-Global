@@ -503,41 +503,107 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
         const normalize = (str: string) => 
             str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
+        // Helper para similaridade (Levenshtein simples)
+        const getSimilarity = (s1: string, s2: string) => {
+            const longer = s1.length > s2.length ? s1 : s2;
+            const shorter = s1.length > s2.length ? s2 : s1;
+            if (longer.length === 0) return 1.0;
+            
+            const editDistance = (a: string, b: string) => {
+                const costs = [];
+                for (let i = 0; i <= a.length; i++) {
+                    let lastValue = i;
+                    for (let j = 0; j <= b.length; j++) {
+                        if (i === 0) costs[j] = j;
+                        else {
+                            if (j > 0) {
+                                let newValue = costs[j - 1];
+                                if (a.charAt(i - 1) !== b.charAt(j - 1))
+                                    newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                                costs[j - 1] = lastValue;
+                                lastValue = newValue;
+                            }
+                        }
+                    }
+                    if (i > 0) costs[b.length] = lastValue;
+                }
+                return costs[b.length];
+            };
+            return (longer.length - editDistance(longer, shorter)) / longer.length;
+        };
+
+        // 1. Tenta identificar o aluno pelo perfil oficial (CPF, Matrícula, Email) ou Correspondência de Nome Parcial
         raw.forEach(g => {
             const rawId = String(g.studentIdentifier || "").trim().toLowerCase();
             const rawName = normalize(g.studentName);
+            const nameWords = rawName.split(/\s+/).filter(w => w.length > 2); // Palavras com mais de 2 letras
 
-            // 1. Tenta identificar o aluno pelo perfil oficial (CPF, Matrícula, Email)
-            const student = students.find(s => {
-                return (
-                    (s.email || "").toLowerCase() === rawId ||
-                    (s.cpf || "").replace(/\D/g, "") === rawId.replace(/\D/g, "") ||
-                    (s.enrollment_number || "").toLowerCase() === rawId ||
-                    normalize(s.name) === rawName // Matching secundário por nome se o ID divergir
-                )
-            })
+            let student = students.find(s => {
+                const sName = normalize(s.name);
+                const sWords = sName.split(/\s+/);
+                
+                // Match por ID oficial (forte)
+                const matchId = (s.email || "").toLowerCase() === rawId ||
+                               (s.cpf || "").replace(/\D/g, "") === rawId.replace(/\D/g, "") ||
+                               (s.enrollment_number || "").toLowerCase() === rawId;
+                
+                if (matchId) return true;
 
-            // 2. Chave de agrupamento: ID do perfil ou Nome Normalizado (para unificar sem perfil)
+                // Match por correspondência de palavras (Fuzzy)
+                // Se TODAS as palavras do nome da nota (mínimo 2) estão no perfil OU similaridade > 85%
+                if (nameWords.length >= 2) {
+                    const allWordsMatch = nameWords.every(w => sWords.some(sw => sw === w || sw.includes(w)));
+                    if (allWordsMatch) return true;
+                }
+                
+                if (getSimilarity(sName, rawName) > 0.85) return true;
+
+                // Caso contrário, match exato de nome normalizado
+                return sName === rawName;
+            });
+
+            // Se não encontrou aluno mas a nota parece pertencer a alguém já identificado em outro grupo pelo nome
+            // (Processa depois do find do perfil primário)
             const key = student ? `profile-${student.id}` : `name-${rawName}`;
             
-            const existing = groupsMap.get(key);
+            // Tentativa extra de merge por sub-string contra chaves já existentes
+            let finalKey = key;
+            if (!student) {
+                // Se é apenas um nome, tenta ver se já existe um card que "contém" este nome ou vice-versa
+                for (const existingKey of groupsMap.keys()) {
+                    if (existingKey.startsWith('name-')) {
+                        const existingName = existingKey.replace('name-', '');
+                        if (existingName.includes(rawName) || rawName.includes(existingName)) {
+                            finalKey = existingKey;
+                            break;
+                        }
+                    } else if (existingKey.startsWith('profile-')) {
+                        const profileName = normalize(groupsMap.get(existingKey)!.studentName);
+                        if (profileName.includes(rawName) || rawName.includes(profileName)) {
+                            finalKey = existingKey;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            const existing = groupsMap.get(finalKey);
             if (!existing) {
-                groupsMap.set(key, {
+                groupsMap.set(finalKey, {
                     studentName: student ? student.name : g.studentName,
                     studentIdentifier: g.studentIdentifier,
                     isPublic: g.isPublic,
                     grades: [g]
                 });
             } else {
-                // Mescla a nota se for de disciplina diferente
+                // Mescla a nota se for de disciplina diferente ou se for uma atualização
                 const discId = g.disciplineId || 'geral';
                 const alreadyHasDisc = existing.grades.find(eg => (eg.disciplineId || 'geral') === discId);
                 
                 if (!alreadyHasDisc) {
                     existing.grades.push(g);
                 } else {
-                    // Se houver duplicidade da mesma disciplina (fragmentação real),
-                    // mantemos a que tem a maior nota (mais provável ser a correta/atualizada)
+                    // Mantém a versão com mais dados (ex: com nota 4.8 em vez de 0.0)
                     const existingScore = parseFloat(calculateAverage(alreadyHasDisc));
                     const newScore = parseFloat(calculateAverage(g));
                     if (newScore > existingScore) {
