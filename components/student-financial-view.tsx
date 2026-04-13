@@ -3,10 +3,11 @@
 import { useState, useEffect, useMemo } from "react"
 import { 
   DollarSign, Calendar, CheckCircle2, Clock, AlertCircle, 
-  ArrowRight, Download, CreditCard, Filter, ChevronRight
+  ArrowRight, Download, CreditCard, Filter, ChevronRight, Copy, QrCode, FileText
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { 
   getStudentTuitions, 
   getDisciplines, 
@@ -16,7 +17,7 @@ import {
   type Discipline,
   type StudentProfile
 } from "@/lib/store"
-import { printReceiptPDF } from "@/lib/pdf"
+import { printReceiptPDF, printTuitionReportPDF } from "@/lib/pdf"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -30,6 +31,10 @@ export function StudentFinancialView({ studentId }: Props) {
   const [student, setStudent] = useState<StudentProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"all" | "pending" | "paid">("all")
+  const [pixModalOpen, setPixModalOpen] = useState(false)
+  const [activePaymentTitle, setActivePaymentTitle] = useState("")
+
+  const pixKey = "34.567.890/0001-12" // Placeholder PIX key
 
   async function load() {
     setLoading(true)
@@ -98,13 +103,25 @@ export function StudentFinancialView({ studentId }: Props) {
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Meu Extrato Financeiro</h2>
           <p className="text-sm text-muted-foreground">Acompanhe suas mensalidades vinculadas ao currículo acadêmico.</p>
         </div>
-        <Button 
-          className="accent-gradient font-bold shadow-lg shadow-orange/20"
-          onClick={handleBulkPayment}
-          disabled={loading || tuitions.filter(t => t.status !== 'paid').length === 0}
-        >
-          <CreditCard className="h-4 w-4 mr-2" /> Pagar Tudo em Lote
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button 
+            variant="outline"
+            className="font-bold whitespace-nowrap"
+            onClick={() => student && printTuitionReportPDF(tuitions, [student], "Cosme de Farias")}
+          >
+            <FileText className="h-4 w-4 mr-2" /> Baixar Relatório PDF
+          </Button>
+          <Button 
+            className="accent-gradient font-bold shadow-lg shadow-orange/20 whitespace-nowrap"
+            onClick={() => {
+              setActivePaymentTitle("Pagamento em Lote")
+              setPixModalOpen(true)
+            }}
+            disabled={loading || tuitions.filter(t => t.status !== 'paid').length === 0}
+          >
+            <CreditCard className="h-4 w-4 mr-2" /> Pagar Tudo em Lote
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -167,7 +184,10 @@ export function StudentFinancialView({ studentId }: Props) {
                             size="sm" 
                             variant="ghost" 
                             className="text-primary hover:bg-primary/5 font-bold h-8"
-                            onClick={() => processTuitionPayment(tu.id, new Date().toISOString().split('T')[0])}
+                            onClick={() => {
+                              setActivePaymentTitle(discipline?.name || "Mensalidade")
+                              setPixModalOpen(true)
+                            }}
                           >
                             Pagar <ChevronRight className="h-4 w-4 ml-1" />
                           </Button>
@@ -180,6 +200,42 @@ export function StudentFinancialView({ studentId }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={pixModalOpen} onOpenChange={setPixModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><QrCode className="h-5 w-5 text-primary" /> Pagamento via PIX</DialogTitle>
+            <DialogDescription>
+              Escaneie o QR Code ou copie a chave abaixo para quitar <strong>{activePaymentTitle}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center p-6 space-y-6 bg-muted/20 rounded-lg">
+             <div className="w-48 h-48 bg-white border rounded-xl flex items-center justify-center shadow-sm">
+                <QrCode className="h-32 w-32 text-slate-800 opacity-50" />
+                <span className="sr-only">QR Code Placeholder</span>
+             </div>
+             <div className="w-full space-y-2">
+                <p className="text-sm font-bold text-center text-muted-foreground uppercase tracking-widest">Chave PIX (CNPJ)</p>
+                <div className="flex items-center gap-2 w-full">
+                   <div className="flex-1 bg-white border border-border p-3 rounded-md text-center font-mono font-bold text-lg select-all">
+                      {pixKey}
+                   </div>
+                   <Button size="icon" variant="default" className="h-[52px] w-[52px] shadow-md" onClick={() => {
+                     navigator.clipboard.writeText(pixKey)
+                     toast.success("Chave PIX copiada!")
+                   }}>
+                      <Copy className="h-5 w-5" />
+                   </Button>
+                </div>
+             </div>
+          </div>
+          <div className="bg-orange/10 p-3 rounded-md border border-orange/20 mt-2">
+             <p className="text-xs text-orange-700 text-center font-medium">
+               Após realizar a transferência, notifique a secretaria com o comprovante. Seu recibo oficial ficará disponível nesta página assim que for confirmado!
+             </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

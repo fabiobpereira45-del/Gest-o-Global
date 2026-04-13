@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { 
   BarChart3, TrendingUp, TrendingDown, DollarSign, Calendar, Filter, Download, Plus, 
   Trash2, CheckCircle2, AlertCircle, PieChart, Wallet, ArrowUpRight, ArrowDownRight,
-  MoreHorizontal, FileText, Printer, Calculator, RefreshCw, X, BookOpen, Briefcase, ChevronDown, ChevronUp
+  MoreHorizontal, FileText, Printer, Calculator, RefreshCw, X, BookOpen, Briefcase, ChevronDown, ChevronUp, Undo2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,6 +23,7 @@ import {
   syncStudentTuition,
   updateTuition,
   processTuitionPayment,
+  revertTuitionPayment,
   getStudents,
   getDisciplines,
   getFinancialSettings,
@@ -295,6 +296,7 @@ export function FinancialManager() {
                            tuitions={tuitions.filter(t => t.studentId === student.id)} 
                            onSync={async (id) => { await syncStudentTuition(id); await loadData(); }}
                            onPayment={async (id) => { await processTuitionPayment(id, new Date().toISOString().split('T')[0]); await loadData(); }}
+                           onRevert={async (id) => { await revertTuitionPayment(id); await loadData(); }}
                            onUpdateDate={async (id, dt) => { await updateTuition(id, { dueDate: dt }); await loadData(); }}
                            onPrintReceipt={(tu, st, ds) => printReceiptPDF(tu, st, ds, "Cosme de Farias")}
                         />
@@ -428,16 +430,31 @@ export function FinancialManager() {
                                      </Button>
                                    )}
                                    {alreadyPaid && (
-                                     <Button 
-                                       size="sm" 
-                                       variant="outline"
-                                       onClick={() => {
-                                          if (prof) printProfessorReceiptPDF(alreadyPaid as any, prof as any, d as any, "Cosme de Farias")
-                                       }}
-                                     >
-                                        <Printer className="h-4 w-4 mr-2" /> Recibo
-                                     </Button>
-                                   )}
+                                     <>
+                                       <Button 
+                                         size="sm" 
+                                         variant="outline"
+                                         onClick={() => {
+                                            if (prof) printProfessorReceiptPDF(alreadyPaid as any, prof as any, d as any, "Cosme de Farias")
+                                         }}
+                                       >
+                                          <Printer className="h-4 w-4 mr-2" /> Recibo
+                                       </Button>
+                                       <Button 
+                                         size="sm" 
+                                         variant="ghost"
+                                         className="text-destructive hover:bg-destructive/10"
+                                         onClick={async () => {
+                                            if (confirm('Tem certeza que deseja estornar este pagamento?')) {
+                                               await deleteFinancialTransaction(alreadyPaid.id);
+                                               loadData();
+                                            }
+                                         }}
+                                       >
+                                          <Undo2 className="h-4 w-4" />
+                                       </Button>
+                                     </>
+                                    )}
                                 </td>
                               </tr>
                              )
@@ -584,12 +601,13 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, onUpdateDate, onPrintReceipt }: {
+function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, onRevert, onUpdateDate, onPrintReceipt }: {
   student: StudentProfile;
   disciplines: Discipline[];
   tuitions: StudentTuition[];
   onSync: (studentId: string) => Promise<void>;
   onPayment: (tuitionId: string) => Promise<void>;
+  onRevert: (tuitionId: string) => Promise<void>;
   onUpdateDate: (tuitionId: string, customDate: string) => Promise<void>;
   onPrintReceipt: (tuition: StudentTuition, student: StudentProfile, discipline: Discipline) => void;
 }) {
@@ -672,9 +690,18 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
                                  <td className="p-3">
                                      <div className="flex gap-2">
                                      {tuition.status === 'paid' ? (
-                                        <Button size="sm" variant="outline" className="h-8 shadow-sm hover:shadow-md transition-shadow focus:ring-2 focus:ring-emerald-500/20" onClick={() => onPrintReceipt(tuition, student, d)}>
-                                            <Printer className="h-3 w-3 sm:mr-2" /> <span className="hidden sm:inline">Emissão Recibo</span>
-                                        </Button>
+                                        <>
+                                          <Button size="sm" variant="outline" className="h-8 shadow-sm hover:shadow-md transition-shadow focus:ring-2 focus:ring-emerald-500/20" onClick={() => onPrintReceipt(tuition, student, d)}>
+                                              <Printer className="h-3 w-3 sm:mr-2" /> <span className="hidden sm:inline">Emissão Recibo</span>
+                                          </Button>
+                                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={async () => {
+                                            if (confirm('Tem certeza que deseja estornar este pagamento?')) {
+                                               await onRevert(tuition.id)
+                                            }
+                                          }} title="Estornar">
+                                              <Undo2 className="h-4 w-4" />
+                                          </Button>
+                                        </>
                                      ) : (
                                         <Button size="sm" className="h-8 shadow-sm hover:shadow-md transition-shadow bg-blue-600 hover:bg-blue-700" onClick={() => onPayment(tuition.id)}>
                                             <DollarSign className="h-3 w-3 sm:mr-2" /> <span className="hidden sm:inline">Confirmar Pgto</span>

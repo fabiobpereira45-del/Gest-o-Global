@@ -1694,6 +1694,23 @@ export async function processTuitionPayment(tuitionId: string, paymentDate: stri
     transaction_id: transaction.id
   }).eq('id', tuitionId)
 }
+
+export async function revertTuitionPayment(tuitionId: string): Promise<void> {
+  const supabase = createClient()
+  const { data: tuition } = await supabase.from('student_tuition').select('*').eq('id', tuitionId).single()
+  if (!tuition) return
+
+  if (tuition.transaction_id) {
+    await supabase.from('financial_transactions').delete().eq('id', tuition.transaction_id)
+  }
+
+  await supabase.from('student_tuition').update({
+    status: 'pending',
+    paid_at: null,
+    transaction_id: null
+  }).eq('id', tuitionId)
+}
+
 export async function processProfessorPayment(data: { professorId: string; disciplineId: string; amount: number; paymentDate: string }): Promise<FinancialTransaction> {
   const supabase = createClient()
   const { data: prof } = await supabase.from('professor_accounts').select('name').eq('id', data.professorId).single()
