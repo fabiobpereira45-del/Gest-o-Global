@@ -593,16 +593,19 @@ export function FinancialManager() {
                  <Button type="button" variant="ghost" onClick={() => setIsSyncOpen(false)}>Cancelar</Button>
                  <Button onClick={async () => {
                     setLoading(true)
-                    const activeStudents = students.filter(s => s.status === 'active')
-                    toast.promise(
-                      syncBatchTuitions(activeStudents.map(s => s.id)).then(() => loadData()),
-                      {
-                        loading: 'Analisando histórico de todos os alunos ativos...',
-                        success: 'Mensalidades em lote lançadas com sucesso!',
-                        error: 'Ocorreu um erro durante a sincronização.',
-                      }
-                    )
                     setIsSyncOpen(false)
+                    try {
+                      const activeStudents = students.filter(s => s.status === 'active')
+                      toast.loading('Sincronizando mensalidades...', { id: 'sync' })
+                      await syncBatchTuitions(activeStudents.map(s => s.id))
+                      await loadData()
+                      toast.success(`Sincronização concluída! ${activeStudents.length} alunos processados.`, { id: 'sync' })
+                    } catch (e) {
+                      console.error(e)
+                      toast.error('Ocorreu um erro durante a sincronização.', { id: 'sync' })
+                    } finally {
+                      setLoading(false)
+                    }
                  }}>Confirmar Sincronização</Button>
               </DialogFooter>
            </div>
