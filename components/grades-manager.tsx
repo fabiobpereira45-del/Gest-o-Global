@@ -42,59 +42,51 @@ const StudentCard = memo(({
     const [isExpanded, setIsExpanded] = useState(false)
     const [selectedDisc, setSelectedDisc] = useState<string | null>(null)
 
-    const bestAvg = Math.max(...grades.map(g => parseFloat(calculateAverage(g)) || 0))
-    const isAnyApproved = bestAvg >= 7
-    const identifier = grades[0]?.studentIdentifier || ""
+    // Média de todas as disciplinas para o card principal
+    const averages = grades.map(g => parseFloat(calculateAverage(g)) || 0)
+    const globalAvg = (averages.reduce((a, b) => a + b, 0) / (averages.length || 1)).toFixed(1)
+    const isAnyApproved = parseFloat(globalAvg) >= 7
     const initial = studentName.charAt(0).toUpperCase()
 
-    // Disciplina ativa para detalhes
+    // Disciplina ativa para detalhes (abaixo)
     const activeGrade = selectedDisc
-        ? grades.find(g => g.id === selectedDisc) || grades[0]
+        ? (grades.find(g => g.id === selectedDisc) || grades[0])
         : grades[0]
 
     return (
-        <div className={`overflow-hidden transition-all duration-300 border-l-4 rounded-b-xl
-            ${isExpanded ? 'bg-slate-50/80 border-primary shadow-sm' : 'hover:bg-slate-50/40 border-transparent bg-white'}`}>
+        <div className={`overflow-hidden transition-all duration-300 border-l-4 rounded-b-xl mb-3
+            ${isExpanded ? 'bg-slate-50 border-primary shadow-md' : 'hover:bg-slate-50/50 border-transparent bg-white shadow-sm'}`}>
 
-            {/* Cabeçalho do Card — sempre visível */}
+            {/* Cabeçalho do Card — Nome e Média */}
             <div
-                className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none"
+                className="p-6 flex items-center justify-between cursor-pointer select-none"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
-                <div className="flex-1 flex items-center gap-4">
-                    <div className={`h-11 w-11 rounded-xl flex items-center justify-center font-black text-base shadow-sm border
+                <div className="flex items-center gap-4">
+                    <div className={`h-12 w-12 rounded-2xl flex items-center justify-center font-black text-lg shadow-sm border
                         ${isAnyApproved ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
                         {initial}
                     </div>
                     <div>
-                        <div className="flex items-center flex-wrap gap-2 mb-0.5">
-                            <h4 className="font-bold text-foreground text-base tracking-tight">{studentName}</h4>
-                            <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
-                                {grades.length} disciplina{grades.length !== 1 ? 's' : ''}
-                            </span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground font-mono opacity-60">ID: {identifier}</p>
-                        {/* Pílulas das disciplinas */}
-                        <div className="flex flex-wrap gap-1 mt-1">
-                            {grades.map(g => {
-                                const disc = disciplines.find(d => d.id === g.disciplineId)
-                                const avg = calculateAverage(g)
-                                const ok = parseFloat(avg) >= 7
-                                return (
-                                    <span key={g.id} className={`text-[10px] px-2 py-0.5 rounded-full font-bold border
-                                        ${ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                                        {disc?.name || 'Geral'}: {avg}
-                                    </span>
-                                )
-                            })}
+                        <h4 className="font-black text-slate-800 text-lg tracking-tight uppercase">{studentName}</h4>
+                        <div className="flex items-center gap-2 mt-0.5">
+                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-full">
+                                {grades.length} {grades.length === 1 ? 'Disciplina' : 'Disciplinas'}
+                           </span>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full transition-transform duration-300
-                        ${isExpanded ? 'rotate-180 bg-primary/10 text-primary' : 'bg-slate-100 text-slate-400'}`}>
-                        <Plus className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-45' : ''}`} />
+                <div className="flex items-center gap-6">
+                    <div className="text-right hidden sm:block">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Média Global</p>
+                        <p className={`text-2xl font-black tabular-nums ${isAnyApproved ? 'text-green-600' : 'text-amber-600'}`}>
+                            {globalAvg}
+                        </p>
+                    </div>
+                    <div className={`p-2.5 rounded-xl transition-all duration-300
+                        ${isExpanded ? 'rotate-180 bg-primary text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}>
+                        <Plus className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-45 text-white' : ''}`} />
                     </div>
                 </div>
             </div>
@@ -503,65 +495,75 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
     const groupedGrades = useMemo(() => {
         const raw = grades
             .filter(g => {
-                // Se houver disciplina selecionada, filtramos apenas alunos que têm nota nela
-                const matchDiscipline = !selectedDiscipline || g.disciplineId === selectedDiscipline
-                const matchName = !searchName || g.studentName.toLowerCase().includes(searchName.toLowerCase()) || g.studentIdentifier.toLowerCase().includes(searchName.toLowerCase())
+                const matchName = !searchName || 
+                                 g.studentName.toLowerCase().includes(searchName.toLowerCase()) || 
+                                 g.studentIdentifier.toLowerCase().includes(searchName.toLowerCase())
                 const matchStatus = statusFilter === "all" || (statusFilter === "released" ? g.isReleased : !g.isReleased)
-                return matchDiscipline && matchName && matchStatus
+                return matchName && matchStatus
             })
-            .sort((a, b) => a.studentName.localeCompare(b.studentName))
 
         // AGRUPAMENTO: Um card por estudante, consolidando múltiplos registros/identificadores
         const groupsMap = new Map<string, { studentName: string; studentIdentifier: string; isPublic: boolean; grades: StudentGrade[] }>();
         
+        // Helper para normalizar nome (remove acentos e espaços extras)
+        const normalize = (str: string) => 
+            str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
         raw.forEach(g => {
-            // Tenta identificar o aluno pelo perfil para agrupar registros fragmentados (CPF, Matrícula, Email)
+            const rawId = String(g.studentIdentifier || "").trim().toLowerCase();
+            const rawName = normalize(g.studentName);
+
+            // 1. Tenta identificar o aluno pelo perfil oficial (CPF, Matrícula, Email)
             const student = students.find(s => {
-                const id = String(g.studentIdentifier || "").trim().toLowerCase()
                 return (
-                    (s.email || "").toLowerCase() === id ||
-                    (s.cpf || "").replace(/\D/g, "") === id.replace(/\D/g, "") ||
-                    (s.enrollment_number || "").toLowerCase() === id
+                    (s.email || "").toLowerCase() === rawId ||
+                    (s.cpf || "").replace(/\D/g, "") === rawId.replace(/\D/g, "") ||
+                    (s.enrollment_number || "").toLowerCase() === rawId ||
+                    normalize(s.name) === rawName // Matching secundário por nome se o ID divergir
                 )
             })
 
-            // Usa o ID do perfil como chave de agrupamento, ou o identificador literal se não houver perfil
-            const key = student ? student.id : String(g.studentIdentifier || "").trim().toLowerCase();
-            const existing = groupsMap.get(key);
+            // 2. Chave de agrupamento: ID do perfil ou Nome Normalizado (para unificar sem perfil)
+            const key = student ? `profile-${student.id}` : `name-${rawName}`;
             
+            const existing = groupsMap.get(key);
             if (!existing) {
                 groupsMap.set(key, {
-                    studentName: g.studentName,
+                    studentName: student ? student.name : g.studentName,
                     studentIdentifier: g.studentIdentifier,
                     isPublic: g.isPublic,
                     grades: [g]
                 });
             } else {
-                // Adiciona ou mescla a nota
+                // Mescla a nota se for de disciplina diferente
                 const discId = g.disciplineId || 'geral';
                 const alreadyHasDisc = existing.grades.find(eg => (eg.disciplineId || 'geral') === discId);
                 
                 if (!alreadyHasDisc) {
                     existing.grades.push(g);
                 } else {
-                    // Se houver duplicidade da mesma disciplina para o mesmo aluno (fragmentação),
-                    // mantemos o que tiver o ID original do banco para permitir edição correta, 
-                    // ou o que tiver mais dados preenchidos.
-                    const existingWeight = (alreadyHasDisc.examGrade || 0) + (alreadyHasDisc.worksGrade || 0) + (alreadyHasDisc.attendanceScore || 0);
-                    const newWeight = (g.examGrade || 0) + (g.worksGrade || 0) + (g.attendanceScore || 0);
-                    
-                    if (newWeight > existingWeight) {
+                    // Se houver duplicidade da mesma disciplina (fragmentação real),
+                    // mantemos a que tem a maior nota (mais provável ser a correta/atualizada)
+                    const existingScore = parseFloat(calculateAverage(alreadyHasDisc));
+                    const newScore = parseFloat(calculateAverage(g));
+                    if (newScore > existingScore) {
                         existing.grades = existing.grades.map(eg => (eg.disciplineId || 'geral') === discId ? g : eg);
-                        // Atualiza o identificador principal do grupo se necessário
-                        existing.studentIdentifier = g.studentIdentifier;
                     }
                 }
             }
         });
 
+        // Filtragem por disciplina base (feita após o agrupamento para mostrar o card do aluno se ele tiver nota na disciplina)
+        let result = Array.from(groupsMap.values());
+        if (selectedDiscipline) {
+            result = result.filter(group => 
+                group.grades.some(g => g.disciplineId === selectedDiscipline)
+            );
+        }
+
         // Retorna os grupos ordenados por nome
-        return Array.from(groupsMap.values()).sort((a, b) => a.studentName.localeCompare(b.studentName));
-    }, [grades, selectedDiscipline, searchName, statusFilter])
+        return result.sort((a, b) => a.studentName.localeCompare(b.studentName, 'pt-BR'));
+    }, [grades, selectedDiscipline, searchName, statusFilter, students])
 
     const listMatriculados = useMemo(() => groupedGrades.filter(g => !g.isPublic), [groupedGrades])
     const listPublicos = useMemo(() => groupedGrades.filter(g => g.isPublic), [groupedGrades])
