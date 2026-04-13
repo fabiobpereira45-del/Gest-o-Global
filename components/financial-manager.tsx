@@ -25,10 +25,18 @@ import {
   processTuitionPayment,
   getStudents,
   getDisciplines,
+  getFinancialSettings,
+  updateFinancialSettings,
+  getProfessorAccounts,
+  getAllProfessorDisciplines,
+  processProfessorPayment,
   type FinancialTransaction,
   type StudentTuition,
   type StudentProfile,
   type Discipline,
+  type ProfessorAccount,
+  type FinancialSettings,
+  type ProfessorDiscipline
 } from "@/lib/store"
 import { cn } from "@/lib/utils"
 import { 
@@ -38,7 +46,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { printFinancialDRE_PDF, printTuitionReportPDF, printReceiptPDF } from "@/lib/pdf"
+import { printFinancialDRE_PDF, printTuitionReportPDF, printReceiptPDF, printProfessorReceiptPDF } from "@/lib/pdf"
 
 // --- Constants ---
 const CATEGORIES = [
@@ -54,26 +62,36 @@ export function FinancialManager() {
   const [tuitions, setTuitions] = useState<StudentTuition[]>([])
   const [students, setStudents] = useState<StudentProfile[]>([])
   const [disciplines, setDisciplines] = useState<Discipline[]>([])
+  const [professors, setProfessors] = useState<ProfessorAccount[]>([])
+  const [profLinks, setProfLinks] = useState<ProfessorDiscipline[]>([])
+  const [settings, setSettings] = useState<FinancialSettings>({ tuitionRate: 300, proLaboreRate: 300 })
   const [loading, setLoading] = useState(true)
   const [competencia, setCompetencia] = useState(new Date().toISOString().substring(0, 7)) // YYYY-MM
   
   // States for Modals
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
   const [isSyncOpen, setIsSyncOpen] = useState(false)
+  const [isConfigOpen, setIsConfigOpen] = useState(false)
 
   async function loadData() {
     setLoading(true)
     try {
-      const [t, tu, st, di] = await Promise.all([
+      const [t, tu, st, di, se, pr, pl] = await Promise.all([
         getFinancialTransactions({ competencia }),
         getStudentTuitions(),
         getStudents(),
-        getDisciplines()
+        getDisciplines(),
+        getFinancialSettings(),
+        getProfessorAccounts(),
+        getAllProfessorDisciplines()
       ])
       setTransactions(t)
       setTuitions(tu)
       setStudents(st)
       setDisciplines(di)
+      setSettings(se)
+      setProfessors(pr)
+      setProfLinks(pl)
     } finally {
       setLoading(false)
     }
@@ -146,6 +164,9 @@ export function FinancialManager() {
           <Button onClick={loadData} variant="outline" size="icon">
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
           </Button>
+          <Button variant="outline" className="border-primary text-primary" onClick={() => setIsConfigOpen(true)}>
+             <Calculator className="h-4 w-4 mr-2" /> Configurar Valores
+          </Button>
           <Button variant="outline" onClick={() => printFinancialDRE_PDF(transactions, competencia, "Cosme de Farias")}>
             <Download className="h-4 w-4 mr-2" /> PDF DRE
           </Button>
@@ -190,7 +211,7 @@ export function FinancialManager() {
         <TabButton active={tab === "dashboard"} onClick={() => setTab("dashboard")} icon={<PieChart className="h-4 w-4" />}>Painel & Gráficos</TabButton>
         <TabButton active={tab === "income"} onClick={() => setTab("income")} icon={<DollarSign className="h-4 w-4" />}>Receitas / Cobranças</TabButton>
         <TabButton active={tab === "expenses"} onClick={() => setTab("expenses")} icon={<TrendingDown className="h-4 w-4" />}>Despesas Diversas</TabButton>
-        <TabButton active={tab === "prolabore"} onClick={() => setTab("prolabore")} icon={<BookOpen className="h-4 w-4" />}>Aulas (Prolabore)</TabButton>
+        <TabButton active={tab === "prolabore"} onClick={() => setTab("prolabore")} icon={<Briefcase className="h-4 w-4" />}>Aulas (Prolabore)</TabButton>
       </div>
 
       {/* Tab Content */}
@@ -279,46 +300,46 @@ export function FinancialManager() {
                        </thead>
                        <tbody>
                           {tuitions.length === 0 ? (
-                            <tr><td colSpan={6} className="p-20 text-center text-muted-foreground">Nenhuma cobrança gerada. Clique em sincronizar para aplicar o currículo aos alunos.</td></tr>
+                             <tr><td colSpan={6} className="p-20 text-center text-muted-foreground">Nenhuma cobrança gerada. Clique em sincronizar para aplicar o currículo aos alunos.</td></tr>
                           ) : (
-                            tuitions.slice(0, 50).map(tu => {
-                               const student = students.find(s => s.id === tu.studentId)
-                               const discipline = disciplines.find(d => d.id === tu.disciplineId)
-                               return (
-                                 <tr key={tu.id} className="border-b hover:bg-muted/10 transition-colors">
-                                    <td className="p-4 font-medium">{student?.name || "Desconhecido"}</td>
-                                    <td className="p-4">{discipline?.name || "---"}</td>
-                                    <td className="p-4">
-                                       <Input 
-                                          type="date" 
-                                          defaultValue={tu.dueDate || ""} 
-                                          className="h-8 text-xs border-none hover:bg-white p-0"
-                                          onBlur={async (e) => await updateTuition(tu.id, { dueDate: e.target.value })}
-                                       />
-                                    </td>
-                                    <td className="p-4">R$ {tu.amount.toFixed(2)}</td>
-                                    <td className="p-4">
-                                       <StatusBadge status={tu.status} />
-                                    </td>
-                                    <td className="p-4 flex gap-2">
-                                       {tu.status === 'paid' && (
-                                         <Button size="sm" variant="outline" onClick={() => {
-                                            const st = students.find(s => s.id === tu.studentId)
-                                            const ds = disciplines.find(d => d.id === tu.disciplineId)
-                                            if (st && ds) printReceiptPDF(tu, st, ds, "Cosme de Farias")
-                                         }}>
-                                            <Printer className="h-4 w-4 mr-2" /> Recibo
-                                         </Button>
-                                       )}
-                                       {tu.status !== 'paid' && (
-                                         <Button size="sm" onClick={() => processTuitionPayment(tu.id, new Date().toISOString().split('T')[0])}>
-                                            Receber
-                                         </Button>
-                                       )}
-                                    </td>
-                                 </tr>
-                               )
-                            })
+                             tuitions.slice(0, 50).map(tu => {
+                                const student = students.find(s => s.id === tu.studentId)
+                                const discipline = disciplines.find(d => d.id === tu.disciplineId)
+                                return (
+                                  <tr key={tu.id} className="border-b hover:bg-muted/10 transition-colors">
+                                     <td className="p-4 font-medium">{student?.name || "Desconhecido"}</td>
+                                     <td className="p-4">{discipline?.name || "---"}</td>
+                                     <td className="p-4">
+                                        <Input 
+                                           type="date" 
+                                           defaultValue={tu.dueDate || ""} 
+                                           className="h-8 text-xs border-none hover:bg-white p-0"
+                                           onBlur={async (e) => await updateTuition(tu.id, { dueDate: e.target.value })}
+                                        />
+                                     </td>
+                                     <td className="p-4">R$ {tu.amount.toFixed(2)}</td>
+                                     <td className="p-4">
+                                        <StatusBadge status={tu.status} />
+                                     </td>
+                                     <td className="p-4 flex gap-2">
+                                        {tu.status === 'paid' && (
+                                          <Button size="sm" variant="outline" onClick={() => {
+                                             const st = students.find(s => s.id === tu.studentId)
+                                             const ds = disciplines.find(d => d.id === tu.disciplineId)
+                                             if (st && ds) printReceiptPDF(tu, st, ds, "Cosme de Farias")
+                                          }}>
+                                             <Printer className="h-4 w-4 mr-2" /> Recibo
+                                          </Button>
+                                        )}
+                                        {tu.status !== 'paid' && (
+                                          <Button size="sm" onClick={() => processTuitionPayment(tu.id, new Date().toISOString().split('T')[0])}>
+                                             Receber
+                                          </Button>
+                                        )}
+                                     </td>
+                                  </tr>
+                                )
+                             })
                           )}
                        </tbody>
                     </table>
@@ -350,29 +371,29 @@ export function FinancialManager() {
                        </thead>
                        <tbody>
                           {transactions.filter(t => t.type === 'expense').length === 0 ? (
-                            <tr><td colSpan={6} className="p-20 text-center text-muted-foreground">Nenhuma despesa registrada para este período.</td></tr>
+                             <tr><td colSpan={6} className="p-20 text-center text-muted-foreground">Nenhuma despesa registrada para este período.</td></tr>
                           ) : (
-                            transactions.filter(t => t.type === 'expense').map(t => (
-                              <tr key={t.id} className="border-b hover:bg-muted/10">
-                                <td className="p-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
-                                <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{t.category}</span></td>
-                                <td className="p-4">{t.description}</td>
-                                <td className="p-4 text-rose-600 font-bold">R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                                <td className="p-4">
-                                   <StatusBadge status={t.status} />
-                                </td>
-                                <td className="p-4">
-                                   {t.status === 'planned' && (
-                                     <Button size="sm" variant="ghost" onClick={() => updateFinancialTransaction(t.id, { status: 'realized' })} title="Dar Baixa">
-                                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                                     </Button>
-                                   )}
-                                   <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteFinancialTransaction(t.id)}>
-                                      <Trash2 className="h-4 w-4" />
-                                   </Button>
-                                </td>
-                              </tr>
-                            ))
+                             transactions.filter(t => t.type === 'expense').map(t => (
+                               <tr key={t.id} className="border-b hover:bg-muted/10">
+                                 <td className="p-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                                 <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{t.category}</span></td>
+                                 <td className="p-4">{t.description}</td>
+                                 <td className="p-4 text-rose-600 font-bold">R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                 <td className="p-4">
+                                    <StatusBadge status={t.status} />
+                                 </td>
+                                 <td className="p-4">
+                                    {t.status === 'planned' && (
+                                      <Button size="sm" variant="ghost" onClick={() => updateFinancialTransaction(t.id, { status: 'realized' })} title="Dar Baixa">
+                                         <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                      </Button>
+                                    )}
+                                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteFinancialTransaction(t.id)}>
+                                       <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                 </td>
+                               </tr>
+                             ))
                           )}
                        </tbody>
                     </table>
@@ -401,20 +422,65 @@ export function FinancialManager() {
                           </tr>
                        </thead>
                        <tbody>
-                          {disciplines.sort((a,b) => a.order - b.order).map((d, index) => (
-                             <tr key={d.id} className="border-b transition-colors hover:bg-muted/10">
+                          {disciplines.sort((a,b) => (a.order || 0) - (b.order || 0)).map((d, index) => {
+                             const link = profLinks.find(l => l.disciplineId === d.id)
+                             const prof = professors.find(p => p.id === link?.professorId)
+                             const alreadyPaid = transactions.find(t => t.type === 'expense' && t.category === 'Professores' && t.disciplineId === d.id && t.status === 'realized')
+                             
+                             return (
+                              <tr key={d.id} className="border-b transition-colors hover:bg-muted/10">
                                 <td className="p-4 font-mono text-xs">{competencia}</td>
                                 <td className="p-4 font-medium"><span className="text-muted-foreground mr-2">{index + 1}.</span> {d.name}</td>
-                                <td className="p-4">{d.professorName || "Não definido"}</td>
-                                <td className="p-4 font-bold text-rose-600">R$ 300,00</td>
                                 <td className="p-4">
-                                   <span className="px-2 py-0.5 rounded-full text-[10px] bg-orange/10 text-orange border border-orange/20 font-black uppercase">Provisão</span>
+                                   <div className="flex flex-col">
+                                      <span className="font-semibold">{prof?.name || d.professorName || "Não definido"}</span>
+                                      {prof?.pix_key && <span className="text-[10px] text-muted-foreground">PIX: {prof.pix_key}</span>}
+                                   </div>
                                 </td>
+                                <td className="p-4 font-bold text-rose-600">R$ {settings.proLaboreRate.toFixed(2)}</td>
                                 <td className="p-4">
-                                   <Button size="sm" variant="outline">Dar Baixa Fiscal</Button>
+                                   <span className={cn(
+                                      "px-2 py-0.5 rounded-full text-[10px] font-black uppercase border",
+                                      alreadyPaid ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-orange-50 text-orange border-orange/20"
+                                   )}>
+                                      {alreadyPaid ? "Quitado" : "Pendente"}
+                                   </span>
                                 </td>
-                             </tr>
-                          ))}
+                                <td className="p-4 flex gap-2">
+                                   {!alreadyPaid && (
+                                     <Button 
+                                       size="sm" 
+                                       variant="default" 
+                                       disabled={!prof}
+                                       onClick={async () => {
+                                          if (!prof) return
+                                          await processProfessorPayment({
+                                            professorId: prof.id,
+                                            disciplineId: d.id,
+                                            amount: settings.proLaboreRate,
+                                            paymentDate: new Date().toISOString().split('T')[0]
+                                          })
+                                          loadData()
+                                       }}
+                                     >
+                                        Dar Baixa
+                                     </Button>
+                                   )}
+                                   {alreadyPaid && (
+                                     <Button 
+                                       size="sm" 
+                                       variant="outline"
+                                       onClick={() => {
+                                          if (prof) printProfessorReceiptPDF(alreadyPaid as any, prof as any, d as any, "Cosme de Farias")
+                                       }}
+                                     >
+                                        <Printer className="h-4 w-4 mr-2" /> Recibo
+                                     </Button>
+                                   )}
+                                </td>
+                              </tr>
+                             )
+                          })}
                        </tbody>
                     </table>
                  </div>
@@ -423,7 +489,43 @@ export function FinancialManager() {
         )}
       </div>
 
-      {/* Modals Implementation */}
+      <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+        <DialogContent>
+           <DialogHeader><DialogTitle>Configurações Financeiras</DialogTitle></DialogHeader>
+           <form onSubmit={async (e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              await updateFinancialSettings({
+                tuitionRate: Number(fd.get('tuition')),
+                proLaboreRate: Number(fd.get('prolabore'))
+              });
+              setIsConfigOpen(false);
+              loadData();
+           }} className="space-y-4">
+              <div className="space-y-2">
+                 <Label>Valor da Mensalidade (Alunos)</Label>
+                 <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input name="tuition" type="number" step="0.01" defaultValue={settings.tuitionRate} className="pl-10" />
+                 </div>
+                 <p className="text-[10px] text-muted-foreground">Este valor será aplicado ao gerar novas parcelas para os alunos.</p>
+              </div>
+              <div className="space-y-2">
+                 <Label>Valor do Pro-labore (Professores)</Label>
+                 <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input name="prolabore" type="number" step="0.01" defaultValue={settings.proLaboreRate} className="pl-10" />
+                 </div>
+                 <p className="text-[10px] text-muted-foreground">Valor pago ao professor por cada disciplina lecionada.</p>
+              </div>
+              <DialogFooter>
+                 <Button type="button" variant="ghost" onClick={() => setIsConfigOpen(false)}>Cancelar</Button>
+                 <Button type="submit">Salvar Configurações</Button>
+              </DialogFooter>
+           </form>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
         <DialogContent>
            <DialogHeader><DialogTitle>Nova Despesa</DialogTitle></DialogHeader>

@@ -336,6 +336,65 @@ export function printReceiptPDF(tuition: StudentTuition, student: StudentProfile
     safePrint(getModernTemplate(content, "Recibo de Pagamento", hubName), existingWin)
 }
 
+export function printProfessorReceiptPDF(transaction: FinancialTransaction, professor: ProfessorAccount, discipline: Discipline, hubName?: string, existingWin?: Window | null): void {
+    if (!transaction || !professor || !discipline) return;
+    
+    const content = `
+        <div style="border: 2px solid #1e3a5f; padding: 30px; border-radius: 12px; background: #fff; position: relative; overflow: hidden; min-height: 500px;">
+            <div style="position: absolute; top: -20px; right: -20px; font-size: 80px; color: #f8fafc; font-weight: 900; z-index: 0; pointer-events:none;">PAGAMENTO</div>
+            
+            <div style="position: relative; z-index: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px;">
+                    <div>
+                        <p style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Recibo de Pro-labore (Mestre)</p>
+                        <h2 style="margin: 0; border: none; padding: 0;">Nº ${(transaction.id || "").slice(0, 8).toUpperCase()}</h2>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="font-size: 11px; color: #64748b;">Data da Baixa</p>
+                        <p class="row-accent">${formatDate(transaction.date)}</p>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 30px;">
+                    <p style="font-size: 14px; margin-bottom: 20px;">Efetuamos o pagamento ao Mestre <strong>${professor.name}</strong>, a quantia líquida de:</p>
+                    <div style="font-size: 32px; font-weight: 800; color: #1e3a5f; margin-bottom: 10px;">${formatCurrency(transaction.amount)}</div>
+                    <p style="font-size: 12px; color: #64748b; font-style: italic; margin-bottom: 20px;">Referente aos serviços educacionais prestados na disciplina: <strong>${discipline.name}</strong></p>
+                    
+                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 20px;">
+                        <p style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 8px;">Dados do Favorecido</p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 12px;">
+                            <div>
+                                <p style="color: #64748b;">Chave PIX:</p>
+                                <p style="font-weight: 600;">${professor.pix_key || "Não informada"}</p>
+                            </div>
+                            <div>
+                                <p style="color: #64748b;">Dados Bancários:</p>
+                                <p style="font-weight: 600;">${professor.bank_info || "Direto / Em espécie"}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="signature-box" style="margin-top: 60px;">
+                    <div class="signature-line">
+                        <p style="font-weight: 700; color: #1e3a5f;">${hubName || "Administração IBAD"}</p>
+                        Responsável Financeiro
+                    </div>
+                    <div class="signature-line">
+                        <p style="font-weight: 700; color: #1e3a5f;">${professor.name}</p>
+                        Assinatura do Mestre
+                    </div>
+                </div>
+                
+                <div style="margin-top: 50px; text-align: center; font-size: 10px; color: #94a3b8;">
+                    Este documento é um comprovante digital de transação efetuada via sistema IBAD.
+                </div>
+            </div>
+        </div>
+    `
+    safePrint(getModernTemplate(content, "Recibo de Pro-labore", hubName), existingWin)
+}
+
 export function printFinancialDRE_PDF(transactions: FinancialTransaction[], competencia: string, hubName?: string, existingWin?: Window | null): void {
     const list = Array.isArray(transactions) ? transactions : []
     const incomes = list.filter(t => t.type === 'income' && t.status === 'realized')

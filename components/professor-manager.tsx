@@ -31,9 +31,11 @@ interface FormState {
   password: string
   role: "master" | "professor"
   active?: boolean
+  pix_key?: string
+  bank_info?: string
 }
 
-const EMPTY_FORM: FormState = { name: "", email: "", password: "", role: "professor" }
+const EMPTY_FORM: FormState = { name: "", email: "", password: "", role: "professor", pix_key: "", bank_info: "" }
 
 function ProfessorForm({
   initial,
@@ -127,6 +129,27 @@ function ProfessorForm({
         </div>
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label>Chave PIX</Label>
+          <Input
+            value={form.pix_key}
+            onChange={(e) => set("pix_key", e.target.value)}
+            placeholder="CPF, E-mail ou Telefone"
+            disabled={isSaving}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Dados Bancários (Banco, Agência, Conta)</Label>
+          <Input
+            value={form.bank_info}
+            onChange={(e) => set("bank_info", e.target.value)}
+            placeholder="Ex: Nubank - Ag: 0001 - Cc: 123456-7"
+            disabled={isSaving}
+          />
+        </div>
+      </div>
+
       {error && (
         <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>
       )}
@@ -202,6 +225,8 @@ export function ProfessorManager() {
         email: data.email,
         password: data.password,
         role: data.role,
+        pix_key: data.pix_key,
+        bank_info: data.bank_info,
       })
 
       await refresh()
@@ -222,6 +247,8 @@ export function ProfessorManager() {
         name: data.name,
         email: data.email,
         role: data.role,
+        pix_key: data.pix_key,
+        bank_info: data.bank_info,
         ...(data.password ? { password: data.password } : {}),
         ...(data.active !== undefined ? { active: data.active } : {}),
       })
@@ -349,6 +376,8 @@ export function ProfessorManager() {
                         email: account.email,
                         password: "",
                         role: account.role,
+                        pix_key: account.pix_key || "",
+                        bank_info: account.bank_info || "",
                       }}
                       onSave={(data) => handleEdit(account.id, data)}
                       onCancel={() => setEditingId(null)}

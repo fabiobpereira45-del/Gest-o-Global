@@ -15,7 +15,8 @@ export interface Question { id: string; disciplineId: string; type: QuestionType
 export interface Assessment { id: string; title: string; disciplineId: string; professor: string; institution: string; questionIds: string[]; pointsPerQuestion: number; totalPoints: number; openAt: string | null; closeAt: string | null; isPublished: boolean; archived: boolean; shuffleVariants?: boolean; timeLimitMinutes?: number | null; logoBase64?: string; rules?: string; releaseResults?: boolean; modality?: "public" | "private"; createdAt: string }
 export interface StudentAnswer { questionId: string; answer: string }
 export interface StudentSubmission { id: string; assessmentId: string; studentName: string; studentEmail: string; answers: StudentAnswer[]; score: number; totalPoints: number; percentage: number; submittedAt: string; timeElapsedSeconds: number; focusLostCount?: number }
-export interface ProfessorAccount { id: string; name: string; email: string; passwordHash: string; role: "master" | "professor"; avatar_url?: string | null; bio?: string | null; createdAt: string; active?: boolean }
+export interface ProfessorAccount { id: string; name: string; email: string; passwordHash: string; role: "master" | "professor"; avatar_url?: string | null; bio?: string | null; createdAt: string; active?: boolean; pix_key?: string | null; bank_info?: string | null; }
+export interface FinancialSettings { tuitionRate: number; proLaboreRate: number; }
 export interface ProfessorSession { loggedIn: boolean; professorId: string; role: "master" | "professor"; avatar_url?: string | null; expiresAt: string }
 export interface StudentSession { name: string; email: string; assessmentId: string; startedAt: string }
 export interface StudentProfile { id: string; auth_user_id: string; name: string; cpf: string; email: string; enrollment_number: string; phone?: string; address?: string; church?: string; pastor_name?: string; class_id?: string; avatar_url?: string | null; bio?: string | null; birth_date?: string; street?: string; number?: string; neighborhood?: string; city?: string; state?: string; status: "pending" | "active" | "inactive"; created_at: string; }
@@ -434,7 +435,7 @@ function mapAssessment(row: any): Assessment {
 function mapSubmission(row: any): StudentSubmission { return { id: row.id, assessmentId: row.assessment_id, studentName: row.student_name, studentEmail: row.student_email, answers: row.answers, score: row.score, totalPoints: row.total_points, percentage: row.percentage, submittedAt: row.submitted_at, timeElapsedSeconds: row.time_elapsed_seconds, focusLostCount: row.focus_lost_count || 0 } }
 function mapProfessor(p: any): ProfessorAccount {
   if (!p) return { id: "unknown", name: "Professor", email: "", passwordHash: "", role: "professor", createdAt: new Date().toISOString(), active: false }
-  return { id: p.id || "unknown", name: p.name || "Professor", email: p.email || "", passwordHash: p.password_hash || "", role: p.role || "professor", avatar_url: p.avatar_url, bio: p.bio || null, createdAt: p.created_at || new Date().toISOString(), active: p.active !== false }
+  return { id: p.id || "unknown", name: p.name || "Professor", email: p.email || "", passwordHash: p.password_hash || "", role: p.role || "professor", avatar_url: p.avatar_url, bio: p.bio || null, createdAt: p.created_at || new Date().toISOString(), active: p.active !== false, pix_key: p.pix_key || null, bank_info: p.bank_info || null }
 }
 function mapGradingSettings(row: any): GradingSettings { return { id: row.id, pointsPerPresence: Number(row.points_per_presence || 0), onlinePresencePoints: Number(row.online_presence_points || 0), interactionPoints: Number(row.interaction_points || 0), bookActivityPoints: Number(row.book_activity_points || 0), passingAverage: Number(row.passing_average || 70), totalDivisor: Number(row.total_divisor || 4), updatedAt: row.updated_at } }
 function mapStudentProfile(row: any): StudentProfile { return { id: row.id, auth_user_id: row.auth_user_id, name: row.name, cpf: row.cpf, email: row.email, enrollment_number: row.enrollment_number, phone: row.phone || undefined, address: row.address || undefined, church: row.church || undefined, pastor_name: row.pastor_name || undefined, class_id: row.class_id || undefined, avatar_url: row.avatar_url || null, bio: row.bio || null, birth_date: row.birth_date, street: row.street, number: row.number, neighborhood: row.neighborhood, city: row.city, state: row.state, status: row.status || 'pending', created_at: row.created_at } }
@@ -495,6 +496,21 @@ export async function updateGradingSettings(settings: Omit<GradingSettings, "id"
   const { data: existing } = await supabase.from('grading_settings').select('id').limit(1).maybeSingle()
   if (existing) await supabase.from('grading_settings').update(updateData).eq('id', existing.id)
   else await supabase.from('grading_settings').insert({ id: uid(), ...updateData })
+}
+
+export async function getFinancialSettings(): Promise<FinancialSettings> {
+  const supabase = createClient()
+  const { data } = await supabase.from('financial_settings').select('*').limit(1).maybeSingle()
+  if (data) return { tuitionRate: Number(data.tuition_rate), proLaboreRate: Number(data.pro_labore_rate) }
+  return { tuitionRate: 300, proLaboreRate: 300 }
+}
+
+export async function updateFinancialSettings(settings: FinancialSettings): Promise<void> {
+  const supabase = createClient()
+  const dbData = { tuition_rate: settings.tuitionRate, pro_labore_rate: settings.proLaboreRate, updated_at: new Date().toISOString() }
+  const { data: existing } = await supabase.from('financial_settings').select('id').limit(1).maybeSingle()
+  if (existing) await supabase.from('financial_settings').update(dbData).eq('id', existing.id)
+  else await supabase.from('financial_settings').insert({ id: uid(), ...dbData })
 }
 
 export async function getClasses(): Promise<ClassRoom[]> {
@@ -885,6 +901,8 @@ export async function updateProfessorAccount(id: string, data: Partial<Omit<Prof
   if (data.role !== undefined) updateData.role = data.role
   if (data.bio !== undefined) updateData.bio = data.bio || null
   if (data.active !== undefined) updateData.active = data.active
+  if (data.pix_key !== undefined) updateData.pix_key = data.pix_key || null
+  if (data.bank_info !== undefined) updateData.bank_info = data.bank_info || null
   if (data.password) updateData.password_hash = hashPassword(data.password)
   
   const { data: updated } = await supabase.from('professor_accounts').update(updateData).eq('id', id).select().maybeSingle()
@@ -1617,6 +1635,7 @@ export async function getStudentTuitions(studentId?: string): Promise<StudentTui
 
 export async function syncStudentTuition(studentId: string): Promise<void> {
   const supabase = createClient()
+  const settings = await getFinancialSettings()
   const disciplines = await getDisciplines()
   const sorted = disciplines.sort((a, b) => a.order - b.order)
   
@@ -1629,7 +1648,7 @@ export async function syncStudentTuition(studentId: string): Promise<void> {
     .map(d => ({
       student_id: studentId,
       discipline_id: d.id,
-      amount: 300.00,
+      amount: settings.tuitionRate,
       status: 'pending',
       created_at: new Date().toISOString()
     }))
@@ -1674,4 +1693,24 @@ export async function processTuitionPayment(tuitionId: string, paymentDate: stri
     transaction_id: transaction.id
   }).eq('id', tuitionId)
 }
-// Version 2.0.1 - Force Deploy
+export async function processProfessorPayment(data: { professorId: string; disciplineId: string; amount: number; paymentDate: string }): Promise<FinancialTransaction> {
+  const supabase = createClient()
+  const { data: prof } = await supabase.from('professor_accounts').select('name').eq('id', data.professorId).single()
+  const { data: disc } = await supabase.from('disciplines').select('name').eq('id', data.disciplineId).single()
+
+  const transaction = await addFinancialTransaction({
+    category: 'Professores',
+    type: 'expense',
+    description: `Pagamento Pro-labore: ${prof?.name || 'Professor'} - Disciplina: ${disc?.name || '---'}`,
+    amount: data.amount,
+    date: data.paymentDate,
+    status: 'realized',
+    competencia: data.paymentDate.substring(0, 7),
+    disciplineId: data.disciplineId
+  })
+
+  // Marcar a disciplina como paga financeiramente para este professor se necessário 
+  // (Poderíamos ter uma tabela disciplne_payments, mas por enquanto a transaction com metadata basta)
+  
+  return transaction
+}
