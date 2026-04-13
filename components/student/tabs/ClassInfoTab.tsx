@@ -234,7 +234,7 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                         const totalGrade = grade ? (
                                             (grade.examGrade || 0) + (grade.worksGrade || 0) + (grade.seminarGrade || 0) + (grade.participationBonus || 0) + (grade.attendanceScore || 0)
                                         ) : 0
-                                        const divisor = (grade?.customDivisor && grade.customDivisor > 0) ? grade.customDivisor : 1
+                                        const divisor = (grade?.customDivisor && grade.customDivisor > 0) ? grade.customDivisor : 2
                                         const average = grade ? totalGrade / divisor : null
                                         
                                         const isPastValue = disc.executionDate ? disc.executionDate < now : false

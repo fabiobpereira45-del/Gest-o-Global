@@ -11,8 +11,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
     StudentGrade, getStudentGrades, saveStudentGrade, deleteStudentGrade, saveBatchGrades,
-    StudentProfile, getStudents, Discipline, getDisciplines, releaseAllGrades, syncGradesForDiscipline
+    StudentProfile, getStudents, Discipline, getDisciplines, releaseAllGrades, syncGradesForDiscipline,
+    Attendance, GradingSettings, getGradingSettings
 } from "@/lib/store"
+import { getAttendances } from "@/lib/store"
 import { printGradesReportPDF } from "@/lib/pdf"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Switch } from "@/components/ui/switch"
@@ -24,17 +26,20 @@ const GradeCard = memo(({
     isMaster, 
     onEdit, 
     onDelete,
-    calculateAverage 
+    calculateAverage,
+    computeFrequency
 }: { 
     grade: StudentGrade, 
     disciplines: Discipline[], 
     isMaster: boolean, 
     onEdit: (g: StudentGrade) => void, 
     onDelete: (id: string) => void,
-    calculateAverage: (g: StudentGrade) => string
+    calculateAverage: (g: StudentGrade) => string,
+    computeFrequency: (g: StudentGrade) => { presencial: number; online: number; total: number }
 }) => {
     const [isExpanded, setIsExpanded] = useState(false)
     const discipline = disciplines.find(d => d.id === grade.disciplineId)
+    const freq = computeFrequency(grade)
     const average = calculateAverage(grade)
     const isApproved = parseFloat(average) >= 7
 
@@ -85,13 +90,20 @@ const GradeCard = memo(({
                                 { label: 'Leitura Livro', val: grade.worksGrade, color: 'text-slate-600' },
                                 { label: 'Quest. Livro', val: grade.seminarGrade, color: 'text-slate-600' },
                                 { label: 'Vídeo Aula', val: grade.participationBonus, color: 'text-purple-600' },
-                                { label: 'Frequência', val: grade.attendanceScore, color: 'text-green-600' },
                             ].map(tag => (
                                 <div key={tag.label} className="flex flex-col gap-1">
                                     <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">{tag.label}</span>
                                     <span className={`text-sm font-black tabular-nums ${tag.color}`}>{tag.val}</span>
                                 </div>
                             ))}
+                            {/* Frequência com breakdown presencial + online */}
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Frequência</span>
+                                <span className="text-sm font-black tabular-nums text-green-600">{freq.total.toFixed(1)}</span>
+                                <span className="text-[9px] text-slate-400 leading-tight">
+                                    📍{freq.presencial.toFixed(1)} + 💻{freq.online.toFixed(1)}
+                                </span>
+                            </div>
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-slate-50">
@@ -129,6 +141,8 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
     const [grades, setGrades] = useState<StudentGrade[]>([])
     const [students, setStudents] = useState<StudentProfile[]>([])
     const [disciplines, setDisciplines] = useState<Discipline[]>([])
+    const [attendances, setAttendances] = useState<Attendance[]>([])
+    const [gradingSettings, setGradingSettings] = useState<GradingSettings | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [isEditing, setIsEditing] = useState<string | null>(null)
@@ -157,14 +171,29 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
     const loadData = async () => {
         try {
             setLoading(true)
-            const [fetchedGrades, fetchedStudents, fetchedDisciplines] = await Promise.all([
-                getStudentGrades(selectedDiscipline || undefined),
+            const discId = selectedDiscipline || undefined
+            const [fetchedGrades, fetchedStudents, fetchedDisciplines, fetchedSettings] = await Promise.all([
+                getStudentGrades(discId),
                 getStudents(),
-                getDisciplines()
+                getDisciplines(),
+                getGradingSettings()
             ])
             setGrades(fetchedGrades)
             setStudents(fetchedStudents)
             setDisciplines(fetchedDisciplines)
+            setGradingSettings(fetchedSettings)
+
+            // Carregar presenças da disciplina selecionada (ou todas se nenhuma filtrada)
+            if (selectedDiscipline) {
+                const atts = await getAttendances(selectedDiscipline)
+                setAttendances(atts)
+            } else {
+                // Sem disciplina filtrada: busca todas as disciplinas e combina
+                const allAtts = await Promise.all(
+                    fetchedDisciplines.map(d => getAttendances(d.id).catch(() => [] as Attendance[]))
+                )
+                setAttendances(allAtts.flat())
+            }
             setError(null)
         } catch (err: any) {
             setError(err.message)
@@ -206,7 +235,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                 seminarGrade: parseFloat(formData.seminarGrade) || 0,
                 participationBonus: parseFloat(formData.participationBonus) || 0,
                 attendanceScore: parseFloat(formData.attendanceScore) || 0,
-                customDivisor: parseFloat(formData.customDivisor) || 4,
+                customDivisor: parseFloat(formData.customDivisor) || 2,
                 isReleased: formData.isReleased
             }
 
@@ -319,12 +348,47 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
         }
     }
 
+    // Calcula a frequência dinâmica (presencial + online) com base nos registros reais de presença
+    const computeFrequency = (grade: StudentGrade): { presencial: number; online: number; total: number } => {
+        const maxPresencial = gradingSettings?.pointsPerPresence ?? 3
+        const maxOnline = gradingSettings?.onlinePresencePoints ?? 2
+
+        // Encontra o aluno pelo identifier para obter o ID
+        const student = students.find(s => {
+            const id = String(grade.studentIdentifier || "").trim().toLowerCase()
+            return (
+                (s.email || "").toLowerCase() === id ||
+                (s.cpf || "").replace(/\D/g, "") === id.replace(/\D/g, "") ||
+                (s.enrollment_number || "").toLowerCase() === id
+            )
+        })
+        if (!student || !grade.disciplineId) {
+            // Sem aluno identificado: usa o attendanceScore armazenado como fallback
+            const stored = parseFloat(grade.attendanceScore as any) || 0
+            return { presencial: stored, online: 0, total: stored }
+        }
+
+        const discAtts = attendances.filter(a => a.disciplineId === grade.disciplineId)
+        const myPresencialDates = new Set(
+            discAtts.filter(a => a.studentId === student.id && a.isPresent && (a.type || 'presencial') === 'presencial').map(a => a.date)
+        )
+        const myOnlineDates = new Set(
+            discAtts.filter(a => a.studentId === student.id && a.isPresent && a.type === 'ead').map(a => a.date)
+        )
+
+        // Modelo fixo: cada presença vale os pontos cheios, limitado ao máx
+        const presencial = myPresencialDates.size > 0 ? Math.min(myPresencialDates.size * maxPresencial, maxPresencial) : 0
+        const online = myOnlineDates.size > 0 ? Math.min(myOnlineDates.size * maxOnline, maxOnline) : 0
+        return { presencial, online, total: Math.round((presencial + online) * 100) / 100 }
+    }
+
     const calculateAverage = (grade: StudentGrade) => {
+        const freq = computeFrequency(grade)
         const notaAtividades = 
             (parseFloat(grade.worksGrade as any) || 0) +
             (parseFloat(grade.seminarGrade as any) || 0) +
             (parseFloat(grade.participationBonus as any) || 0) +
-            (parseFloat(grade.attendanceScore as any) || 0)
+            freq.total  // frequência dinâmica em vez do valor estático
 
         const provaOnline = parseFloat(grade.examGrade as any) || 0
         const media = (notaAtividades + provaOnline) / 2
@@ -436,7 +500,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                         <Button onClick={() => {
                             setFormData({
                                 studentIdentifier: "", studentName: "", disciplineId: selectedDiscipline || "", isPublic: false,
-                                examGrade: "", worksGrade: "", seminarGrade: "", participationBonus: "", attendanceScore: "", customDivisor: "4", isReleased: true
+                                examGrade: "", worksGrade: "", seminarGrade: "", participationBonus: "", attendanceScore: "", customDivisor: "2", isReleased: true
                             })
                             setIsCreating(true)
                             setIsEditing(null)
@@ -664,6 +728,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                             disciplines={disciplines}
                                             isMaster={isMaster}
                                             calculateAverage={calculateAverage}
+                                            computeFrequency={computeFrequency}
                                             onEdit={(g) => {
                                                 setFormData(g)
                                                 setIsEditing(g.id)

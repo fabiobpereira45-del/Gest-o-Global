@@ -460,7 +460,17 @@ function mapClassSchedule(row: any): ClassSchedule {
         createdAt: row.created_at 
     } 
 }
-function mapStudentGrade(row: any): StudentGrade { return { id: row.id, studentIdentifier: row.student_identifier, studentName: row.student_name, disciplineId: row.discipline_id || undefined, isPublic: row.is_public, examGrade: Number(row.exam_grade), worksGrade: Number(row.works_grade), seminarGrade: Number(row.seminar_grade), participationBonus: Number(row.participation_bonus), attendanceScore: Number(row.attendance_score), customDivisor: Number(row.custom_divisor), isReleased: !!row.is_released, createdAt: row.created_at } }
+function mapStudentGrade(row: any): StudentGrade { 
+  // Normaliza o custom_divisor: legado pode ter salvo o valor 4 erroneamente.
+  // A fórmula correta é (atividades + prova) / 2. Se vier 0 ou 4 (bug antigo), corrige para 2.
+  const rawDivisor = Number(row.custom_divisor)
+  const safeDivisor = (!rawDivisor || rawDivisor === 4) ? 2 : rawDivisor
+  // Normaliza examGrade: notas antigas podem ter sido salvas com score bruto (ex: 19 de 20 acertos).
+  // A escala do boletim é 0-10, então qualquer valor > 10 é claramente inválido e deve ser limitado.
+  const rawExam = Number(row.exam_grade || 0)
+  const safeExam = rawExam > 10 ? 10 : rawExam
+  return { id: row.id, studentIdentifier: row.student_identifier, studentName: row.student_name, disciplineId: row.discipline_id || undefined, isPublic: row.is_public, examGrade: safeExam, worksGrade: Number(row.works_grade), seminarGrade: Number(row.seminar_grade), participationBonus: Number(row.participation_bonus), attendanceScore: Number(row.attendance_score), customDivisor: safeDivisor, isReleased: !!row.is_released, createdAt: row.created_at } 
+}
 function mapBoardMember(row: any): BoardMember { return { id: row.id, name: row.name, role: row.role, category: row.category, avatar_url: row.avatar_url, createdAt: row.created_at } }
 function mapProfessorDiscipline(row: any): ProfessorDiscipline { return { id: row.id, professorId: row.professor_id, disciplineId: row.discipline_id, createdAt: row.created_at } }
 function mapFinancialTransaction(row: any): FinancialTransaction {
@@ -1355,10 +1365,10 @@ export async function syncGradesForDiscipline(disciplineId: string) {
   
   const assessmentIds = (assessments || []).map((a: any) => a.id) || []
   
-  // 2. Buscar Submissões (apenas se houver avaliações)
+  // 2. Buscar Submissões (apenas se houver avaliações) — inclui total_points para normalização
   const { data: submissions } = assessmentIds.length > 0 ? await supabase
     .from('student_submissions')
-    .select('student_email, student_name, score')
+    .select('student_email, student_name, score, total_points, percentage')
     .in('assessment_id', assessmentIds) : { data: [] }
 
   // 3. Buscar Frequência da Disciplina COM TIPO (otimizado com índice)
@@ -1401,11 +1411,28 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     syncResults[key] = { examGrade: 0, attendanceScore: 0, name: p.name };
   });
 
-  // Processar Notas de Prova (Pega a maior nota por aluno)
+  // Processar Notas de Prova — normaliza para escala 0-10
+  // O score bruto pode representar nº de acertos (ex: 19/20) enquanto o boletim
+  // usa escala de 0 a 10. Usa percentage (já em %) dividido por 10 para obter
+  // o valor na escala correta. Fallback: score/totalPoints*10 ou score se já <= 10.
   (submissions || []).forEach((sub: any) => {
     const key = (sub.student_email || "").toLowerCase().trim();
     if (!key || !syncResults[key]) return;
-    syncResults[key].examGrade = Math.max(syncResults[key].examGrade, Number(sub.score || 0));
+    const rawScore = Number(sub.score || 0);
+    const totalPts = Number(sub.total_points || 0);
+    const pct = Number(sub.percentage || 0); // 0-100
+    let examGrade: number;
+    if (pct > 0) {
+      // percentage é a fonte mais confiável: converte 0-100 → 0-10
+      examGrade = Math.round((pct / 10) * 100) / 100;
+    } else if (totalPts > 0 && rawScore > 10) {
+      // score bruto maior que 10 → claramente fora da escala, normaliza
+      examGrade = Math.round((rawScore / totalPts) * 10 * 100) / 100;
+    } else {
+      // score já está na escala 0-10 (ou <= 10 e sem info de totalPoints)
+      examGrade = rawScore;
+    }
+    syncResults[key].examGrade = Math.max(syncResults[key].examGrade, examGrade);
   });
 
   // Processar Frequência com PESOS por tipo
@@ -1427,16 +1454,17 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     }
   })
 
-  // Calcular nota de frequência ponderada: (presenças/total) * max
+  // Calcular nota de frequência: MODELO FIXO - cada presença vale os pontos cheios,
+  // com cap no máximo configurado. Ex: 1 presença presencial = 3pt (não proporcional).
   Object.keys(syncResults).forEach(key => {
     let score = 0
-    if (totalPresencial > 0) {
-      const ratio = (studentPresencial[key] || 0) / totalPresencial
-      score += ratio * maxPresencial
+    const presCount = studentPresencial[key] || 0
+    const onlCount = studentOnline[key] || 0
+    if (presCount > 0) {
+      score += Math.min(presCount * maxPresencial, maxPresencial)
     }
-    if (totalOnline > 0) {
-      const ratio = (studentOnline[key] || 0) / totalOnline
-      score += ratio * maxOnline
+    if (onlCount > 0) {
+      score += Math.min(onlCount * maxOnline, maxOnline)
     }
     syncResults[key].attendanceScore = Math.round(score * 100) / 100
   })

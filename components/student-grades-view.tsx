@@ -138,7 +138,16 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
             const assessmentIds = disciplineAssessments.map(a => a.id);
             const studentDisciplineSubs = submissions.filter(s => assessmentIds.includes(s.assessmentId));
             if (studentDisciplineSubs.length > 0) {
-                finalExamGrade = Math.max(...studentDisciplineSubs.map(s => Number(s.score || 0)));
+                // Normaliza para escala 0-10 usando percentage (mais confiável)
+                // percentage está em 0-100, então ÷ 10 = escala 0-10
+                finalExamGrade = Math.max(...studentDisciplineSubs.map(s => {
+                    const pct = Number(s.percentage || 0);
+                    const rawScore = Number(s.score || 0);
+                    const totalPts = Number(s.totalPoints || 0);
+                    if (pct > 0) return Math.round((pct / 10) * 100) / 100;
+                    if (totalPts > 0 && rawScore > 10) return Math.round((rawScore / totalPts) * 10 * 100) / 100;
+                    return rawScore;
+                }));
             }
 
             // Dynamic Attendance by type
@@ -146,18 +155,17 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
             const presencialAtts = disciplineAtts.filter(a => (a.type || 'presencial') === 'presencial');
             const onlineAtts = disciplineAtts.filter(a => a.type === 'ead');
             
-            // Count unique dates
-            const totalPresencialDates = new Set(attendances.filter(a => a.disciplineId === grade.disciplineId && (a.type || 'presencial') === 'presencial').map(a => a.date)).size;
-            const totalOnlineDates = new Set(attendances.filter(a => a.disciplineId === grade.disciplineId && a.type === 'ead').map(a => a.date)).size;
-            
+            // Unique attended dates per type
             const uniquePresencialPresent = new Set(presencialAtts.map(a => a.date)).size;
             const uniqueOnlinePresent = new Set(onlineAtts.map(a => a.date)).size;
 
-            if (totalPresencialDates > 0) {
-                presencialScore = (uniquePresencialPresent / totalPresencialDates) * maxPresencial;
+            // MODELO FIXO: cada presença vale os pontos cheios configurados,
+            // com cap no máximo. Ex: 1 presença presencial = 3pt (não proporcional).
+            if (uniquePresencialPresent > 0) {
+                presencialScore = Math.min(uniquePresencialPresent * maxPresencial, maxPresencial);
             }
-            if (totalOnlineDates > 0) {
-                onlineScore = (uniqueOnlinePresent / totalOnlineDates) * maxOnline;
+            if (uniqueOnlinePresent > 0) {
+                onlineScore = Math.min(uniqueOnlinePresent * maxOnline, maxOnline);
             }
         }
 
