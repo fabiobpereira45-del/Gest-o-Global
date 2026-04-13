@@ -116,15 +116,20 @@ export function FinancialManager() {
     // Projeção de pro-labore: total de disciplinas × taxa configurada
     const proLaboreProjected = disciplines.length * settings.proLaboreRate
     
+    // Receita projetada: alunos ativos × mensalidade × disciplinas
+    const activeStudentCount = students.filter(s => s.status === 'active').length
+    const revenueProjected = activeStudentCount * settings.tuitionRate * disciplines.length
+    
     return {
       plannedIncome, realizedIncome,
       plannedExpense, realizedExpense,
       pendingTuition,
       proLaboreProjected,
+      revenueProjected,
       netPlanned: plannedIncome - plannedExpense,
       netRealized: realizedIncome - realizedExpense
     }
-  }, [transactions, tuitions, disciplines, settings])
+  }, [transactions, tuitions, disciplines, settings, students])
 
   const chartData = useMemo(() => [
     { name: "Receitas", Previsto: stats.plannedIncome + stats.realizedIncome, Realizado: stats.realizedIncome },
@@ -190,7 +195,7 @@ export function FinancialManager() {
         <StatCard 
           title="Receita Realizada" 
           value={stats.realizedIncome} 
-          subtitle={`Previsto: R$ ${stats.plannedIncome.toFixed(2)}`}
+          subtitle={`Projeção total: R$ ${stats.revenueProjected.toFixed(2)}`}
           icon={<ArrowUpRight className="text-emerald-500" />}
           trend="positive"
         />
