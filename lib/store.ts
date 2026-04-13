@@ -511,6 +511,11 @@ export async function updateFinancialSettings(settings: FinancialSettings): Prom
   const { data: existing } = await supabase.from('financial_settings').select('id').limit(1).maybeSingle()
   if (existing) await supabase.from('financial_settings').update(dbData).eq('id', existing.id)
   else await supabase.from('financial_settings').insert({ id: uid(), ...dbData })
+
+  // Atualiza automaticamente todas as mensalidades pendentes com o novo valor
+  await supabase.from('student_tuition')
+    .update({ amount: settings.tuitionRate })
+    .neq('status', 'paid')
 }
 
 export async function getClasses(): Promise<ClassRoom[]> {
