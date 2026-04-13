@@ -16,7 +16,12 @@ export interface Assessment { id: string; title: string; disciplineId: string; p
 export interface StudentAnswer { questionId: string; answer: string }
 export interface StudentSubmission { id: string; assessmentId: string; studentName: string; studentEmail: string; answers: StudentAnswer[]; score: number; totalPoints: number; percentage: number; submittedAt: string; timeElapsedSeconds: number; focusLostCount?: number }
 export interface ProfessorAccount { id: string; name: string; email: string; passwordHash: string; role: "master" | "professor"; avatar_url?: string | null; bio?: string | null; createdAt: string; active?: boolean; pix_key?: string | null; bank_info?: string | null; }
-export interface FinancialSettings { tuitionRate: number; proLaboreRate: number; }
+export interface FinancialSettings { 
+  tuitionRate: number; 
+  proLaboreRate: number;
+  pixKey?: string;
+  pixQRCode?: string;
+}
 export interface ProfessorSession { loggedIn: boolean; professorId: string; role: "master" | "professor"; avatar_url?: string | null; expiresAt: string }
 export interface StudentSession { name: string; email: string; assessmentId: string; startedAt: string }
 export interface StudentProfile { id: string; auth_user_id: string; name: string; cpf: string; email: string; enrollment_number: string; phone?: string; address?: string; church?: string; pastor_name?: string; class_id?: string; avatar_url?: string | null; bio?: string | null; birth_date?: string; street?: string; number?: string; neighborhood?: string; city?: string; state?: string; status: "pending" | "active" | "inactive"; created_at: string; }
@@ -1654,11 +1659,42 @@ export async function getStudentTuitions(studentId?: string): Promise<StudentTui
   return allData.map(mapStudentTuition)
 }
 
-export async function syncStudentTuition(studentId: string): Promise<void> {
+export async function getFinancialSettings(): Promise<FinancialSettings> {
   const supabase = createClient()
-  const settings = await getFinancialSettings()
-  const disciplines = await getDisciplines()
-  const sorted = disciplines.sort((a, b) => a.order - b.order)
+  const { data } = await supabase.from('financial_settings').select('*').limit(1).maybeSingle()
+  if (data) return { 
+    tuitionRate: Number(data.tuition_rate), 
+    proLaboreRate: Number(data.pro_labore_rate),
+    pixKey: data.pix_key || "",
+    pixQRCode: data.pix_qrcode || ""
+  }
+  return { tuitionRate: 100, proLaboreRate: 300, pixKey: "", pixQRCode: "" }
+}
+
+export async function updateFinancialSettings(settings: FinancialSettings): Promise<void> {
+  const supabase = createClient()
+  const dbData = { 
+    tuition_rate: settings.tuitionRate, 
+    pro_labore_rate: settings.proLaboreRate,
+    pix_key: settings.pixKey,
+    pix_qrcode: settings.pixQRCode,
+    updated_at: new Date().toISOString() 
+  }
+  const { data: existing } = await supabase.from('financial_settings').select('id').limit(1).maybeSingle()
+  if (existing) await supabase.from('financial_settings').update(dbData).eq('id', existing.id)
+  else await supabase.from('financial_settings').insert({ id: uid(), ...dbData })
+
+  // Atualiza automaticamente todas as mensalidades pendentes com o novo valor
+  await supabase.from('student_tuition')
+    .update({ amount: settings.tuitionRate })
+    .neq('status', 'paid')
+}
+
+export async function syncStudentTuition(studentId: string, settings?: FinancialSettings, disciplines?: Discipline[]): Promise<void> {
+  const supabase = createClient()
+  const finalSettings = settings || await getFinancialSettings()
+  const finalDisciplines = disciplines || await getDisciplines()
+  const sorted = finalDisciplines.sort((a, b) => a.order - b.order)
   
   // Get existing to avoid duplicates
   const { data: existing } = await supabase.from('student_tuition').select('discipline_id').eq('student_id', studentId)
@@ -1669,7 +1705,7 @@ export async function syncStudentTuition(studentId: string): Promise<void> {
     .map(d => ({
       student_id: studentId,
       discipline_id: d.id,
-      amount: settings.tuitionRate,
+      amount: finalSettings.tuitionRate,
       due_date: d.executionDate ? `${d.executionDate}-10` : null,
       status: 'pending',
       created_at: new Date().toISOString()
@@ -1687,12 +1723,16 @@ export async function syncStudentTuition(studentId: string): Promise<void> {
 export async function syncBatchTuitions(studentIds: string[]): Promise<void> {
     if (studentIds.length === 0) return
 
+    // Busca dados comuns uma única vez para o lote todo (Performance Boost)
+    const settings = await getFinancialSettings()
+    const disciplines = await getDisciplines()
+
     // Processa em lotes paralelos de 5 alunos por vez para evitar throttling
     const chunkSize = 5
     for (let i = 0; i < studentIds.length; i += chunkSize) {
       const chunk = studentIds.slice(i, i + chunkSize)
       const results = await Promise.allSettled(
-        chunk.map(id => syncStudentTuition(id))
+        chunk.map(id => syncStudentTuition(id, settings, disciplines))
       )
       // Loga erros individuais mas não interrompe o lote
       for (const r of results) {
@@ -1701,7 +1741,7 @@ export async function syncBatchTuitions(studentIds: string[]): Promise<void> {
         }
       }
     }
-  }
+}
 
 export async function updateTuition(id: string, data: Partial<StudentTuition>): Promise<void> {
   const supabase = createClient()

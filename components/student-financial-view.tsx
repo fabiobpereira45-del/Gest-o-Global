@@ -13,9 +13,11 @@ import {
   getDisciplines, 
   processTuitionPayment,
   getStudentProfile,
+  getFinancialSettings,
   type StudentTuition, 
   type Discipline,
-  type StudentProfile
+  type StudentProfile,
+  type FinancialSettings
 } from "@/lib/store"
 import { printReceiptPDF, printTuitionReportPDF } from "@/lib/pdf"
 import { cn } from "@/lib/utils"
@@ -29,24 +31,27 @@ export function StudentFinancialView({ studentId }: Props) {
   const [tuitions, setTuitions] = useState<StudentTuition[]>([])
   const [disciplines, setDisciplines] = useState<Discipline[]>([])
   const [student, setStudent] = useState<StudentProfile | null>(null)
+  const [settings, setSettings] = useState<FinancialSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"all" | "pending" | "paid">("all")
   const [pixModalOpen, setPixModalOpen] = useState(false)
   const [activePaymentTitle, setActivePaymentTitle] = useState("")
 
-  const pixKey = "34.567.890/0001-12" // Placeholder PIX key
+  const pixKey = settings?.pixKey || "Chave não configurada"
 
   async function load() {
     setLoading(true)
     try {
-      const [t, d, s] = await Promise.all([
+      const [t, d, s, setts] = await Promise.all([
         getStudentTuitions(studentId),
         getDisciplines(),
-        getStudentProfile(studentId)
+        getStudentProfile(studentId),
+        getFinancialSettings()
       ])
       setTuitions(t)
       setDisciplines(d)
       setStudent(s)
+      setSettings(setts)
     } finally {
       setLoading(false)
     }
@@ -219,23 +224,31 @@ export function StudentFinancialView({ studentId }: Props) {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center justify-center p-6 space-y-6 bg-muted/20 rounded-lg">
-             <div className="w-48 h-48 bg-white border rounded-xl flex items-center justify-center shadow-sm">
-                <QrCode className="h-32 w-32 text-slate-800 opacity-50" />
-                <span className="sr-only">QR Code Placeholder</span>
+             <div className="w-48 h-48 bg-white border rounded-xl flex items-center justify-center shadow-sm relative overflow-hidden">
+                <QrCode className="h-32 w-32 text-slate-800 opacity-20" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+                   <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">QR Code</p>
+                   <p className="text-[9px] text-muted-foreground leading-tight">Escaneie pelo App do Banco ou use o código abaixo</p>
+                </div>
              </div>
              <div className="w-full space-y-2">
-                <p className="text-sm font-bold text-center text-muted-foreground uppercase tracking-widest">Chave PIX (CNPJ)</p>
+                <p className="text-sm font-bold text-center text-muted-foreground uppercase tracking-widest">Chave PIX ou Copia e Cola</p>
                 <div className="flex items-center gap-2 w-full">
-                   <div className="flex-1 bg-white border border-border p-3 rounded-md text-center font-mono font-bold text-lg select-all">
-                      {pixKey}
+                   <div className="flex-1 bg-white border border-border p-3 rounded-md text-center font-mono font-bold text-xs select-all break-all h-[52px] flex items-center justify-center">
+                      {settings?.pixQRCode ? (settings.pixQRCode.substring(0, 30) + "...") : pixKey}
                    </div>
-                   <Button size="icon" variant="default" className="h-[52px] w-[52px] shadow-md" onClick={() => {
-                     navigator.clipboard.writeText(pixKey)
-                     toast.success("Chave PIX copiada!")
+                   <Button size="icon" variant="default" className="h-[52px] w-[52px] shadow-md flex-shrink-0" title="Copiar Código" onClick={() => {
+                      const toCopy = settings?.pixQRCode || settings?.pixKey || ""
+                      if (!toCopy) return toast.error("Chave não configurada.")
+                      navigator.clipboard.writeText(toCopy)
+                      toast.success(settings?.pixQRCode ? "Código Copia e Cola copiado!" : "Chave PIX copiada!")
                    }}>
                       <Copy className="h-5 w-5" />
                    </Button>
                 </div>
+                {settings?.pixQRCode && (
+                  <p className="text-[10px] text-center text-emerald-600 font-bold">✓ Código "Copia e Cola" disponível!</p>
+                )}
              </div>
           </div>
           <div className="bg-orange/10 p-3 rounded-md border border-orange/20 mt-2">

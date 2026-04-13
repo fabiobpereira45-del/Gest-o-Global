@@ -559,37 +559,63 @@ export function FinancialManager() {
       </div>
 
       <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
            <DialogHeader><DialogTitle>Configurações Financeiras</DialogTitle></DialogHeader>
            <form onSubmit={async (e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
               await updateFinancialSettings({
                 tuitionRate: Number(fd.get('tuition')),
-                proLaboreRate: Number(fd.get('prolabore'))
+                proLaboreRate: Number(fd.get('prolabore')),
+                pixKey: fd.get('pixKey')?.toString() || "",
+                pixQRCode: fd.get('pixQRCode')?.toString() || ""
               });
               setIsConfigOpen(false);
               loadData();
+              toast.success('Configurações salvas com sucesso!');
            }} className="space-y-4">
-              <div className="space-y-2">
-                 <Label>Valor da Mensalidade (Alunos)</Label>
-                 <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input name="tuition" type="number" step="0.01" defaultValue={settings.tuitionRate} className="pl-10" />
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <Label>Mensalidade (Alunos)</Label>
+                    <div className="relative">
+                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                       <Input name="tuition" type="number" step="0.01" defaultValue={settings.tuitionRate} className="pl-10 h-9 text-sm" />
+                    </div>
                  </div>
-                 <p className="text-[10px] text-muted-foreground">Este valor será aplicado ao gerar novas parcelas para os alunos.</p>
-              </div>
-              <div className="space-y-2">
-                 <Label>Valor do Pro-labore (Professores)</Label>
-                 <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input name="prolabore" type="number" step="0.01" defaultValue={settings.proLaboreRate} className="pl-10" />
+                 <div className="space-y-2">
+                    <Label>Pro-labore (Profas)</Label>
+                    <div className="relative">
+                       <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                       <Input name="prolabore" type="number" step="0.01" defaultValue={settings.proLaboreRate} className="pl-10 h-9 text-sm" />
+                    </div>
                  </div>
-                 <p className="text-[10px] text-muted-foreground">Valor pago ao professor por cada disciplina lecionada.</p>
               </div>
-              <DialogFooter>
+
+              <div className="space-y-2 p-3 bg-muted/30 rounded-lg border border-muted-foreground/10">
+                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-2">
+                    <QrCode className="h-3 w-3" /> Dados para Recebimento (PIX)
+                 </h4>
+                 <div className="space-y-3">
+                    <div className="space-y-1">
+                       <Label className="text-[11px]">Chave PIX (E-mail, CPF, Tel ou Aleatória)</Label>
+                       <Input name="pixKey" placeholder="Ex: financeiro@teoglobal.com" defaultValue={settings.pixKey} className="h-9 text-sm" />
+                    </div>
+                    <div className="space-y-1">
+                       <Label className="text-[11px]">Código PIX Copia e Cola (Payload)</Label>
+                       <textarea 
+                          name="pixQRCode" 
+                          defaultValue={settings.pixQRCode}
+                          placeholder="Cole aqui o payload do seu QR Code estático..."
+                          className="w-full min-h-[80px] text-xs p-2 rounded-md border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+                       />
+                       <p className="text-[9px] text-muted-foreground">Este código permite que o aluno utilize a função "Copia e Cola" no app do banco.</p>
+                    </div>
+                 </div>
+              </div>
+
+              <DialogFooter className="pt-2">
                  <Button type="button" variant="ghost" onClick={() => setIsConfigOpen(false)}>Cancelar</Button>
-                 <Button type="submit">Salvar Configurações</Button>
+                 <Button type="submit" className="accent-gradient">Salvar Configurações</Button>
               </DialogFooter>
            </form>
         </DialogContent>
