@@ -19,123 +19,183 @@ import { printGradesReportPDF } from "@/lib/pdf"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Switch } from "@/components/ui/switch"
 
-// --- Sub-componente Memoizado para cada Linha de Nota (Expansível) ---
-const GradeCard = memo(({ 
-    grade, 
-    disciplines, 
-    isMaster, 
-    onEdit, 
+// --- StudentCard: 1 card por aluno, com todas as disciplinas agrupadas ---
+const StudentCard = memo(({
+    studentName,
+    grades,
+    disciplines,
+    isMaster,
+    onEdit,
     onDelete,
     calculateAverage,
     computeFrequency
-}: { 
-    grade: StudentGrade, 
-    disciplines: Discipline[], 
-    isMaster: boolean, 
-    onEdit: (g: StudentGrade) => void, 
+}: {
+    studentName: string,
+    grades: StudentGrade[],
+    disciplines: Discipline[],
+    isMaster: boolean,
+    onEdit: (g: StudentGrade) => void,
     onDelete: (id: string) => void,
     calculateAverage: (g: StudentGrade) => string,
     computeFrequency: (g: StudentGrade) => { presencial: number; online: number; total: number }
 }) => {
     const [isExpanded, setIsExpanded] = useState(false)
-    const discipline = disciplines.find(d => d.id === grade.disciplineId)
-    const freq = computeFrequency(grade)
-    const average = calculateAverage(grade)
-    const isApproved = parseFloat(average) >= 7
+    const [selectedDisc, setSelectedDisc] = useState<string | null>(null)
+
+    const bestAvg = Math.max(...grades.map(g => parseFloat(calculateAverage(g)) || 0))
+    const isAnyApproved = bestAvg >= 7
+    const identifier = grades[0]?.studentIdentifier || ""
+    const initial = studentName.charAt(0).toUpperCase()
+
+    // Disciplina ativa para detalhes
+    const activeGrade = selectedDisc
+        ? grades.find(g => g.id === selectedDisc) || grades[0]
+        : grades[0]
 
     return (
-        <div className={`overflow-hidden transition-all duration-300 border-l-4 ${isExpanded ? 'bg-slate-50/80 border-primary' : 'hover:bg-slate-50/50 border-transparent bg-white'}`}>
-            {/* Cabeçalho do Card (Sempre Visível) */}
-            <div 
+        <div className={`overflow-hidden transition-all duration-300 border-l-4 rounded-b-xl
+            ${isExpanded ? 'bg-slate-50/80 border-primary shadow-sm' : 'hover:bg-slate-50/40 border-transparent bg-white'}`}>
+
+            {/* Cabeçalho do Card — sempre visível */}
+            <div
                 className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex-1 flex items-center gap-4">
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-black text-sm shadow-sm border ${isApproved ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                        {grade.studentName.charAt(0)}
+                    <div className={`h-11 w-11 rounded-xl flex items-center justify-center font-black text-base shadow-sm border
+                        ${isAnyApproved ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                        {initial}
                     </div>
                     <div>
                         <div className="flex items-center flex-wrap gap-2 mb-0.5">
-                            <h4 className="font-bold text-foreground text-base tracking-tight">{grade.studentName}</h4>
-                            {discipline && (
-                                <span className="bg-primary/5 text-primary text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
-                                    {discipline.name}
-                                </span>
-                            )}
+                            <h4 className="font-bold text-foreground text-base tracking-tight">{studentName}</h4>
+                            <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
+                                {grades.length} disciplina{grades.length !== 1 ? 's' : ''}
+                            </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground font-mono opacity-60">ID: {grade.studentIdentifier}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono opacity-60">ID: {identifier}</p>
+                        {/* Pílulas das disciplinas */}
+                        <div className="flex flex-wrap gap-1 mt-1">
+                            {grades.map(g => {
+                                const disc = disciplines.find(d => d.id === g.disciplineId)
+                                const avg = calculateAverage(g)
+                                const ok = parseFloat(avg) >= 7
+                                return (
+                                    <span key={g.id} className={`text-[10px] px-2 py-0.5 rounded-full font-bold border
+                                        ${ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                                        {disc?.name || 'Geral'}: {avg}
+                                    </span>
+                                )
+                            })}
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="text-right hidden sm:block">
-                        <div className="text-[9px] text-muted-foreground uppercase font-black tracking-widest mb-0.5">Média</div>
-                        <div className={`text-xl font-black tabular-nums ${isApproved ? 'text-green-600' : 'text-amber-600'}`}>
-                            {average}
-                        </div>
-                    </div>
-                    <div className={`p-2 rounded-full transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-primary/10 text-primary' : 'bg-slate-100 text-slate-400'}`}>
+                <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-full transition-transform duration-300
+                        ${isExpanded ? 'rotate-180 bg-primary/10 text-primary' : 'bg-slate-100 text-slate-400'}`}>
                         <Plus className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-45' : ''}`} />
                     </div>
                 </div>
             </div>
 
-            {/* Conteúdo Detalhado (Expansível) */}
+            {/* Conteúdo expandido — seletor de disciplina + detalhes */}
             {isExpanded && (
-                <div className="px-5 pb-6 pt-2 animate-in slide-in-from-top-2 duration-300">
-                    <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-                            {[
-                                { label: 'Prova Online', val: grade.examGrade, color: 'text-blue-600' },
-                                { label: 'Leitura Livro', val: grade.worksGrade, color: 'text-slate-600' },
-                                { label: 'Quest. Livro', val: grade.seminarGrade, color: 'text-slate-600' },
-                                { label: 'Vídeo Aula', val: grade.participationBonus, color: 'text-purple-600' },
-                            ].map(tag => (
-                                <div key={tag.label} className="flex flex-col gap-1">
-                                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">{tag.label}</span>
-                                    <span className={`text-sm font-black tabular-nums ${tag.color}`}>{tag.val}</span>
+                <div className="px-5 pb-6 pt-1 animate-in slide-in-from-top-2 duration-300">
+                    {/* Tabs de disciplina */}
+                    {grades.length > 1 && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            {grades.map(g => {
+                                const disc = disciplines.find(d => d.id === g.disciplineId)
+                                const isActive = (selectedDisc || grades[0].id) === g.id
+                                return (
+                                    <button
+                                        key={g.id}
+                                        onClick={e => { e.stopPropagation(); setSelectedDisc(g.id) }}
+                                        className={`px-4 py-1.5 rounded-full text-xs font-black border transition-all
+                                            ${isActive
+                                                ? 'bg-primary text-white border-primary shadow-sm'
+                                                : 'bg-white text-slate-500 border-slate-200 hover:border-primary/40 hover:text-primary'}`}
+                                    >
+                                        {disc?.name || 'Geral'}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
+
+                    {/* Detalhes da disciplina selecionada */}
+                    {(() => {
+                        const g = activeGrade
+                        const disc = disciplines.find(d => d.id === g.disciplineId)
+                        const freq = computeFrequency(g)
+                        const average = calculateAverage(g)
+                        const isApproved = parseFloat(average) >= 7
+                        return (
+                            <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="font-bold text-sm text-primary">{disc?.name || 'Disciplina Geral'}</div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border
+                                            ${isApproved ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                            {isApproved ? 'Aprovado' : 'Reprovado'}
+                                        </span>
+                                        <span className={`text-lg font-black tabular-nums ${isApproved ? 'text-green-600' : 'text-amber-600'}`}>
+                                            {average}
+                                        </span>
+                                    </div>
                                 </div>
-                            ))}
-                            {/* Frequência com breakdown presencial + online */}
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Frequência</span>
-                                <span className="text-sm font-black tabular-nums text-green-600">{freq.total.toFixed(1)}</span>
-                                <span className="text-[9px] text-slate-400 leading-tight">
-                                    📍{freq.presencial.toFixed(1)} + 💻{freq.online.toFixed(1)}
-                                </span>
-                            </div>
-                        </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-slate-50">
-                            <div className="flex items-center gap-2">
-                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black border uppercase tracking-wider ${grade.isReleased ? 'bg-green-500 text-white border-green-600 shadow-lg shadow-green-500/20' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                                    {grade.isReleased ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                                    {grade.isReleased ? 'Liberada para o Aluno' : 'Oculta no Boletim'}
-                                </span>
-                                <span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-full border ${isApproved ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                                    {isApproved ? 'Aprovado' : 'Reprovado / Pendente'}
-                                </span>
-                            </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+                                    {[
+                                        { label: 'Prova Online', val: g.examGrade, color: 'text-blue-600' },
+                                        { label: 'Leitura', val: g.worksGrade, color: 'text-slate-600' },
+                                        { label: 'Questionário', val: g.seminarGrade, color: 'text-slate-600' },
+                                        { label: 'Vídeo Aula', val: g.participationBonus, color: 'text-purple-600' },
+                                    ].map(tag => (
+                                        <div key={tag.label} className="bg-slate-50 rounded-lg p-2.5 flex flex-col gap-0.5">
+                                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">{tag.label}</span>
+                                            <span className={`text-sm font-black tabular-nums ${tag.color}`}>{tag.val}</span>
+                                        </div>
+                                    ))}
+                                    <div className="bg-green-50 rounded-lg p-2.5 flex flex-col gap-0.5">
+                                        <span className="text-[9px] font-black uppercase text-green-400 tracking-tighter">Frequência</span>
+                                        <span className="text-sm font-black tabular-nums text-green-600">{freq.total.toFixed(1)}</span>
+                                        <span className="text-[9px] text-green-400">📍{freq.presencial.toFixed(1)} 💻{freq.online.toFixed(1)}</span>
+                                    </div>
+                                </div>
 
-                            <div className="flex gap-2">
-                                <Button variant="outline" size="sm" className="h-10 px-5 font-bold border-slate-200 hover:bg-primary/5 hover:text-primary transition-all rounded-xl" onClick={(e) => { e.stopPropagation(); onEdit(grade); }}>
-                                    <Pencil className="h-3.5 w-3.5 mr-2" /> Editar Notas
-                                </Button>
-                                {isMaster && (
-                                    <Button variant="ghost" size="sm" className="h-10 px-5 font-bold text-red-400 hover:text-red-600 hover:bg-red-50 transition-all rounded-xl" onClick={(e) => { e.stopPropagation(); onDelete(grade.id); }}>
-                                        <Trash2 className="h-3.5 w-3.5 mr-2" /> Remover
-                                    </Button>
-                                )}
+                                <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-50">
+                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black border uppercase
+                                        ${g.isReleased ? 'bg-green-500 text-white border-green-600 shadow-sm shadow-green-500/20' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                                        {g.isReleased ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                                        {g.isReleased ? 'Liberada para o Aluno' : 'Oculta no Boletim'}
+                                    </span>
+                                    <div className="flex gap-2">
+                                        <Button variant="outline" size="sm"
+                                            className="h-9 px-4 font-bold border-slate-200 hover:bg-primary/5 hover:text-primary transition-all rounded-xl"
+                                            onClick={e => { e.stopPropagation(); onEdit(g) }}>
+                                            <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
+                                        </Button>
+                                        {isMaster && (
+                                            <Button variant="ghost" size="sm"
+                                                className="h-9 px-4 font-bold text-red-400 hover:text-red-600 hover:bg-red-50 transition-all rounded-xl"
+                                                onClick={e => { e.stopPropagation(); onDelete(g.id) }}>
+                                                <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remover
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        )
+                    })()}
                 </div>
             )}
         </div>
     )
 })
 
-GradeCard.displayName = "GradeCard"
+StudentCard.displayName = "StudentCard"
 
 export function GradesManager({ isMaster }: { isMaster: boolean }) {
     const [grades, setGrades] = useState<StudentGrade[]>([])
@@ -419,10 +479,11 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
         return media.toFixed(2)
     }
 
-    // --- Listas Memoizadas para Performance ---
-    const filteredGrades = useMemo(() => {
+    // --- Listas Memoizadas para Performance e Agrupamento ---
+    const groupedGrades = useMemo(() => {
         const raw = grades
             .filter(g => {
+                // Se houver disciplina selecionada, filtramos apenas alunos que têm nota nela
                 const matchDiscipline = !selectedDiscipline || g.disciplineId === selectedDiscipline
                 const matchName = !searchName || g.studentName.toLowerCase().includes(searchName.toLowerCase()) || g.studentIdentifier.toLowerCase().includes(searchName.toLowerCase())
                 const matchStatus = statusFilter === "all" || (statusFilter === "released" ? g.isReleased : !g.isReleased)
@@ -430,29 +491,45 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
             })
             .sort((a, b) => a.studentName.localeCompare(b.studentName))
 
-        // DEDUPLICAÇÃO: Agrupar por estudante + disciplina para evitar duplicidade visual
-        const uniqueGradesMap = new Map<string, StudentGrade>();
+        // AGRUPAMENTO: Um card por estudante, com todas as disciplinas dentro
+        const groupsMap = new Map<string, { studentName: string; studentIdentifier: string; isPublic: boolean; grades: StudentGrade[] }>();
+        
         raw.forEach(g => {
-            const key = `${String(g.studentIdentifier || "").trim().toLowerCase()}-${g.disciplineId || 'geral'}`;
-            const existing = uniqueGradesMap.get(key);
+            const key = String(g.studentIdentifier || "").trim().toLowerCase();
+            const existing = groupsMap.get(key);
             
             if (!existing) {
-                uniqueGradesMap.set(key, g);
+                groupsMap.set(key, {
+                    studentName: g.studentName,
+                    studentIdentifier: g.studentIdentifier,
+                    isPublic: g.isPublic,
+                    grades: [g]
+                });
             } else {
-                // Se o novo registro tiver mais notas (ex: examGrade > 0), ele substitui o "vazio"
-                const existingPoints = (existing.examGrade || 0) + (existing.attendanceScore || 0);
-                const newPoints = (g.examGrade || 0) + (g.attendanceScore || 0);
-                if (newPoints > existingPoints) {
-                    uniqueGradesMap.set(key, g);
+                // Adiciona a nota de outra disciplina ao mesmo aluno
+                // Nota: se o mesmo aluno+disciplina aparecer (duplicidade no banco), pegamos o que tiver mais dados
+                const discId = g.disciplineId || 'geral';
+                const alreadyHasDisc = existing.grades.find(eg => (eg.disciplineId || 'geral') === discId);
+                
+                if (!alreadyHasDisc) {
+                    existing.grades.push(g);
+                } else {
+                    // Substitui se o registro atual for mais completo
+                    const existingScore = (alreadyHasDisc.examGrade || 0) + (alreadyHasDisc.attendanceScore || 0);
+                    const newScore = (g.examGrade || 0) + (g.attendanceScore || 0);
+                    if (newScore > existingScore) {
+                        existing.grades = existing.grades.map(eg => eg.id === alreadyHasDisc.id ? g : eg);
+                    }
                 }
             }
         });
 
-        return Array.from(uniqueGradesMap.values());
+        // Retorna os grupos ordenados por nome
+        return Array.from(groupsMap.values()).sort((a, b) => a.studentName.localeCompare(b.studentName));
     }, [grades, selectedDiscipline, searchName, statusFilter])
 
-    const listMatriculados = useMemo(() => filteredGrades.filter(g => !g.isPublic), [filteredGrades])
-    const listPublicos = useMemo(() => filteredGrades.filter(g => g.isPublic), [filteredGrades])
+    const listMatriculados = useMemo(() => groupedGrades.filter(g => !g.isPublic), [groupedGrades])
+    const listPublicos = useMemo(() => groupedGrades.filter(g => g.isPublic), [groupedGrades])
 
     if (loading) {
         return (
@@ -745,19 +822,27 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                     </h3>
                                 </div>
                                 <div className="divide-y divide-slate-100">
-                                    {list.map((grade) => (
-                                        <GradeCard 
-                                            key={grade.id} 
-                                            grade={grade} 
+                                    {list.map((group) => (
+                                        <StudentCard 
+                                            key={group.studentIdentifier} 
+                                            studentName={group.studentName}
+                                            grades={group.grades}
                                             disciplines={disciplines}
                                             isMaster={isMaster}
                                             calculateAverage={calculateAverage}
                                             computeFrequency={computeFrequency}
                                             onEdit={(g) => {
                                                 savedScrollY.current = window.scrollY
-                                                setFormData(g)
+                                                setFormData({
+                                                    ...g,
+                                                    examGrade: String(g.examGrade || ""),
+                                                    worksGrade: String(g.worksGrade || ""),
+                                                    seminarGrade: String(g.seminarGrade || ""),
+                                                    participationBonus: String(g.participationBonus || ""),
+                                                    attendanceScore: String(g.attendanceScore || ""),
+                                                    customDivisor: String(g.customDivisor || "2")
+                                                })
                                                 setIsEditing(g.id)
-                                                // Não rola para o topo — mantém o aluno visível
                                             }}
                                             onDelete={(id) => setDeleteConfirm(id)}
                                         />

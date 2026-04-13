@@ -1399,10 +1399,15 @@ export async function syncGradesForDiscipline(disciplineId: string) {
   const profilesByEmail = new Map<string, any>()
   const profilesById = new Map<string, any>()
 
+  // Helper para obter o identificador canônico do aluno (Matrícula > CPF > Email)
+  const getCanonicalId = (p: any) => {
+    return (p.enrollment_number || p.cpf || p.email || "").toString().toLowerCase().trim()
+  }
+
   // Buscar por email em lotes
   for (let i = 0; i < involvedStudentEmails.length; i += BATCH) {
     const chunk = involvedStudentEmails.slice(i, i + BATCH)
-    const { data } = await supabase.from('students').select('id, email, name').in('email', chunk)
+    const { data } = await supabase.from('students').select('id, email, name, cpf, enrollment_number').in('email', chunk)
     ;(data || []).forEach((p: any) => {
       const emailKey = (p.email || "").toLowerCase().trim()
       if (emailKey) profilesByEmail.set(emailKey, p)
@@ -1412,7 +1417,7 @@ export async function syncGradesForDiscipline(disciplineId: string) {
   // Buscar por ID (para alunos de frequência que talvez não tenham submetido)
   for (let i = 0; i < involvedStudentIds.length; i += BATCH) {
     const chunk = involvedStudentIds.slice(i, i + BATCH)
-    const { data } = await supabase.from('students').select('id, email, name').in('id', chunk)
+    const { data } = await supabase.from('students').select('id, email, name, cpf, enrollment_number').in('id', chunk)
     ;(data || []).forEach((p: any) => {
       const emailKey = (p.email || "").toLowerCase().trim()
       if (emailKey) profilesByEmail.set(emailKey, p)
@@ -1424,24 +1429,28 @@ export async function syncGradesForDiscipline(disciplineId: string) {
   const syncResults: Record<string, { examGrade: number; attendanceScore: number; name: string }> = {};
 
   // ── INICIALIZAR A PARTIR DAS SUBMISSÕES DIRETAMENTE ──────────────────────
-  // Garante que TODOS os que submeteram aparecem no boletim,
-  // independente de o email estar cadastrado com exatidão na tabela students.
+  // Garante que TODOS os que submeteram aparecem no boletim.
+  // Se encontrarmos o perfil do aluno, usamos o identificador canônico (Matrícula ou CPF)
+  // para bater com o que já existe no sistema Admin.
   ;(submissions || []).forEach((sub: any) => {
-    const key = (sub.student_email || "").toLowerCase().trim()
-    if (!key) return
+    const emailKey = (sub.student_email || "").toLowerCase().trim()
+    if (!emailKey) return
+    
+    const profile = profilesByEmail.get(emailKey)
+    const key = profile ? getCanonicalId(profile) : emailKey
+
     if (!syncResults[key]) {
-      // Usa o nome do perfil se existir, senão usa o nome da submissão
-      const profile = profilesByEmail.get(key)
       syncResults[key] = { examGrade: 0, attendanceScore: 0, name: profile?.name || sub.student_name || key }
     }
   })
 
   // Também inicializa alunos que têm frequência registrada mas podem não ter submetido
   studentProfiles.forEach((p: any) => {
-    const key = (p.email || "").toLowerCase().trim();
+    const key = getCanonicalId(p)
     if (!key || syncResults[key]) return; // já existe da submissão
     syncResults[key] = { examGrade: 0, attendanceScore: 0, name: p.name };
   });
+
 
   // Processar Notas de Prova — normaliza para escala 0-10
   // O score bruto pode representar nº de acertos (ex: 19/20) enquanto o boletim
