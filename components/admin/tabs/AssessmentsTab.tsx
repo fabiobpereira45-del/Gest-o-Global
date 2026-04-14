@@ -314,13 +314,16 @@ export function AssessmentsTab({ assessments, submissions, questions, discipline
                     onClick={() => { setEditingAssessment(a); setBuilderOpen(true) }} title="Editar">
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  {isMaster && (
-                    <Button size="sm" variant="ghost"
-                      className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => setDeleteId(a.id)} title="Excluir">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setDeleteId(a.id)} 
+                    title="Excluir Prova permanentemente"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 sm:mr-1" />
+                    <span className="hidden sm:inline">Excluir</span>
+                  </Button>
                 </div>
               </div>
             )
@@ -340,12 +343,20 @@ export function AssessmentsTab({ assessments, submissions, questions, discipline
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir prova</AlertDialogTitle>
-            <AlertDialogDescription>Tem certeza que deseja excluir esta prova? Esta ação não pode ser desfeita.</AlertDialogDescription>
+            <AlertDialogTitle>Excluir prova permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação removerá a prova e todos os dados associados do sistema de forma definitiva. 
+              Tem certeza que deseja continuar?
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={handleDelete}>Excluir</AlertDialogAction>
+            <AlertDialogAction 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90" 
+              onClick={handleDelete}
+            >
+              Excluir permanentemente
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
