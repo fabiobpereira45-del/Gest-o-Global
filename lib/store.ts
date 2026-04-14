@@ -1156,7 +1156,7 @@ export async function finalizeAttendance(disciplineId: string, date: string, fin
         throw new Error(error.message)
     }
 
-    // Auto-sync grades after finalization
+    // Auto-sync grades after finalization and await it
     await syncGradesForDiscipline(disciplineId)
   } catch (err: any) {
     throw err
@@ -1506,20 +1506,62 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     }
   })
 
-  // Calcular nota de frequência: MODELO FIXO - cada presença vale os pontos cheios,
-  // com cap no máximo configurado. Ex: 1 presença presencial = 3pt (não proporcional).
+  // Calcular nota de frequência: MODELO ADITIVO - cada presença soma pontos
+  // Se houver total de aulas, poderíamos fazer proporcional, mas seguindo o pedido
+  // do usuário de 'segundo configurações do master', usaremos os pontos por tipo.
   Object.keys(syncResults).forEach(key => {
-    let score = 0
     const presCount = studentPresencial[key] || 0
     const onlCount = studentOnline[key] || 0
-    if (presCount > 0) {
-      score += Math.min(presCount * maxPresencial, maxPresencial)
-    }
-    if (onlCount > 0) {
-      score += Math.min(onlCount * maxOnline, maxOnline)
-    }
-    syncResults[key].attendanceScore = Math.round(score * 100) / 100
+    
+    // Calcula pontos acumulados
+    const presScore = presCount * maxPresencial
+    const onlineScore = onlCount * maxOnline
+    
+    // No modelo IBAD, a nota de frequência geralmente é limitada a 10 ou ao divisor.
+    // Usaremos a soma limitada a 10 por segurança, ou o valor real se preferir.
+    syncResults[key].attendanceScore = Math.min(10, Math.round((presScore + onlineScore) * 100) / 100)
   })
+
+  // ── SALVAR RESULTADOS NO BANCO DE DADOS ──────────────────────────────────
+  // Buscamos as notas atuais para não sobrescrever o que já foi lançado manualmente (Trabalhos, etc)
+  const { data: currentGrades } = await supabase.from('student_grades').select('*').eq('discipline_id', disciplineId);
+
+  const recordsToSave = Object.entries(syncResults).map(([identifier, data]) => {
+    // Busca registro existente por identificador (E-mail, CPF ou Matrícula)
+    const existing = (currentGrades || []).find(g => {
+        const gid = String(g.student_identifier || "").trim().toLowerCase();
+        const profile = profilesByEmail.get(identifier) || profilesById.get(identifier); // identifier can be email or id
+        if (gid === identifier) return true;
+        if (profile) {
+            return gid === (profile.email || "").toLowerCase() || 
+                   gid === (profile.cpf || "").replace(/\D/g, "") || 
+                   gid === (profile.enrollment_number || "").toLowerCase();
+        }
+        return false;
+    });
+
+    return {
+      studentIdentifier: identifier,
+      studentName: data.name,
+      discipline_id: disciplineId, // use snake_case for consistency in DB calls
+      is_public: existing?.is_public ?? false,
+      exam_grade: data.examGrade,
+      works_grade: existing?.works_grade ?? 0,
+      seminar_grade: existing?.seminar_grade ?? 0,
+      participation_bonus: existing?.participation_bonus ?? 0,
+      attendance_score: data.attendanceScore,
+      custom_divisor: existing?.custom_divisor ?? 2,
+      is_released: true 
+    }
+  })
+
+  if (recordsToSave.length > 0) {
+      // Usamos upsert direto aqui para ser mais preciso
+      const { error: upsertErr } = await supabase.from('student_grades').upsert(recordsToSave, {
+        onConflict: 'student_identifier,discipline_id'
+      })
+      if (upsertErr) console.error("Erro ao persistir sincronização:", upsertErr)
+  }
 
   return syncResults
 }

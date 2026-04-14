@@ -186,7 +186,8 @@ CREATE TABLE IF NOT EXISTS public.student_grades (
   participation_bonus NUMERIC NOT NULL DEFAULT 0,
   attendance_score   NUMERIC NOT NULL DEFAULT 0,
   custom_divisor     NUMERIC NOT NULL DEFAULT 4,
-  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(student_identifier, discipline_id)
 );
 
 -- ── 15. Frequência (attendance) ───────────────────────────────

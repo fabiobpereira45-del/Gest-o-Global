@@ -351,7 +351,6 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
     const [statusFilter, setStatusFilter] = useState<"all" | "released" | "hidden">("all")
 
     const handleSync = async () => {
-
         if (!selectedDiscipline) {
             alert("Selecione uma disciplina no filtro abaixo para sincronizar.")
             return
@@ -359,59 +358,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
 
         try {
             setIsSyncing(true)
-            const syncData = await syncGradesForDiscipline(selectedDiscipline)
+            // A função sync agora salva os resultados no banco de dados automaticamente
+            await syncGradesForDiscipline(selectedDiscipline)
             
-            if ((syncData as any).reason) {
-                alert((syncData as any).reason)
-                setIsSyncing(false)
-                return
-            }
-
-            // Converter os resultados em um ÚNICO lote de salvamento (Muito mais rápido)
-            const recordsToSave = Object.entries(syncData).map(([identifier, data]) => {
-                // Encontra o perfil do aluno para buscar por outros identificadores possíveis
-                const student = students.find(s => {
-                    const id = String(identifier).trim().toLowerCase()
-                    return (
-                        (s.email || "").toLowerCase() === id ||
-                        (s.cpf || "").replace(/\D/g, "") === id.replace(/\D/g, "") ||
-                        (s.enrollment_number || "").toLowerCase() === id
-                    )
-                })
-
-                // Busca registro existente usando qualquer um dos identificadores conhecidos do aluno
-                const existing = grades.find(g => {
-                    if (g.disciplineId !== selectedDiscipline) return false;
-                    const gId = String(g.studentIdentifier || "").trim().toLowerCase();
-                    if (gId === identifier) return true;
-                    if (student) {
-                        return (
-                            gId === (student.email || "").toLowerCase() ||
-                            gId === (student.cpf || "").replace(/\D/g, "") ||
-                            gId === (student.enrollment_number || "").toLowerCase()
-                        );
-                    }
-                    return false;
-                })
-
-                return {
-                    studentIdentifier: identifier,
-                    studentName: (data as any).name,
-                    disciplineId: selectedDiscipline as string,
-                    isPublic: false,
-                    examGrade: (data as any).examGrade,
-                    worksGrade: existing?.worksGrade || 0,
-                    seminarGrade: existing?.seminarGrade || 0,
-                    participationBonus: existing?.participationBonus || 0,
-                    attendanceScore: (data as any).attendanceScore,
-                    customDivisor: existing?.customDivisor || 2,
-                    isReleased: true,
-                    id: existing?.id
-                }
-            })
-
-            await saveBatchGrades(recordsToSave)
-            alert("Sincronização concluída com sucesso!")
+            alert("Sincronização concluída com sucesso! Os diários foram atualizados com as presenças e notas de avaliações.")
             loadData()
         } catch (err: any) {
             alert("Erro na sincronização: " + err.message)
@@ -468,10 +418,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
             discAtts.filter(a => a.studentId === student.id && a.isPresent && a.type === 'ead').map(a => a.date)
         )
 
-        // Modelo fixo: cada presença vale os pontos cheios, limitado ao máx
-        const presencial = myPresencialDates.size > 0 ? Math.min(myPresencialDates.size * maxPresencial, maxPresencial) : 0
-        const online = myOnlineDates.size > 0 ? Math.min(myOnlineDates.size * maxOnline, maxOnline) : 0
-        return { presencial, online, total: Math.round((presencial + online) * 100) / 100 }
+        // Modelo aditivo: cada presença soma pontos, limitado a 10
+        const presencial = myPresencialDates.size * maxPresencial
+        const online = myOnlineDates.size * maxOnline
+        return { presencial, online, total: Math.min(10, Math.round((presencial + online) * 100) / 100) }
     }
 
     const calculateAverage = (grade: StudentGrade) => {
