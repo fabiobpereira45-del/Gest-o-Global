@@ -43,7 +43,7 @@ import {
 } from "@/lib/store"
 import { cn } from "@/lib/utils"
 import { 
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter 
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription 
 } from "@/components/ui/dialog"
 import { 
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
