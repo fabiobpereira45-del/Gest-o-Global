@@ -215,9 +215,10 @@ export function FinancialManager() {
 
         data.push({
           name: monthNames[m-1],
-          Receitas: income,
-          Despesas: expense,
-          Previsto: pIncome + pExpense // Consolidated projection for simplicity
+          Realizado: income,
+          Previsto: expense,
+          originalReceita: income,
+          originalDespesa: expense
         })
       }
       return data
@@ -229,11 +230,17 @@ export function FinancialManager() {
       const yearTransactions = allTransactions.filter(t => t.competencia?.startsWith(year))
       const income = yearTransactions.filter(t => t.type === 'income' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
       const expense = yearTransactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
-      return { name: year, Receitas: income, Despesas: expense }
+      return { 
+        name: year, 
+        Realizado: income, 
+        Previsto: expense, // Usando Previsto como "Despesa" para manter compatibilidade com as cores do gráfico original
+        originalReceita: income,
+        originalDespesa: expense
+      }
     })
   }, [viewScope, stats, allTransactions, competencia])
 
-  const categoryData = useMemo(() => {
+  const expenseDistribution = useMemo(() => {
     const scopeYear = competencia.substring(0, 4)
     const realization = allTransactions.filter(t => {
       if (t.type !== 'expense' || t.status !== 'realized') return false
