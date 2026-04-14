@@ -582,7 +582,7 @@ export function FinancialManager() {
       <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
         <DialogContent className="max-w-md">
            <DialogHeader><DialogTitle>Configurações Financeiras</DialogTitle></DialogHeader>
-           <form onSubmit={async (e) => {
+           <form key={`cfg-${settings.tuitionRate}-${settings.proLaboreRate}-${settings.pixKey}`} onSubmit={async (e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
               await updateFinancialSettings({
