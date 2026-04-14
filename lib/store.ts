@@ -1678,15 +1678,24 @@ export async function syncStudentTuition(studentId: string, settings?: Financial
   const finalDisciplines = disciplines || await getDisciplines()
   const sorted = [...finalDisciplines].sort((a, b) => a.order - b.order)
 
-  // Build the due_date from executionDate (format: YYYY-MM → YYYY-MM-10)
-  const toUpsert = sorted.map(d => ({
-    student_id: studentId,
-    discipline_id: d.id,
-    amount: finalSettings.tuitionRate,
-    due_date: d.executionDate ? `${d.executionDate}-10` : null,
-    status: 'pending',
-    created_at: new Date().toISOString()
-  }))
+  // Build the due_date from executionDate.
+  // executionDate can be in 'YYYY-MM' OR 'YYYY-MM-DD' format depending on how it was saved.
+  // We always extract only the first 7 chars (YYYY-MM) before appending the day '-10'.
+  const toUpsert = sorted.map(d => {
+    let dueDate: string | null = null
+    if (d.executionDate) {
+      const yearMonth = d.executionDate.substring(0, 7) // Always 'YYYY-MM'
+      dueDate = `${yearMonth}-10`
+    }
+    return {
+      student_id: studentId,
+      discipline_id: d.id,
+      amount: finalSettings.tuitionRate,
+      due_date: dueDate,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    }
+  })
 
   if (toUpsert.length === 0) return
 
