@@ -76,6 +76,14 @@ export function FinancialManager() {
   const [isSyncOpen, setIsSyncOpen] = useState(false)
   const [isConfigOpen, setIsConfigOpen] = useState(false)
 
+  // Local draft state for the config dialog — always mirrors the last persisted settings
+  const [configDraft, setConfigDraft] = useState({
+    tuitionRate: settings.tuitionRate,
+    proLaboreRate: settings.proLaboreRate,
+    pixKey: settings.pixKey || "",
+    pixQRCode: settings.pixQRCode || ""
+  })
+
   async function loadData() {
     setLoading(true)
     try {
@@ -579,20 +587,28 @@ export function FinancialManager() {
         )}
       </div>
 
-      <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+      <Dialog open={isConfigOpen} onOpenChange={(open) => {
+        // Sync draft with latest persisted settings every time dialog opens
+        if (open) setConfigDraft({
+          tuitionRate: settings.tuitionRate,
+          proLaboreRate: settings.proLaboreRate,
+          pixKey: settings.pixKey || "",
+          pixQRCode: settings.pixQRCode || ""
+        })
+        setIsConfigOpen(open)
+      }}>
         <DialogContent className="max-w-md">
            <DialogHeader><DialogTitle>Configurações Financeiras</DialogTitle></DialogHeader>
-           <form key={`cfg-${settings.tuitionRate}-${settings.proLaboreRate}-${settings.pixKey}`} onSubmit={async (e) => {
+           <form onSubmit={async (e) => {
               e.preventDefault();
-              const fd = new FormData(e.currentTarget);
               await updateFinancialSettings({
-                tuitionRate: Number(fd.get('tuition')),
-                proLaboreRate: Number(fd.get('prolabore')),
-                pixKey: fd.get('pixKey')?.toString() || "",
-                pixQRCode: fd.get('pixQRCode')?.toString() || ""
+                tuitionRate: configDraft.tuitionRate,
+                proLaboreRate: configDraft.proLaboreRate,
+                pixKey: configDraft.pixKey,
+                pixQRCode: configDraft.pixQRCode
               });
               setIsConfigOpen(false);
-              loadData();
+              await loadData(); // await so state is fresh before any re-render
               toast.success('Configurações salvas com sucesso!');
            }} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -600,14 +616,24 @@ export function FinancialManager() {
                     <Label>Mensalidade (Alunos)</Label>
                     <div className="relative">
                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                       <Input name="tuition" type="number" step="0.01" defaultValue={settings.tuitionRate} className="pl-10 h-9 text-sm" />
+                       <Input
+                         type="number" step="0.01"
+                         value={configDraft.tuitionRate}
+                         onChange={e => setConfigDraft(d => ({ ...d, tuitionRate: Number(e.target.value) }))}
+                         className="pl-10 h-9 text-sm"
+                       />
                     </div>
                  </div>
                  <div className="space-y-2">
                     <Label>Pro-labore (Profas)</Label>
                     <div className="relative">
                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                       <Input name="prolabore" type="number" step="0.01" defaultValue={settings.proLaboreRate} className="pl-10 h-9 text-sm" />
+                       <Input
+                         type="number" step="0.01"
+                         value={configDraft.proLaboreRate}
+                         onChange={e => setConfigDraft(d => ({ ...d, proLaboreRate: Number(e.target.value) }))}
+                         className="pl-10 h-9 text-sm"
+                       />
                     </div>
                  </div>
               </div>
@@ -619,13 +645,17 @@ export function FinancialManager() {
                  <div className="space-y-3">
                     <div className="space-y-1">
                        <Label className="text-[11px]">Chave PIX (E-mail, CPF, Tel ou Aleatória)</Label>
-                       <Input name="pixKey" placeholder="Ex: financeiro@teoglobal.com" defaultValue={settings.pixKey} className="h-9 text-sm" />
+                       <Input
+                         value={configDraft.pixKey}
+                         onChange={e => setConfigDraft(d => ({ ...d, pixKey: e.target.value }))}
+                         placeholder="Ex: financeiro@teoglobal.com" className="h-9 text-sm"
+                       />
                     </div>
                     <div className="space-y-1">
                        <Label className="text-[11px]">Código PIX Copia e Cola (Payload)</Label>
-                       <textarea 
-                          name="pixQRCode" 
-                          defaultValue={settings.pixQRCode}
+                       <textarea
+                          value={configDraft.pixQRCode}
+                          onChange={e => setConfigDraft(d => ({ ...d, pixQRCode: e.target.value }))}
                           placeholder="Cole aqui o payload do seu QR Code estático..."
                           className="w-full min-h-[80px] text-xs p-2 rounded-md border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary"
                        />
