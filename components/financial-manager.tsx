@@ -68,7 +68,7 @@ export function FinancialManager() {
   const [disciplines, setDisciplines] = useState<Discipline[]>([])
   const [professors, setProfessors] = useState<ProfessorAccount[]>([])
   const [profLinks, setProfLinks] = useState<ProfessorDiscipline[]>([])
-  const [settings, setSettings] = useState<FinancialSettings>({ tuitionRate: 300, proLaboreRate: 300 })
+  const [settings, setSettings] = useState<FinancialSettings>({ tuitionRate: 0, proLaboreRate: 0 })
   const [loading, setLoading] = useState(true)
   const [competencia, setCompetencia] = useState(new Date().toISOString().substring(0, 7)) // YYYY-MM
   const [viewScope, setViewScope] = useState<"month" | "year" | "all">("month")
@@ -90,6 +90,16 @@ export function FinancialManager() {
     pixKey: settings.pixKey || "",
     pixQRCode: settings.pixQRCode || ""
   })
+
+  // Sync configDraft whenever settings updates from the database
+  useEffect(() => {
+    setConfigDraft({
+      tuitionRate: settings.tuitionRate,
+      proLaboreRate: settings.proLaboreRate,
+      pixKey: settings.pixKey || "",
+      pixQRCode: settings.pixQRCode || ""
+    })
+  }, [settings])
 
   async function loadData() {
     setLoading(true)
