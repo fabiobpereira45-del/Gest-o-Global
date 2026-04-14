@@ -9,7 +9,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { type Assessment, type StudentSubmission, type Question, type Discipline, updateAssessment, deleteAssessment } from "@/lib/store"
+import { type Assessment, type StudentSubmission, type Question, type Discipline, updateAssessment, deleteAssessment, getQuestionsByDiscipline } from "@/lib/store"
 import { printBlankAssessmentPDF, printAnswerKeyPDF } from "@/lib/pdf"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { AssessmentBuilder } from "@/components/assessment-builder"
@@ -69,8 +69,39 @@ export function AssessmentsTab({ assessments, submissions, questions, discipline
     onRefresh()
   }
 
-  function handlePrint(a: Assessment) {
-    printBlankAssessmentPDF({ assessment: a, questions })
+  async function handlePrint(a: Assessment) {
+    try {
+      // Garantir que temos as questões desta disciplina carregadas antes de imprimir
+      let allQuestions = [...questions]
+      const needsFetch = a.questionIds.some(id => !allQuestions.find(q => q.id === id))
+      
+      if (needsFetch && a.disciplineId) {
+        const discQuestions = await getQuestionsByDiscipline(a.disciplineId)
+        allQuestions = [...allQuestions, ...discQuestions]
+      }
+      
+      printBlankAssessmentPDF({ assessment: a, questions: allQuestions })
+    } catch (err) {
+      console.error("Erro ao imprimir prova:", err)
+      alert("Erro ao carregar questões para a prova.")
+    }
+  }
+
+  async function handlePrintAnswerKey(a: Assessment) {
+    try {
+      let allQuestions = [...questions]
+      const needsFetch = a.questionIds.some(id => !allQuestions.find(q => q.id === id))
+      
+      if (needsFetch && a.disciplineId) {
+        const discQuestions = await getQuestionsByDiscipline(a.disciplineId)
+        allQuestions = [...allQuestions, ...discQuestions]
+      }
+      
+      printAnswerKeyPDF({ assessment: a, questions: allQuestions })
+    } catch (err) {
+      console.error("Erro ao imprimir gabarito:", err)
+      alert("Erro ao carregar questões para o gabarito.")
+    }
   }
 
   async function handleUpdateSchedule() {
@@ -262,7 +293,7 @@ export function AssessmentsTab({ assessments, submissions, questions, discipline
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Imprimir Prova em Branco" onClick={() => handlePrint(a)}>
                     <Download className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50" title="Baixar Gabarito em PDF" onClick={() => printAnswerKeyPDF({ assessment: a, questions })}>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50" title="Baixar Gabarito em PDF" onClick={() => handlePrintAnswerKey(a)}>
                     <FileCheck className="h-3.5 w-3.5" />
                   </Button>
                   <Button

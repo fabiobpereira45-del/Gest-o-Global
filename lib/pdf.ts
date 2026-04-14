@@ -716,6 +716,10 @@ export function printBlankAssessmentPDF({ assessment, questions }: { assessment:
     const qList = Array.isArray(questions) ? questions : []
     const orderedQuestions = (assessment?.questionIds || []).map(id => qList.find(q => q.id === id)).filter(Boolean) as Question[]
     
+    if (orderedQuestions.length === 0) {
+        console.warn("printBlankAssessmentPDF: Nenhuma questão encontrada para a prova", assessment?.title)
+    }
+    
     const rows = orderedQuestions.map((q, i) => {
         const optionsHtml = q.type === "multiple-choice" ? 
           (q.choices || []).map((c, ci) => `<div style="margin:8px 0;display:flex;gap:10px;"><div style="width:20px;height:20px;border:1.5px solid #cbd5e1;border-radius:4px;flex-shrink:0;"></div> <span style="font-size:13px;">(${String.fromCharCode(65 + ci)}) ${c.text}</span></div>`).join('') :
