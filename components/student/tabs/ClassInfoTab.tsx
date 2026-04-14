@@ -1,7 +1,7 @@
 "use client"
 
 import { Users, CalendarDays, Clock, BookOpen, GraduationCap, Video, MonitorPlay, FileCheck2 } from "lucide-react"
-import type { ClassRoom, StudentProfile, ClassSchedule, Discipline, StudentGrade } from "@/lib/store"
+import { calculateFinalGrade, type ClassRoom, type StudentProfile, type ClassSchedule, type Discipline, type StudentGrade } from "@/lib/store"
 import { cn } from "@/lib/utils"
 
 const formatDateTime = (dateStr?: string) => {
@@ -240,11 +240,7 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {sortedDisciplines.map(disc => {
                                         const grade = officialGrades.find(g => g.disciplineId === disc.id)
-                                        const totalGrade = grade ? (
-                                            (grade.examGrade || 0) + (grade.worksGrade || 0) + (grade.seminarGrade || 0) + (grade.participationBonus || 0) + (grade.attendanceScore || 0)
-                                        ) : 0
-                                        const divisor = (grade?.customDivisor && grade.customDivisor > 0) ? grade.customDivisor : 2
-                                        const average = grade ? totalGrade / divisor : null
+                                        const average = grade ? calculateFinalGrade(grade, grade.attendanceScore || 0) : null
                                         
                                         const isPastValue = disc.executionDate ? disc.executionDate < now : false
                                         const isFutureValue = disc.executionDate ? disc.executionDate > now : false

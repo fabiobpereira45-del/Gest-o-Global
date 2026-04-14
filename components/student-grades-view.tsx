@@ -2,7 +2,8 @@ import { useEffect, useState } from "react"
 import { FileText, Award, CalendarCheck, Loader2, Calculator, CheckCircle2, Clock, Lock } from "lucide-react"
 import {
     type Discipline, type Semester, type StudentSubmission, type Attendance, type Assessment, type StudentGrade, type GradingSettings,
-    getDisciplines, getSemesters, getSubmissions, getAttendances, getAttendancesByStudent, getAssessments, getStudentGrades, getGradingSettings
+    getDisciplines, getSemesters, getSubmissions, getAttendances, getAttendancesByStudent, getAssessments, getStudentGrades, getGradingSettings,
+    calculateAttendanceScore, calculateFinalGrade
 } from "@/lib/store"
 
 interface Props {
@@ -125,21 +126,18 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
     }
 
     const calculateDynamicGrade = (grade: StudentGrade) => {
+        if (!gradingSettings) return { presencialScore: 0, onlineScore: 0, videoAula: 0, leituraLivro: 0, questionarioLivro: 0, notaAtividades: 0, examGrade: 0, media: 0 }
+        
         let finalExamGrade = grade.examGrade || 0;
-        let presencialScore = 0;
-        let onlineScore = 0;
+        let presencialCount = 0;
+        let onlineCount = 0;
 
-        const maxPresencial = gradingSettings?.pointsPerPresence || 3
-        const maxOnline = gradingSettings?.onlinePresencePoints || 2
-
-        // Dynamic Exam Grade
+        // Dynamic Exam Grade from Submissions
         if (grade.disciplineId) {
             const disciplineAssessments = assessments.filter(a => a.disciplineId === grade.disciplineId && a.releaseResults === true);
             const assessmentIds = disciplineAssessments.map(a => a.id);
             const studentDisciplineSubs = submissions.filter(s => assessmentIds.includes(s.assessmentId));
             if (studentDisciplineSubs.length > 0) {
-                // Normaliza para escala 0-10 usando percentage (mais confiável)
-                // percentage está em 0-100, então ÷ 10 = escala 0-10
                 finalExamGrade = Math.max(...studentDisciplineSubs.map(s => {
                     const pct = Number(s.percentage || 0);
                     const rawScore = Number(s.score || 0);
@@ -150,42 +148,30 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
                 }));
             }
 
-            // Dynamic Attendance by type
+            // Attendance Count
             const disciplineAtts = attendances.filter(a => a.disciplineId === grade.disciplineId && a.isPresent);
-            const presencialAtts = disciplineAtts.filter(a => (a.type || 'presencial') === 'presencial');
-            const onlineAtts = disciplineAtts.filter(a => a.type === 'ead');
-            
-            // Unique attended dates per type
-            const uniquePresencialPresent = new Set(presencialAtts.map(a => a.date)).size;
-            const uniqueOnlinePresent = new Set(onlineAtts.map(a => a.date)).size;
-
-            // MODELO FIXO: cada presença vale os pontos cheios configurados,
-            // com cap no máximo. Ex: 1 presença presencial = 3pt (não proporcional).
-            if (uniquePresencialPresent > 0) {
-                presencialScore = Math.min(uniquePresencialPresent * maxPresencial, maxPresencial);
-            }
-            if (uniqueOnlinePresent > 0) {
-                onlineScore = Math.min(uniqueOnlinePresent * maxOnline, maxOnline);
-            }
+            presencialCount = new Set(disciplineAtts.filter(a => (a.type || 'presencial') === 'presencial').map(a => a.date)).size;
+            onlineCount = new Set(disciplineAtts.filter(a => a.type === 'ead').map(a => a.date)).size;
         }
 
-        const frequenciaTotal = Math.round((presencialScore + onlineScore) * 100) / 100;
+        const attendanceScore = calculateAttendanceScore(presencialCount, onlineCount, gradingSettings);
+        const media = calculateFinalGrade({ ...grade, examGrade: finalExamGrade }, attendanceScore);
+
         const videoAula = grade.participationBonus || 0;
         const leituraLivro = grade.worksGrade || 0;
         const questionarioLivro = grade.seminarGrade || 0;
 
-        const notaAtividades = Math.round((presencialScore + onlineScore + videoAula + leituraLivro + questionarioLivro) * 100) / 100;
-        const media = (notaAtividades + finalExamGrade) / 2;
+        const notaAtividades = Math.round((attendanceScore + videoAula + leituraLivro + questionarioLivro) * 100) / 100;
 
         return {
-            presencialScore: Math.round(presencialScore * 100) / 100,
-            onlineScore: Math.round(onlineScore * 100) / 100,
+            presencialScore: presencialCount * (gradingSettings.pointsPerPresence || 3),
+            onlineScore: onlineCount * (gradingSettings.onlinePresencePoints || 2),
             videoAula,
             leituraLivro,
             questionarioLivro,
             notaAtividades: Math.min(notaAtividades, 10),
             examGrade: finalExamGrade,
-            media: Math.round(media * 100) / 100,
+            media,
         }
     }
 

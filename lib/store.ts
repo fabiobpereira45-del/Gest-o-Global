@@ -1362,7 +1362,26 @@ export async function saveBatchGrades(grades: Array<Omit<StudentGrade, "id" | "c
   }
 }
 
-/** Sincroniza notas de submissões e frequência para uma disciplina e aluno. */
+export function calculateAttendanceScore(presCount: number, onlineCount: number, settings: GradingSettings): number {
+    const presScore = presCount * (settings.pointsPerPresence || 3);
+    const onlineScore = onlineCount * (settings.onlinePresencePoints || 2);
+    // Limita a 10 ou conforme regra específica se necessário.
+    return Math.min(10, Math.round((presScore + onlineScore) * 100) / 100);
+}
+
+export function calculateFinalGrade(grade: Partial<StudentGrade>, attendanceScore: number): number {
+    const notaAtividades = (Number(grade.worksGrade) || 0) +
+                         (Number(grade.seminarGrade) || 0) +
+                         (Number(grade.participationBonus) || 0) +
+                         attendanceScore;
+    
+    const provaOnline = Number(grade.examGrade) || 0;
+    const divisor = (Number(grade.customDivisor) && Number(grade.customDivisor) > 0) ? Number(grade.customDivisor) : 2;
+    
+    // Fórmula padrão IBAD: (Atividades + Prova) / Divisor
+    return Math.round(((notaAtividades + provaOnline) / divisor) * 100) / 100;
+}
+
 /** Sincroniza notas de submissões e frequência para uma disciplina. */
 export async function syncGradesForDiscipline(disciplineId: string) {
   const supabase = createClient()
@@ -1487,16 +1506,22 @@ export async function syncGradesForDiscipline(disciplineId: string) {
   });
 
 
-  // Processar Frequência com PESOS por tipo
-  const profileById = new Map(studentProfiles.map(p => [p.id, p]))
+  // ── PROCESSAR FREQUÊNCIA ──────────────────────────────────────────────────
   const studentPresencial: Record<string, number> = {}
   const studentOnline: Record<string, number> = {}
 
   ;(attendances || []).forEach((att: any) => {
-    const profile = profileById.get(att.student_id)
+    const profile = profilesById.get(att.student_id)
     if (!profile || !att.is_present) return
-    const key = (profile.email || "").toLowerCase().trim()
-    if (!key || !syncResults[key]) return
+    
+    // Usamos o identificador canônico como chave primária interna do sync
+    const key = getCanonicalId(profile)
+    if (!key) return
+
+    // Garante que o aluno existe no syncResults
+    if (!syncResults[key]) {
+        syncResults[key] = { examGrade: 0, attendanceScore: 0, name: profile.name }
+    }
 
     const attType = att.type || 'presencial'
     if (attType === 'presencial') {
@@ -1506,20 +1531,13 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     }
   })
 
-  // Calcular nota de frequência: MODELO ADITIVO - cada presença soma pontos
-  // Se houver total de aulas, poderíamos fazer proporcional, mas seguindo o pedido
-  // do usuário de 'segundo configurações do master', usaremos os pontos por tipo.
+  // Calcular nota de frequência: MODELO ADITIVO 
   Object.keys(syncResults).forEach(key => {
     const presCount = studentPresencial[key] || 0
     const onlCount = studentOnline[key] || 0
     
-    // Calcula pontos acumulados
-    const presScore = presCount * maxPresencial
-    const onlineScore = onlCount * maxOnline
-    
-    // No modelo IBAD, a nota de frequência geralmente é limitada a 10 ou ao divisor.
-    // Usaremos a soma limitada a 10 por segurança, ou o valor real se preferir.
-    syncResults[key].attendanceScore = Math.min(10, Math.round((presScore + onlineScore) * 100) / 100)
+    // Usa a nova função centralizada
+    syncResults[key].attendanceScore = calculateAttendanceScore(presCount, onlCount, gradingSettings)
   })
 
   // ── SALVAR RESULTADOS NO BANCO DE DADOS ──────────────────────────────────
@@ -1530,8 +1548,12 @@ export async function syncGradesForDiscipline(disciplineId: string) {
     // Busca registro existente por identificador (E-mail, CPF ou Matrícula)
     const existing = (currentGrades || []).find(g => {
         const gid = String(g.student_identifier || "").trim().toLowerCase();
-        const profile = profilesByEmail.get(identifier) || profilesById.get(identifier); // identifier can be email or id
+        
+        // Match exato
         if (gid === identifier) return true;
+
+        // Match por perfil (se o identificador fornecido for um dos campos do perfil)
+        const profile = profilesByEmail.get(identifier) || profilesById.get(identifier); 
         if (profile) {
             return gid === (profile.email || "").toLowerCase() || 
                    gid === (profile.cpf || "").replace(/\D/g, "") || 

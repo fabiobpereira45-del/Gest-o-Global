@@ -12,7 +12,7 @@ import {
 import {
     StudentGrade, getStudentGrades, saveStudentGrade, deleteStudentGrade, saveBatchGrades,
     StudentProfile, getStudents, Discipline, getDisciplines, releaseAllGrades, syncGradesForDiscipline,
-    Attendance, GradingSettings, getGradingSettings
+    Attendance, GradingSettings, getGradingSettings, calculateAttendanceScore, calculateFinalGrade
 } from "@/lib/store"
 import { getAttendances } from "@/lib/store"
 import { printGradesReportPDF } from "@/lib/pdf"
@@ -392,9 +392,8 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
 
     // Calcula a frequência dinâmica (presencial + online) com base nos registros reais de presença
     const computeFrequency = (grade: StudentGrade): { presencial: number; online: number; total: number } => {
-        const maxPresencial = gradingSettings?.pointsPerPresence ?? 3
-        const maxOnline = gradingSettings?.onlinePresencePoints ?? 2
-
+        if (!gradingSettings) return { presencial: 0, online: 0, total: 0 }
+        
         // Encontra o aluno pelo identifier para obter o ID
         const student = students.find(s => {
             const id = String(grade.studentIdentifier || "").trim().toLowerCase()
@@ -410,31 +409,26 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
             return { presencial: stored, online: 0, total: stored }
         }
 
-        const discAtts = attendances.filter(a => a.disciplineId === grade.disciplineId)
+        const discAtts = attendances.filter(a => a.disciplineId === grade.disciplineId && a.isPresent)
         const myPresencialDates = new Set(
-            discAtts.filter(a => a.studentId === student.id && a.isPresent && (a.type || 'presencial') === 'presencial').map(a => a.date)
+            discAtts.filter(a => a.studentId === student.id && (a.type || 'presencial') === 'presencial').map(a => a.date)
         )
         const myOnlineDates = new Set(
-            discAtts.filter(a => a.studentId === student.id && a.isPresent && a.type === 'ead').map(a => a.date)
+            discAtts.filter(a => a.studentId === student.id && a.type === 'ead').map(a => a.date)
         )
 
-        // Modelo aditivo: cada presença soma pontos, limitado a 10
-        const presencial = myPresencialDates.size * maxPresencial
-        const online = myOnlineDates.size * maxOnline
-        return { presencial, online, total: Math.min(10, Math.round((presencial + online) * 100) / 100) }
+        const total = calculateAttendanceScore(myPresencialDates.size, myOnlineDates.size, gradingSettings)
+        
+        return { 
+            presencial: myPresencialDates.size * (gradingSettings.pointsPerPresence || 3), 
+            online: myOnlineDates.size * (gradingSettings.onlinePresencePoints || 2), 
+            total 
+        }
     }
 
     const calculateAverage = (grade: StudentGrade) => {
         const freq = computeFrequency(grade)
-        const notaAtividades = 
-            (parseFloat(grade.worksGrade as any) || 0) +
-            (parseFloat(grade.seminarGrade as any) || 0) +
-            (parseFloat(grade.participationBonus as any) || 0) +
-            freq.total  // frequência dinâmica em vez do valor estático
-
-        const provaOnline = parseFloat(grade.examGrade as any) || 0
-        const media = (notaAtividades + provaOnline) / 2
-        return media.toFixed(2)
+        return calculateFinalGrade(grade, freq.total).toFixed(2)
     }
 
     // --- Listas Memoizadas para Performance e Agrupamento ---
