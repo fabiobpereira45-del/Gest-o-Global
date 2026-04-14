@@ -215,13 +215,13 @@ export function AttendanceManager() {
 
     return (
         <div className="flex flex-col gap-6 w-full max-w-[1400px] mx-auto">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-lg font-semibold text-foreground">Diário de Classe (Frequência)</h2>
-                    <p className="text-sm text-muted-foreground">Registre a presença dos alunos nas suas disciplinas</p>
+                    <h2 className="text-lg font-bold text-foreground">Diário de Classe</h2>
+                    <p className="text-xs text-muted-foreground">Registre a presença nas disciplinas</p>
                 </div>
-                <div className="flex gap-2">
-                    <AttendanceReportModal 
+                <div className="flex flex-wrap items-center gap-2">
+                    <AttendanceReportModal
                         disciplines={disciplines}
                         classes={classes}
                         students={students}
@@ -230,96 +230,99 @@ export function AttendanceManager() {
 
                     {isFinalized ? (
                         <div className="flex items-center gap-2">
-                             <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold bg-amber-100 text-amber-700 border border-amber-200 shadow-sm">
-                                <AlertCircle className="h-4 w-4" /> Gravação Finalizada
+                             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                                <AlertCircle className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline">Gravação Finalizada</span>
+                                <span className="sm:hidden">Finalizada</span>
                             </span>
                             {isMaster && (
-                                <Button onClick={handleUnlock} variant="destructive" className="rounded-lg shadow-lg">
-                                    <RefreshCw className="h-4 w-4 mr-2" /> Desbloquear
+                                <Button onClick={handleUnlock} variant="destructive" size="sm" className="rounded-lg shadow-lg h-9">
+                                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Desbloquear
                                 </Button>
                             )}
                         </div>
                     ) : (
-                        <div className="flex gap-2">
-                            <Button variant="secondary" onClick={handleSave} disabled={saving || selectedDisciplineId === "none" || !selectedDate} className="bg-slate-100 text-slate-700 hover:bg-slate-200">
-                                {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                        <div className="flex gap-2 w-full sm:w-auto">
+                            <Button variant="secondary" onClick={handleSave} disabled={saving || selectedDisciplineId === "none" || !selectedDate} className="flex-1 sm:flex-none h-9 text-xs bg-slate-100 text-slate-700 hover:bg-slate-200">
+                                {saving ? <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
                                 Salvar
                             </Button>
-                            <Button onClick={handleFinalize} disabled={finalizing || saving || selectedDisciplineId === "none" || !selectedDate} className="bg-primary hover:bg-primary/90 text-white shadow-lg">
-                                {finalizing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                                Gravar Chamada
+                            <Button onClick={handleFinalize} disabled={finalizing || saving || selectedDisciplineId === "none" || !selectedDate} className="flex-1 sm:flex-none h-9 text-xs bg-primary hover:bg-primary/90 text-white shadow-lg">
+                                {finalizing ? <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
+                                <span className="hidden sm:inline">Gravar Chamada</span>
+                                <span className="sm:hidden">Gravar</span>
                             </Button>
                         </div>
                     )}
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 bg-muted/30 border border-border rounded-xl p-4">
-                <div className="flex flex-col gap-1.5 align-bottom">
-                    <Label>Disciplina *</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-muted/30 border border-border rounded-xl p-3">
+                <div className="flex flex-col gap-1">
+                    <Label className="text-[11px] font-bold text-muted-foreground">Disciplina *</Label>
                     <Select value={selectedDisciplineId} onValueChange={setSelectedDisciplineId}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Selecione a disciplina" />
+                        <SelectTrigger className="h-9 text-xs">
+                            <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="none">Selecione uma disciplina...</SelectItem>
                             {disciplines.map(d => (
-                                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                                <SelectItem key={d.id} value={d.id} className="text-xs">{d.name}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
                 </div>
                 
-                <div className="flex flex-col gap-1.5 align-bottom">
-                    <Label>Tipo de Aula *</Label>
+                <div className="flex flex-col gap-1">
+                    <Label className="text-[11px] font-bold text-muted-foreground">Tipo de Aula *</Label>
                     <Select value={lessonType} onValueChange={(val) => setLessonType(val as "presencial" | "ead")}>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 text-xs">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="presencial">📍 Presencial</SelectItem>
-                            <SelectItem value="ead">💻 Online</SelectItem>
+                            <SelectItem value="presencial" className="text-xs">📍 Presencial</SelectItem>
+                            <SelectItem value="ead" className="text-xs">💻 Online</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                <div className="flex flex-col gap-1.5 align-bottom">
-                    <Label>Data da Aula *</Label>
+                <div className="flex flex-col gap-1">
+                    <Label className="text-[11px] font-bold text-muted-foreground">Data da Aula *</Label>
                     <div className="relative">
-                        <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
                         <Input
                             type="date"
                             value={selectedDate}
                             onChange={(e) => setSelectedDate(e.target.value)}
-                            className="pl-10"
+                            className="pl-8 h-9 text-xs"
                         />
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-1.5 align-bottom">
-                    <Label>Turma (Opcional)</Label>
+                <div className="flex flex-col gap-1">
+                    <Label className="text-[11px] font-bold text-muted-foreground">Turma (Opcional)</Label>
                     <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Todos os Núcleos" />
+                        <SelectTrigger className="h-9 text-xs">
+                            <SelectValue placeholder="Todos" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Todos os Núcleos</SelectItem>
+                            <SelectItem value="all" className="text-xs">Todos os Núcleos</SelectItem>
                             {classes.map(c => (
-                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                <SelectItem key={c.id} value={c.id} className="text-xs">{c.name}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
                 </div>
 
-                <div className="flex flex-col gap-1.5 align-bottom">
-                    <Label>Buscar Aluno</Label>
+                <div className="flex flex-col gap-1">
+                    <Label className="text-[11px] font-bold text-muted-foreground">Buscar Aluno</Label>
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
                         <Input
-                            placeholder="Nome ou Matrícula"
+                            placeholder="Nome..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10"
+                            className="pl-8 h-9 text-xs"
                         />
                     </div>
                 </div>
@@ -338,12 +341,12 @@ export function AttendanceManager() {
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
-                                <thead className="bg-muted/50 text-muted-foreground text-xs uppercase font-semibold">
+                                <thead className="bg-muted/50 text-muted-foreground text-[10px] uppercase font-bold">
                                     <tr>
-                                        <th className="px-4 py-3 w-16 text-center">Nº</th>
-                                        <th className="px-4 py-3 min-w-[200px]">Nome do Aluno</th>
-                                        <th className="px-4 py-3">Matrícula</th>
-                                        <th className="px-4 py-3 text-center">Status</th>
+                                        <th className="px-4 py-3 w-12 text-center hidden sm:table-cell">Nº</th>
+                                        <th className="px-4 py-3 min-w-[150px]">Aluno</th>
+                                        <th className="px-4 py-3 hidden md:table-cell">Matrícula</th>
+                                        <th className="px-4 py-3 text-center hidden sm:table-cell">Status</th>
                                         <th className="px-4 py-3 text-center">Presença</th>
                                     </tr>
                                 </thead>
@@ -361,23 +364,24 @@ export function AttendanceManager() {
 
                                             return (
                                                 <tr key={student.id} className="hover:bg-muted/30 transition-colors">
-                                                    <td className="px-4 py-3 text-center text-muted-foreground font-mono">
+                                                    <td className="px-4 py-3 text-center text-muted-foreground font-mono text-[10px] hidden sm:table-cell">
                                                         {(idx + 1).toString().padStart(2, '0')}
                                                     </td>
                                                     <td className="px-4 py-3 font-medium text-foreground">
-                                                        {student.name}
+                                                        <div className="truncate max-w-[140px] sm:max-w-none">{student.name}</div>
+                                                        <div className="text-[9px] text-muted-foreground sm:hidden">{student.enrollment_number}</div>
                                                     </td>
-                                                    <td className="px-4 py-3 text-muted-foreground font-mono">
+                                                    <td className="px-4 py-3 text-muted-foreground font-mono text-xs hidden md:table-cell">
                                                         {student.enrollment_number}
                                                     </td>
-                                                    <td className="px-4 py-3 text-center">
+                                                    <td className="px-4 py-3 text-center hidden sm:table-cell">
                                                         {isPresent ? (
-                                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700">
-                                                                <CheckCircle2 className="h-3.5 w-3.5" /> Presente
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-green-100 text-green-700">
+                                                                Presente
                                                             </span>
                                                         ) : (
-                                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700">
-                                                                <AlertCircle className="h-3.5 w-3.5" /> Faltou
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-red-100 text-red-700">
+                                                                Faltou
                                                             </span>
                                                         )}
                                                     </td>

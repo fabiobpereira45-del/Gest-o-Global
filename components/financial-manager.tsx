@@ -179,31 +179,33 @@ export function FinancialManager() {
   return (
     <div className="flex flex-col gap-6">
       {/* Header section with Stats Cards */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-navy to-orange bg-clip-text text-transparent">Gestão Financeira</h1>
-          <p className="text-muted-foreground">Controle de fluxo de caixa, mensalidades e projeções acadêmicas.</p>
+          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-navy to-orange bg-clip-text text-transparent">Gestão Financeira</h1>
+          <p className="text-muted-foreground text-xs lg:text-sm">Controle de caixa, mensalidades e projeções.</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
           <Input 
             type="month" 
             value={competencia} 
             onChange={e => setCompetencia(e.target.value)}
-            className="w-40 border-primary/20 bg-primary/5"
+            className="flex-1 lg:w-40 border-primary/20 bg-primary/5 h-9 text-sm"
           />
-          <Button onClick={loadData} variant="outline" size="icon">
+          <Button onClick={loadData} variant="outline" size="icon" className="h-9 w-9">
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
           </Button>
-          <Button variant="outline" className="border-primary text-primary" onClick={() => setIsConfigOpen(true)}>
-             <Calculator className="h-4 w-4 mr-2" /> Configurar Valores
-          </Button>
-          <Button variant="outline" onClick={() => printFinancialDRE_PDF(transactions, competencia, "Cosme de Farias")}>
-            <Download className="h-4 w-4 mr-2" /> PDF DRE
-          </Button>
-          <Button variant="outline" onClick={() => printTuitionReportPDF(tuitions, students, "Cosme de Farias")}>
-            <Printer className="h-4 w-4 mr-2" /> Relatório Mensalidades
-          </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="outline" size="sm" className="flex-1 sm:flex-none border-primary text-primary h-9 text-xs" onClick={() => setIsConfigOpen(true)}>
+                 <Calculator className="h-4 w-4 mr-1.5" /> Valores
+              </Button>
+              <Button variant="outline" size="sm" className="flex-1 sm:flex-none h-9 text-xs" onClick={() => printFinancialDRE_PDF(transactions, competencia, "Cosme de Farias")}>
+                <Download className="h-4 w-4 mr-1.5" /> DRE
+              </Button>
+              <Button variant="outline" size="sm" className="flex-1 sm:flex-none h-9 text-xs" onClick={() => printTuitionReportPDF(tuitions, students, "Cosme de Farias")}>
+                <Printer className="h-4 w-4 mr-1.5" /> Relatório
+              </Button>
+          </div>
         </div>
       </div>
 
@@ -238,11 +240,13 @@ export function FinancialManager() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-border/50 gap-6">
-        <TabButton active={tab === "dashboard"} onClick={() => setTab("dashboard")} icon={<PieChart className="h-4 w-4" />}>Painel & Gráficos</TabButton>
-        <TabButton active={tab === "income"} onClick={() => setTab("income")} icon={<DollarSign className="h-4 w-4" />}>Receitas / Cobranças</TabButton>
-        <TabButton active={tab === "expenses"} onClick={() => setTab("expenses")} icon={<TrendingDown className="h-4 w-4" />}>Despesas Diversas</TabButton>
-        <TabButton active={tab === "prolabore"} onClick={() => setTab("prolabore")} icon={<Briefcase className="h-4 w-4" />}>Aulas (Prolabore)</TabButton>
+      <div className="overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex border-b border-border/50 gap-4 lg:gap-8 min-w-max">
+          <TabButton active={tab === "dashboard"} onClick={() => setTab("dashboard")} icon={<PieChart className="h-4 w-4" />}>Dashboard</TabButton>
+          <TabButton active={tab === "income"} onClick={() => setTab("income")} icon={<DollarSign className="h-4 w-4" />}>Receitas</TabButton>
+          <TabButton active={tab === "expenses"} onClick={() => setTab("expenses")} icon={<TrendingDown className="h-4 w-4" />}>Despesas</TabButton>
+          <TabButton active={tab === "prolabore"} onClick={() => setTab("prolabore")} icon={<Briefcase className="h-4 w-4" />}>Pro-labore</TabButton>
+        </div>
       </div>
 
       {/* Tab Content */}

@@ -372,55 +372,60 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
         <div className="flex flex-col gap-6">
 
             {/* Header */}
-            <div className="flex justify-between items-center glass rounded-2xl p-6 premium-shadow">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 glass rounded-2xl p-4 lg:p-6 premium-shadow">
                 <div>
-                    <h2 className="text-xl font-bold font-serif text-foreground">Gestão de Alunos</h2>
-                    <p className="text-muted-foreground text-sm">Visualize, edite e gerencie os alunos com matrícula ativa.</p>
+                    <h2 className="text-lg lg:text-xl font-bold font-serif text-foreground">Gestão de Alunos</h2>
+                    <p className="text-muted-foreground text-xs lg:text-sm">Gerencie os alunos com matrícula ativa.</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                     <Button
                         variant="outline"
                         onClick={handleSyncAuth}
                         disabled={syncing}
-                        className="rounded-xl border-orange-200 bg-orange-50/50 text-orange-700 hover:bg-orange-100 transition-colors"
+                        className="flex-1 lg:flex-none rounded-xl border-orange-200 bg-orange-50/50 text-orange-700 hover:bg-orange-100 transition-colors h-9 text-xs"
                     >
-                        {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ShieldCheck className="h-4 w-4 mr-1.5" />}
-                        Sincronizar Contas
+                        {syncing ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <ShieldCheck className="h-3 w-3 mr-1.5" />}
+                        <span className="hidden sm:inline">Sincronizar</span>
+                        <span className="sm:hidden">Sinc.</span>
                     </Button>
                     <Button
                         variant="outline"
                         onClick={() => setIsBulkOpen(true)}
-                        className="rounded-xl border border-border bg-background"
+                        className="flex-1 lg:flex-none rounded-xl border border-border bg-background h-9 text-xs"
                     >
-                        <Plus className="h-4 w-4 mr-1.5" /> Importar Lote
+                        <Plus className="h-4 w-4 mr-1.5" />
+                        <span className="hidden sm:inline">Importar Lote</span>
+                        <span className="sm:hidden">Lote</span>
                     </Button>
                     <Button
                         variant="outline"
                         onClick={downloadStudentsPDF}
                         disabled={filtered.length === 0}
-                        className="rounded-xl border border-border bg-background"
+                        className="flex-1 lg:flex-none rounded-xl border border-border bg-background h-9 text-xs"
                     >
-                        <Download className="h-4 w-4 mr-1.5" /> Exportar PDF
+                        <Download className="h-4 w-4 mr-1.5" />
+                        <span className="hidden sm:inline">Exportar PDF</span>
+                        <span className="sm:hidden">PDF</span>
                     </Button>
                     <Button
                         onClick={() => { resetAddForm(); setIsAddOpen(true) }}
-                        className="rounded-xl shadow-lg shadow-primary/20"
+                        className="w-full lg:w-auto rounded-xl shadow-lg shadow-primary/20 h-9 text-xs mt-1 lg:mt-0"
                     >
-                        <Plus className="h-4 w-4 mr-1.5" /> Matricular Aluno
+                        <Plus className="h-4 w-4 mr-1.5" /> Matricular
                     </Button>
                 </div>
             </div>
 
 
             {/* Search and Filters */}
-            <div className="flex flex-col md:flex-row gap-4 items-center">
-                <div className="relative group flex-1 w-full">
+            <div className="flex flex-col lg:flex-row gap-3 items-center">
+                <div className="relative group w-full">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
-                        placeholder="Buscar por nome, matrícula, CPF ou telefone..."
+                        placeholder="Buscar aluno..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="pl-11 h-12 text-sm rounded-xl border-border/50 bg-card hover:border-primary/30 focus:border-primary/50 transition-all premium-shadow shadow-sm"
+                        className="pl-11 h-11 text-sm rounded-xl border-border/50 bg-card hover:border-primary/30 focus:border-primary/50 transition-all premium-shadow shadow-sm"
                     />
                     {search && (
                         <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -429,13 +434,13 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                     )}
                 </div>
 
-                <div className="flex gap-2 w-full md:w-auto">
+                <div className="w-full lg:w-auto">
                     <select
                         value={filterClass}
                         onChange={e => setFilterClass(e.target.value)}
-                        className="h-12 px-4 rounded-xl border border-border/50 bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all min-w-[140px]"
+                        className="w-full lg:w-auto h-11 px-4 rounded-xl border border-border/50 bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all lg:min-w-[200px]"
                     >
-                        <option value="all">Todos os Núcleos</option>
+                        <option value="all">Filtro: Todos os Núcleos</option>
                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
@@ -446,14 +451,14 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                 <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-black/5 to-transparent pointer-events-none md:hidden" />
                 
                 <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-muted-foreground/20">
-                    <table className="w-full text-sm min-w-[600px] sm:min-w-0">
+                    <table className="w-full text-sm min-w-[500px] lg:min-w-0">
                         <thead>
                             <tr className="border-b border-border/50 bg-muted/20">
-                                <th className="text-left px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Aluno</th>
-                                <th className="text-left px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Matrícula</th>
-                                <th className="text-center px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Turma</th>
-                                <th className="text-center px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Status Conta</th>
-                                <th className="text-right px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Ações</th>
+                                <th className="text-left px-4 lg:px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Aluno</th>
+                                <th className="text-left px-4 lg:px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Matrícula</th>
+                                <th className="text-center px-4 lg:px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Turma</th>
+                                <th className="text-center px-4 lg:px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Status</th>
+                                <th className="text-right px-4 lg:px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -461,31 +466,31 @@ export function StudentManager({ isMaster }: { isMaster?: boolean }) {
                                 const cls = classes.find(c => c.id === stu.class_id)
                                 return (
                                     <tr key={stu.id} className="border-b border-border/50 last:border-0 hover:bg-muted/10 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-foreground group-hover:text-primary transition-colors">{stu.name}</div>
-                                            {stu.phone && <div className="text-xs text-muted-foreground">{stu.phone}</div>}
+                                        <td className="px-4 lg:px-6 py-4">
+                                            <div className="font-bold text-foreground group-hover:text-primary transition-colors truncate max-w-[150px] lg:max-w-none">{stu.name}</div>
+                                            {stu.phone && <div className="text-[10px] text-muted-foreground">{stu.phone}</div>}
                                         </td>
-                                        <td className="px-4 py-3 text-muted-foreground text-xs hidden sm:table-cell font-mono">
+                                        <td className="px-4 lg:px-6 py-3 text-muted-foreground text-[10px] hidden md:table-cell font-mono">
                                             {stu.enrollment_number || "—"}
                                         </td>
-                                        <td className="px-4 py-3 text-center text-xs hidden md:table-cell">
+                                        <td className="px-4 lg:px-6 py-3 text-center text-[10px] hidden lg:table-cell">
                                             {cls
                                                 ? <span className="bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20">{cls.name}</span>
                                                 : <span className="text-muted-foreground">Sem turma</span>
                                             }
                                         </td>
-                                        <td className="px-4 py-3 text-center hidden lg:table-cell">
+                                        <td className="px-4 lg:px-6 py-3 text-center hidden xl:table-cell">
                                             {stu.status === "inactive" ? (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-red-100 text-red-700 px-2 py-0.5 rounded">
+                                                <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase bg-red-100 text-red-700 px-2 py-0.5 rounded">
                                                     Inativo
                                                 </span>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">
+                                                <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">
                                                     Ativo
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-right">
+                                        <td className="px-4 lg:px-6 py-3 text-right">
                                             <div className="flex items-center justify-end gap-1">
                                                 <Button
                                                     size="sm" variant="ghost"

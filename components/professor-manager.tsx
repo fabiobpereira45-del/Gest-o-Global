@@ -301,11 +301,11 @@ export function ProfessorManager() {
 
       {/* Other professors */}
       <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            Professores cadastrados
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            Professores Cadastrados
           </h3>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={async () => {
               const win = window.open("", "_blank")
               if (win) {
@@ -334,12 +334,12 @@ export function ProfessorManager() {
                   alert(`Erro ao gerar PDF: ${e.message}`)
                 }
               }
-            }} className="border-primary text-primary hover:bg-primary/10">
-              <Download className="h-4 w-4 mr-1.5" /> Exportar PDF
+            }} className="flex-1 sm:flex-none border-primary text-primary hover:bg-primary/10 h-9">
+              <Download className="h-4 w-4 mr-1.5" /> <span className="hidden sm:inline">Exportar PDF</span> <span className="sm:hidden">PDF</span>
             </Button>
             {!adding && (
-              <Button size="sm" onClick={() => setAdding(true)}>
-                <Plus className="h-4 w-4 mr-1.5" /> Adicionar professor
+              <Button size="sm" onClick={() => setAdding(true)} className="flex-1 sm:flex-none h-9">
+                <Plus className="h-4 w-4 mr-1.5" /> Adicionar
               </Button>
             )}
           </div>
@@ -411,36 +411,32 @@ export function ProfessorManager() {
                         {account.role === "master" ? "Master" : "Professor"}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0">
                       <Button
-                        size="sm" variant="ghost" className={`h-7 w-7 p-0 transition-colors ${account.active === false ? 'text-emerald-600 hover:bg-emerald-50' : 'text-rose-600 hover:bg-rose-50'}`}
+                        size="sm" variant="ghost" className={`h-8 w-8 p-0 transition-colors ${account.active === false ? 'text-emerald-600 hover:bg-emerald-50' : 'text-rose-600 hover:bg-rose-50'}`}
                         onClick={async () => {
                           const newStatus = account.active === false ? true : false
                           await handleEdit(account.id, { ...account, active: newStatus, password: "" })
                         }}
-                        title={account.active === false ? "Ativar Professor" : "Desativar Professor"}
                       >
                         {account.active === false ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
                       </Button>
                       <Button
-                        size="sm" variant="ghost" className="h-7 w-7 p-0 text-primary hover:bg-primary/10"
+                        size="sm" variant="ghost" className="h-8 w-8 p-0 text-primary hover:bg-primary/10"
                         onClick={() => setLinkProfId(account.id)}
-                        title="Vincular Disciplinas"
                       >
                         <Link2 className="h-3.5 w-3.5" />
                       </Button>
                       <Button
-                        size="sm" variant="ghost" className="h-7 w-7 p-0"
+                        size="sm" variant="ghost" className="h-8 w-8 p-0"
                         onClick={() => { setEditingId(account.id); setAdding(false) }}
-                        title="Editar"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         size="sm" variant="ghost"
-                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                         onClick={() => setDeleteId(account.id)}
-                        title="Excluir"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

@@ -132,22 +132,24 @@ const StudentCard = memo(({
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 lg:gap-3 mb-5">
                                     {[
                                         { label: 'Prova Online', val: g.examGrade, color: 'text-blue-600' },
                                         { label: 'Leitura', val: g.worksGrade, color: 'text-slate-600' },
                                         { label: 'Questionário', val: g.seminarGrade, color: 'text-slate-600' },
                                         { label: 'Vídeo Aula', val: g.participationBonus, color: 'text-purple-600' },
                                     ].map(tag => (
-                                        <div key={tag.label} className="bg-slate-50 rounded-lg p-2.5 flex flex-col gap-0.5">
-                                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">{tag.label}</span>
-                                            <span className={`text-sm font-black tabular-nums ${tag.color}`}>{tag.val}</span>
+                                        <div key={tag.label} className="bg-slate-50 rounded-lg p-2 flex flex-col gap-0.5">
+                                            <span className="text-[8px] lg:text-[9px] font-black uppercase text-slate-400 tracking-tighter">{tag.label}</span>
+                                            <span className={`text-xs lg:text-sm font-black tabular-nums ${tag.color}`}>{tag.val}</span>
                                         </div>
                                     ))}
-                                    <div className="bg-green-50 rounded-lg p-2.5 flex flex-col gap-0.5">
-                                        <span className="text-[9px] font-black uppercase text-green-400 tracking-tighter">Frequência</span>
-                                        <span className="text-sm font-black tabular-nums text-green-600">{freq.total.toFixed(1)}</span>
-                                        <span className="text-[9px] text-green-400">📍{freq.presencial.toFixed(1)} 💻{freq.online.toFixed(1)}</span>
+                                    <div className="bg-green-50 rounded-lg p-2 flex flex-col gap-0.5 col-span-2 md:col-span-1">
+                                        <span className="text-[8px] lg:text-[9px] font-black uppercase text-green-400 tracking-tighter">Frequência</span>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs lg:text-sm font-black tabular-nums text-green-600">{freq.total.toFixed(1)}</span>
+                                            <span className="text-[8px] lg:text-[9px] text-green-400">📍{freq.presencial.toFixed(0)} 💻{freq.online.toFixed(0)}</span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -660,40 +662,34 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
     return (
         <ErrorBoundary>
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
                     <div>
-                        <h2 className="text-3xl flex items-center gap-3 font-black tracking-tighter text-foreground">
-                            <GraduationCap className="h-8 w-8 text-primary p-1.5 bg-primary/10 rounded-xl" />
-                            Gestão de Notas e Diários
+                        <h2 className="text-2xl lg:text-3xl flex items-center gap-3 font-black tracking-tighter text-foreground">
+                            <GraduationCap className="h-7 w-7 lg:h-8 lg:w-8 text-primary p-1.5 bg-primary/10 rounded-xl" />
+                            Gestão de Notas
                         </h2>
-                        <p className="text-muted-foreground mt-1 text-sm font-medium">Controle acadêmico de alunos matriculados e inscrições de prova pública.</p>
+                        <p className="text-muted-foreground mt-1 text-xs lg:text-sm font-medium">Controle acadêmico e boletins individuais.</p>
                     </div>
-                    <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+                    <div className="flex flex-wrap gap-2 w-full xl:w-auto">
                         {isMaster && (
-                            <Button variant="outline" onClick={() => printGradesReportPDF(grades, "Relatório Geral de Notas", "Cosme de Farias")} className="flex-1 lg:flex-none border-slate-200 text-slate-600 hover:bg-slate-50 font-bold h-11">
-                                <Download className="h-4 w-4 mr-2" />
-                                Exportar PDF
+                            <Button variant="outline" size="sm" onClick={() => printGradesReportPDF(grades, "Relatório Geral de Notas", "Cosme de Farias")} className="flex-1 lg:flex-none border-slate-200 text-slate-600 hover:bg-slate-50 font-bold h-10">
+                                <Download className="h-4 w-4 mr-1.5" /> <span className="hidden sm:inline">Exportar PDF</span> <span className="sm:hidden">PDF</span>
                             </Button>
                         )}
                         <div className="relative group flex-1 lg:flex-none">
                             <Button 
                                 variant="secondary" 
+                                size="sm"
                                 onClick={handleSync} 
                                 disabled={isSyncing || !selectedDiscipline}
-                                className="w-full bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20 font-black h-11 px-6 uppercase text-[10px] tracking-widest disabled:opacity-30 disabled:bg-slate-300 disabled:text-slate-500 transition-all"
+                                className="w-full bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20 font-black h-10 px-4 uppercase text-[10px] tracking-widest transition-all"
                             >
-                                {isSyncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                                Sincronizar Diário
+                                {isSyncing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
+                                Sincronizar
                             </Button>
-                            {!selectedDiscipline && !isSyncing && (
-                                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-xl font-bold">
-                                    Selecione uma disciplina para sincronizar
-                                </div>
-                            )}
                         </div>
-                        <Button variant="outline" onClick={() => setBulkReleaseConfirm(true)} className="flex-1 lg:flex-none border-green-600 text-green-600 hover:bg-green-500 hover:text-white font-black h-11 px-6 uppercase text-[10px] tracking-widest transition-all">
-                            <CheckCheck className="h-4 w-4 mr-2" />
-                            Liberar Tudo
+                        <Button variant="outline" size="sm" onClick={() => setBulkReleaseConfirm(true)} className="flex-1 lg:flex-none border-green-600 text-green-600 hover:bg-green-500 hover:text-white font-black h-10 px-4 uppercase text-[10px] tracking-widest">
+                            <CheckCheck className="h-4 w-4 mr-1.5" /> <span className="hidden sm:inline">Liberar Tudo</span> <span className="sm:hidden">Liberar</span>
                         </Button>
                         <Button onClick={() => {
                             setFormData({
@@ -703,7 +699,7 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                             setIsCreating(true)
                             setIsEditing(null)
                             window.scrollTo({ top: 0, behavior: 'smooth' })
-                        }} className="flex-1 lg:flex-none bg-primary text-white hover:bg-primary/90 shadow-xl shadow-primary/20 font-black h-11 px-8 uppercase text-[10px] tracking-widest transition-all hover:scale-105 active:scale-95 group">
+                        }} className="w-full xl:w-auto bg-primary text-white hover:bg-primary/90 shadow-xl shadow-primary/20 font-black h-10 px-6 uppercase text-[10px] tracking-widest transition-all group">
                             <Plus className="h-5 w-5 mr-1 group-hover:rotate-90 transition-transform" />
                             Lançar Notas
                         </Button>
@@ -711,11 +707,11 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                 </div>
 
                 {/* Filtro e Pesquisa Otimizados */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center bg-white p-5 rounded-3xl border border-slate-100 shadow-sm relative z-20">
-                    <div className="md:col-span-4 flex flex-col gap-1.5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 items-end bg-white p-4 lg:p-5 rounded-3xl border border-slate-100 shadow-sm relative z-20">
+                    <div className="lg:col-span-3 flex flex-col gap-1.5">
                         <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Disciplina Base</Label>
                         <select
-                            className="flex h-12 w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                            className="flex h-10 w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
                             value={selectedDiscipline}
                             onChange={(e) => setSelectedDiscipline(e.target.value)}
                         >
@@ -724,10 +720,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                         </select>
                     </div>
 
-                    <div className="md:col-span-2 flex flex-col gap-1.5">
+                    <div className="lg:col-span-2 flex flex-col gap-1.5">
                         <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Situação</Label>
                         <select
-                            className="flex h-12 w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                            className="flex h-10 w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value as any)}
                         >
@@ -737,27 +733,27 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                         </select>
                     </div>
 
-                    <div className="md:col-span-6 flex flex-col gap-1.5">
+                    <div className="lg:col-span-4 flex flex-col gap-1.5">
                         <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Localizar Aluno</Label>
                         <div className="relative group">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                             <Input 
-                                placeholder="Nome, matrícula ou CPF..." 
+                                placeholder="Busca..." 
                                 value={searchName}
                                 onChange={(e) => setSearchName(e.target.value)}
-                                className="pl-11 h-12 bg-slate-50 border-slate-200 rounded-2xl focus:ring-primary/20 transition-all font-medium"
+                                className="pl-9 h-10 bg-slate-50 border-slate-200 rounded-xl focus:ring-primary/20 transition-all text-xs"
                             />
                         </div>
                     </div>
                     
-                    <div className="md:col-span-3 flex items-end justify-end h-full py-0.5">
+                    <div className="lg:col-span-3">
                         {selectedDiscipline && (
-                            <div className="flex gap-2 w-full sm:w-auto">
-                                <Button variant="ghost" size="sm" onClick={() => handlePublishFiltered(true)} className="flex-1 text-green-600 font-bold hover:bg-green-50 rounded-xl h-11 border border-transparent hover:border-green-100">
-                                    <Eye className="h-4 w-4 mr-2" /> Liberar
+                            <div className="flex gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => handlePublishFiltered(true)} className="flex-1 text-[10px] text-green-600 font-bold hover:bg-green-50 rounded-lg h-10 border border-slate-100">
+                                    Liberar
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handlePublishFiltered(false)} className="flex-1 text-amber-600 font-bold hover:bg-amber-50 rounded-xl h-11 border border-transparent hover:border-amber-100">
-                                    <EyeOff className="h-4 w-4 mr-2" /> Ocultar
+                                <Button variant="ghost" size="sm" onClick={() => handlePublishFiltered(false)} className="flex-1 text-[10px] text-amber-600 font-bold hover:bg-amber-50 rounded-lg h-10 border border-slate-100">
+                                    Ocultar
                                 </Button>
                             </div>
                         )}
