@@ -338,14 +338,14 @@ export function FinancialManager() {
         <StatCard 
           title="Receita Realizada" 
           value={stats.realizedIncome} 
-          subtitle={`No mês. Acumulado: R$ ${stats.accumulatedIncome.toLocaleString('pt-BR')}`}
+          subtitle={`No mês. Acumulado: R$ ${(stats.accumulatedIncome ?? 0).toLocaleString('pt-BR')}`}
           icon={<ArrowUpRight className="text-emerald-500" />}
           trend="positive"
         />
         <StatCard 
           title="Despesa Realizada" 
           value={stats.realizedExpense} 
-          subtitle={`No mês. Acumulado: R$ ${stats.accumulatedExpense.toLocaleString('pt-BR')}`}
+          subtitle={`No mês. Acumulado: R$ ${(stats.accumulatedExpense ?? 0).toLocaleString('pt-BR')}`}
           icon={<ArrowDownRight className="text-rose-500" />}
           trend="negative"
         />
@@ -393,7 +393,7 @@ export function FinancialManager() {
                       <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$ ${val}`} />
                       <Tooltip 
                         contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #eee', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                        formatter={(val: number) => `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                        formatter={(val: number) => `R$ ${(val ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                       />
                       <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
                       <Bar dataKey="Previsto" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={40} />
@@ -430,7 +430,7 @@ export function FinancialManager() {
                           </Pie>
                           <Tooltip 
                             contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #eee', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                            formatter={(val: number) => `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                            formatter={(val: number) => `R$ ${(val ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                           />
                           <Legend iconType="circle" layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: '10px' }} />
                         </RePieChart>
@@ -513,7 +513,7 @@ export function FinancialManager() {
                                <tr key={t.id} className="border-b hover:bg-muted/10">
                                  <td className="p-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
                                  <td className="p-4 text-xs">{t.description}</td>
-                                 <td className="p-4 text-emerald-600 font-bold">R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                 <td className="p-4 text-emerald-600 font-bold">R$ {(t.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                                  <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{t.competencia || '---'}</span></td>
                                  <td className="p-4"><StatusBadge status={t.status} /></td>
                                  <td className="p-4">
@@ -575,7 +575,7 @@ export function FinancialManager() {
                                  <td className="p-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
                                  <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{t.category}</span></td>
                                  <td className="p-4">{t.description}</td>
-                                 <td className="p-4 text-rose-600 font-bold">R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                 <td className="p-4 text-rose-600 font-bold">R$ {(t.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                                  <td className="p-4">
                                     <StatusBadge status={t.status} />
                                  </td>
@@ -938,7 +938,7 @@ function StatCard({ title, value, subtitle, icon, trend, highlight }: { title: s
         <div className={cn("p-2 rounded-lg", highlight ? "bg-white/20" : "bg-muted")}>{icon}</div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-black">R$ {value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+        <div className="text-2xl font-black">R$ {(value ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
         <p className={cn("text-[10px] mt-1 font-medium", highlight ? "text-white/60" : "text-muted-foreground")}>{subtitle}</p>
       </CardContent>
     </Card>
@@ -1059,7 +1059,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
                                         onBlur={(e) => onUpdateDate(tuition.id, e.target.value)}
                                      />
                                  </td>
-                                 <td className="p-3 font-bold text-navy">R$ {tuition.amount.toFixed(2)}</td>
+                                 <td className="p-3 font-bold text-navy">R$ {(tuition.amount ?? 0).toFixed(2)}</td>
                                  <td className="p-3"><StatusBadge status={tuition.status} /></td>
                                  <td className="p-3">
                                      <div className="flex gap-2">
@@ -1213,7 +1213,7 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
                            <span className="font-bold">{p.date.split('-').reverse().join('/')}</span>
                            <span className="text-[10px] text-muted-foreground">{p.description}</span>
                         </div>
-                        <span className="font-bold text-rose-600">R$ {p.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        <span className="font-bold text-rose-600">R$ {(p.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                      </div>
                    ))}
                    {preview.length === 0 && (
@@ -1277,7 +1277,7 @@ function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: {
         <div className="grid gap-4 py-4">
           <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg border">
             <span className="text-sm font-medium">Valor a Receber:</span>
-            <span className="text-lg font-black text-emerald-600">R$ {tuition.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            <span className="text-lg font-black text-emerald-600">R$ {(tuition.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
           </div>
           
           <div className="grid gap-2">

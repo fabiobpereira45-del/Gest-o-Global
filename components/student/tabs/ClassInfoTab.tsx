@@ -188,7 +188,7 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                     <div>
                                                         <p className="text-2xl font-black text-foreground leading-tight">{disc.name}</p>
                                                         <p className="text-sm text-indigo-700 font-bold uppercase tracking-tighter mt-1">
-                                                            Referência: {new Date(disc.executionDate + "T00:00:00").toLocaleString('pt-br', { month: 'long', year: 'numeric' })}
+                                                        Referência: {disc.executionDate ? new Date(disc.executionDate + "T00:00:00").toLocaleString('pt-br', { month: 'long', year: 'numeric' }) : "---"}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -262,7 +262,7 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                     </div>
                                                     {disc.executionDate && (
                                                         <span className="text-[10px] font-bold text-muted-foreground">
-                                                            {new Date(disc.executionDate + "T00:00:00").toLocaleString('pt-br', { month: 'short', year: 'numeric' })}
+                                                            {disc.executionDate ? new Date(disc.executionDate + "T00:00:00").toLocaleString('pt-br', { month: 'short', year: 'numeric' }) : "---"}
                                                         </span>
                                                     )}
                                                 </div>

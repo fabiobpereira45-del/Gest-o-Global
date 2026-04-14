@@ -178,7 +178,7 @@ export function StudentFinancialView({ studentId }: Props) {
                     </div>
                       <div className="flex items-center justify-between sm:justify-end gap-2">
                         <div className="text-right mr-4">
-                          <p className="font-black text-foreground">R$ {tu.amount.toFixed(2)}</p>
+                          <p className="font-black text-foreground">R$ {(tu.amount ?? 0).toFixed(2)}</p>
                           <StatusBadge status={tu.status} />
                         </div>
                         {tu.status === 'paid' && (
@@ -273,7 +273,7 @@ function SummaryCard({ title, value, icon, color }: { title: string, value: numb
     <div className={cn("p-4 rounded-xl border flex items-center justify-between gap-4 shadow-sm", colorMap[color])}>
       <div className="space-y-1">
         <p className="text-[10px] font-bold uppercase tracking-widest opacity-80">{title}</p>
-        <p className="text-xl font-black">R$ {value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+        <p className="text-xl font-black">R$ {(value ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
       </div>
       <div className="p-2 rounded-lg bg-white/50">{icon}</div>
     </div>
