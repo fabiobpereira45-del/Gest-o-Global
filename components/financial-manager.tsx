@@ -123,20 +123,24 @@ export function FinancialManager() {
     const tuitionsThisMonth = tuitions.filter(tu => tu.dueDate?.startsWith(competencia))
     const disciplinesThisMonth = disciplines.filter(d => d.executionDate?.startsWith(competencia))
 
-    const pendingTuition = tuitionsThisMonth.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
+    const pendingTuition = tuitions.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
     
     // Projeção de pro-labore: total geral (todas as disciplinas × taxa configurada)
     const proLaboreProjected = disciplines.length > 0 
       ? disciplines.length * settings.proLaboreRate 
       : 0
     
-    // Receita projetada: total geral estimado (alunos ativos × mensalidade × total de disciplinas)
-    const activeStudentCount = students.filter(s => s.status === 'active').length
-    const expectedFromTuitions = tuitionsThisMonth.reduce((acc, tu) => acc + tu.amount, 0)
+    // Receita projetada: Total das mensalidades já geradas + (saldo de mensalidades não geradas × taxa padrão selecionada)
+    const activeStudents = students.filter(s => s.status === 'active')
+    const activeStudentIds = new Set(activeStudents.map(s => s.id))
+    const tuitionsActive = tuitions.filter(tu => activeStudentIds.has(tu.studentId))
     
-    const revenueProjected = activeStudentCount > 0 && disciplines.length > 0
-      ? activeStudentCount * settings.tuitionRate * disciplines.length
-      : 0
+    const generatedAmount = tuitionsActive.reduce((acc, tu) => acc + tu.amount, 0)
+    const totalExpectedCount = activeStudents.length * disciplines.length
+    const generatedCount = tuitionsActive.length
+    const remainingCount = Math.max(0, totalExpectedCount - generatedCount)
+    
+    const revenueProjected = generatedAmount + (remainingCount * settings.tuitionRate)
 
     return {
       plannedIncome, realizedIncome,
@@ -244,7 +248,7 @@ export function FinancialManager() {
         <StatCard 
           title="Mensalidades em Aberto" 
           value={stats.pendingTuition} 
-          subtitle="Previsão de Recebimento"
+          subtitle="Previsão Total de Recebimento"
           icon={<Calculator className="text-orange" />}
         />
       </div>
