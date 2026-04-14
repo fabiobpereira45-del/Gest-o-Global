@@ -49,7 +49,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { printFinancialDRE_PDF, printTuitionReportPDF, printReceiptPDF, printProfessorReceiptPDF } from "@/lib/pdf"
+import { printFinancialDRE_PDF, printTuitionReportPDF, printReceiptPDF, printProfessorReceiptPDF, printInstallmentsReportPDF } from "@/lib/pdf"
 
 // --- Constants ---
 const CATEGORIES = [
@@ -61,6 +61,7 @@ const COLORS = ["#f97316", "#0ea5e9", "#8b5cf6", "#10b981", "#f43f5e", "#eab308"
 
 export function FinancialManager() {
   const [tab, setTab] = useState<"dashboard" | "income" | "expenses" | "prolabore">("dashboard")
+  const [allTransactions, setAllTransactions] = useState<FinancialTransaction[]>([])
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([])
   const [tuitions, setTuitions] = useState<StudentTuition[]>([])
   const [students, setStudents] = useState<StudentProfile[]>([])
@@ -73,6 +74,7 @@ export function FinancialManager() {
   
   // States for Modals
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
+  const [isInstallmentModalOpen, setIsInstallmentModalOpen] = useState(false)
   const [isSyncOpen, setIsSyncOpen] = useState(false)
   const [isConfigOpen, setIsConfigOpen] = useState(false)
 
@@ -87,8 +89,8 @@ export function FinancialManager() {
   async function loadData() {
     setLoading(true)
     try {
-      const [t, tu, st, di, se, pr, pl] = await Promise.all([
-        getFinancialTransactions({ competencia }),
+      const [allT, tu, st, di, se, pr, pl] = await Promise.all([
+        getFinancialTransactions(), // Fetch all for accumulation
         getStudentTuitions(),
         getStudents(),
         getDisciplines(),
@@ -96,7 +98,8 @@ export function FinancialManager() {
         getProfessorAccounts(),
         getAllProfessorDisciplines()
       ])
-      setTransactions(t)
+      setAllTransactions(allT)
+      setTransactions(allT.filter(t => t.competencia === competencia))
       setTuitions(tu)
       setStudents(st)
       setDisciplines(di)
@@ -142,16 +145,30 @@ export function FinancialManager() {
     
     const revenueProjected = generatedAmount + (remainingCount * settings.tuitionRate)
 
+    const netRealized = realizedIncome - realizedExpense
+
+    // Acumulado: Soma de todas as transações realizadas ATÉ a competência atual
+    // Ordenamos as competências alfabeticamente para o filtro (YYYY-MM)
+    const accumulatedIncome = allTransactions
+      .filter(t => t.type === 'income' && t.status === 'realized' && (!t.competencia || t.competencia <= competencia))
+      .reduce((acc, t) => acc + t.amount, 0)
+    
+    const accumulatedExpense = allTransactions
+      .filter(t => t.type === 'expense' && t.status === 'realized' && (!t.competencia || t.competencia <= competencia))
+      .reduce((acc, t) => acc + t.amount, 0)
+
     return {
       plannedIncome, realizedIncome,
       plannedExpense, realizedExpense,
       pendingTuition,
       proLaboreProjected,
       revenueProjected,
+      accumulatedIncome,
+      accumulatedExpense,
       netPlanned: plannedIncome - plannedExpense,
-      netRealized: realizedIncome - realizedExpense
+      netRealized
     }
-  }, [transactions, tuitions, disciplines, settings, students, competencia])
+  }, [allTransactions, tuitions, disciplines, settings, students, competencia])
 
   const chartData = useMemo(() => [
     { name: "Receitas", Previsto: stats.plannedIncome + stats.realizedIncome, Realizado: stats.realizedIncome },
@@ -216,6 +233,12 @@ export function FinancialManager() {
               <Button variant="outline" size="sm" className="flex-1 sm:flex-none h-9 text-xs" onClick={() => printFinancialDRE_PDF(transactions, competencia, "Cosme de Farias")}>
                 <Download className="h-4 w-4 mr-1.5" /> DRE
               </Button>
+              <Button variant="outline" size="sm" className="flex-1 sm:flex-none h-9 text-xs border-primary/40 text-primary" onClick={() => {
+                const accTransactions = allTransactions.filter(t => !t.competencia || t.competencia <= competencia)
+                printFinancialDRE_PDF(accTransactions, competencia, "Cosme de Farias", null, `DRE ACUMULADO - Até ${competencia}`)
+              }}>
+                <Download className="h-4 w-4 mr-1.5" /> DRE Acumulado
+              </Button>
               <Button variant="outline" size="sm" className="flex-1 sm:flex-none h-9 text-xs" onClick={() => printTuitionReportPDF(tuitions, students, "Cosme de Farias")}>
                 <Printer className="h-4 w-4 mr-1.5" /> Relatório
               </Button>
@@ -227,14 +250,14 @@ export function FinancialManager() {
         <StatCard 
           title="Receita Realizada" 
           value={stats.realizedIncome} 
-          subtitle={`Projeção total: R$ ${stats.revenueProjected.toFixed(2)}`}
+          subtitle={`No mês. Acumulado: R$ ${stats.accumulatedIncome.toLocaleString('pt-BR')}`}
           icon={<ArrowUpRight className="text-emerald-500" />}
           trend="positive"
         />
         <StatCard 
           title="Despesa Realizada" 
           value={stats.realizedExpense} 
-          subtitle={`Previsto: R$ ${stats.plannedExpense.toFixed(2)} · Pro-labore projetado: R$ ${stats.proLaboreProjected.toFixed(2)}`}
+          subtitle={`No mês. Acumulado: R$ ${stats.accumulatedExpense.toLocaleString('pt-BR')}`}
           icon={<ArrowDownRight className="text-rose-500" />}
           trend="negative"
         />
@@ -428,9 +451,17 @@ export function FinancialManager() {
               <CardContent className="p-0">
                  <div className="p-4 border-b flex justify-between items-center bg-muted/20">
                     <h3 className="font-bold flex items-center gap-2"><ArrowDownRight className="h-4 w-4 text-rose-600" /> Despesas de Custeio</h3>
-                    <Button size="sm" onClick={() => setIsAddExpenseOpen(true)}>
-                       <Plus className="h-4 w-4 mr-2" /> Nova Despesa
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => printInstallmentsReportPDF(allTransactions, "Cosme de Farias")}>
+                        <Download className="h-4 w-4 mr-2" /> Relatório Projeções
+                      </Button>
+                      <Button size="sm" onClick={() => setIsInstallmentModalOpen(true)} variant="secondary" className="bg-orange/10 text-orange hover:bg-orange/20 border-orange/20">
+                        <Calendar className="h-4 w-4 mr-2" /> Despesas Parceladas
+                      </Button>
+                      <Button size="sm" onClick={() => setIsAddExpenseOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" /> Nova Despesa
+                      </Button>
+                    </div>
                  </div>
                  <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
@@ -763,6 +794,25 @@ export function FinancialManager() {
         </DialogContent>
       </Dialog>
 
+      <InstallmentExpenseModal
+        isOpen={isInstallmentModalOpen}
+        onClose={() => setIsInstallmentModalOpen(false)}
+        onSave={async (installments) => {
+          setLoading(true)
+          try {
+            for (const item of installments) {
+              await addFinancialTransaction(item)
+            }
+            toast.success(`${installments.length} parcelas lançadas com sucesso!`)
+            await loadData()
+          } catch (err) {
+            toast.error("Erro ao lançar parcelas.")
+          } finally {
+            setLoading(false)
+            setIsInstallmentModalOpen(false)
+          }
+        }}
+      />
     </div>
   )
 }
@@ -941,3 +991,143 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
   )
 }
 
+
+// --- Componente de Cadastro de Despesas Parceladas ---
+
+function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean, onClose: () => void, onSave: (data: any[]) => void }) {
+  const [formData, setFormData] = useState({
+    description: "",
+    category: CATEGORIES[0],
+    totalAmount: 0,
+    firstDueDate: new Date().toISOString().split('T')[0],
+    installmentsCount: 12
+  })
+
+  // Pre-calculate installments for preview
+  const preview = useMemo(() => {
+    if (!formData.totalAmount || !formData.installmentsCount || formData.installmentsCount <= 0) return []
+    
+    const installments = []
+    const amountPerInstallment = Number((formData.totalAmount / formData.installmentsCount).toFixed(2))
+    
+    // Use a date object for calculation, specifying time to avoid DST/timezone issues
+    const startDate = new Date(formData.firstDueDate + 'T12:00:00')
+    
+    for (let i = 0; i < formData.installmentsCount; i++) {
+       const date = new Date(startDate)
+       date.setMonth(startDate.getMonth() + i)
+       
+       const competencia = date.toISOString().substring(0, 7)
+       const formattedDate = date.toISOString().split('T')[0]
+       
+       installments.push({
+         category: formData.category,
+         description: `${formData.description} (${i + 1}/${formData.installmentsCount})`,
+         amount: amountPerInstallment,
+         date: formattedDate,
+         competencia: competencia,
+         status: 'planned' as const,
+         type: 'expense' as const
+       })
+    }
+    return installments
+  }, [formData])
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-orange" /> Lançamento de Despesas Parceladas
+          </DialogTitle>
+          <DialogDescription>As parcelas serão criadas como despesas previstas no DRE dos meses correspondentes.</DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>Descrição da Despesa</Label>
+              <Input 
+                 placeholder="Ex: Compra de Equipamentos"
+                 value={formData.description}
+                 onChange={e => setFormData(d => ({ ...d, description: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Categoria</Label>
+              <Select value={formData.category} onValueChange={v => setFormData(d => ({ ...d, category: v }))}>
+                 <SelectTrigger><SelectValue /></SelectTrigger>
+                 <SelectContent>
+                    {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                 </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-1">
+                 <Label>Valor Total (R$)</Label>
+                 <Input 
+                   type="number" step="0.01"
+                   value={formData.totalAmount || ''}
+                   onChange={e => setFormData(d => ({ ...d, totalAmount: Number(e.target.value) }))}
+                 />
+               </div>
+               <div className="space-y-1">
+                 <Label>Nº Parcelas</Label>
+                 <Input 
+                   type="number"
+                   value={formData.installmentsCount || ''}
+                   onChange={e => setFormData(d => ({ ...d, installmentsCount: Number(e.target.value) }))}
+                 />
+               </div>
+            </div>
+            <div className="space-y-1">
+               <Label>Data 1º Vencimento</Label>
+               <Input 
+                 type="date"
+                 value={formData.firstDueDate}
+                 onChange={e => setFormData(d => ({ ...d, firstDueDate: e.target.value }))}
+               />
+            </div>
+          </div>
+
+          <div className="flex flex-col border rounded-lg bg-muted/20 overflow-hidden">
+             <div className="p-2 bg-muted font-bold text-[10px] uppercase tracking-wider flex justify-between">
+                <span>Pré-visualização</span>
+                <span>{preview.length} Parcelas</span>
+             </div>
+             <ScrollArea className="flex-1 h-[280px] p-3">
+                <div className="space-y-2">
+                   {preview.map((p, i) => (
+                     <div key={i} className="flex justify-between items-center text-xs p-2 bg-background border rounded-md">
+                        <div className="flex flex-col">
+                           <span className="font-bold">{p.date.split('-').reverse().join('/')}</span>
+                           <span className="text-[10px] text-muted-foreground">{p.description}</span>
+                        </div>
+                        <span className="font-bold text-rose-600">R$ {p.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                     </div>
+                   ))}
+                   {preview.length === 0 && (
+                     <div className="h-full flex flex-col items-center justify-center text-muted-foreground italic py-10">
+                        <Calendar className="h-8 w-8 opacity-20 mb-2" />
+                        <p className="text-xs">Preencha os dados ao lado</p>
+                     </div>
+                   )}
+                </div>
+             </ScrollArea>
+          </div>
+        </div>
+
+        <DialogFooter className="mt-6">
+           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+           <Button 
+             className="accent-gradient"
+             disabled={!formData.description || !formData.totalAmount || preview.length === 0}
+             onClick={() => onSave(preview)}
+           >
+             Gerar e Lançar Parcelas
+           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

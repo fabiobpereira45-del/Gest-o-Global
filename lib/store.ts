@@ -89,6 +89,16 @@ export interface StudentTuition {
   createdAt: string;
 }
 
+export interface SystemUpdate {
+  id: string;
+  title: string;
+  content: string;
+  type: "feature" | "fix" | "announcement" | "maintenance";
+  version?: string;
+  image_url?: string;
+  createdAt: string;
+}
+
 export function hashPassword(plain: string): string {
   if (typeof window !== "undefined") return btoa(unescape(encodeURIComponent(plain)))
   return Buffer.from(plain).toString("base64")
@@ -1817,11 +1827,8 @@ export async function processTuitionPayment(tuitionId: string, paymentDate: stri
   const { data: tuition } = await supabase.from('student_tuition').select('*').eq('id', tuitionId).single()
   if (!tuition) return
 
-  // Usa o competencia da disciplina (due_date), não do mês de pagamento
-  // Isso garante que a receita aparece no mês correto da grade curricular
-  const competencia = tuition.due_date
-    ? String(tuition.due_date).substring(0, 7)
-    : paymentDate.substring(0, 7)
+  // Usa o mês do pagamento como competência para refletir no DRE (Regime de Caixa)
+  const competencia = paymentDate.substring(0, 7)
 
   // 1. Create realized income transaction
   const transaction = await addFinancialTransaction({
@@ -1880,4 +1887,60 @@ export async function processProfessorPayment(data: { professorId: string; disci
   // (Poderíamos ter uma tabela disciplne_payments, mas por enquanto a transaction com metadata basta)
   
   return transaction
+}
+
+// ——— System Updates —————————————————————————————————————————————————————————————
+
+export async function getUnreadSystemUpdates(userId: string): Promise<SystemUpdate[]> {
+  const supabase = createClient()
+  
+  // 1. Get all updates
+  const { data: updates, error: err1 } = await supabase
+    .from('system_updates')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (err1) {
+    console.error("Erro ao buscar atualizações de sistema:", err1)
+    return []
+  }
+
+  // 2. Get updates read by this user
+  const { data: reads, error: err2 } = await supabase
+    .from('system_update_reads')
+    .select('update_id')
+    .eq('user_id', userId)
+  
+  if (err2) {
+    console.error("Erro ao buscar registros de leitura:", err2)
+    return updates.map(mapSystemUpdate)
+  }
+
+  const readIds = new Set(reads.map((r: { update_id: string }) => r.update_id))
+  
+  // 3. Filter only unread
+  return (updates || [])
+    .filter((u: any) => !readIds.has(u.id))
+    .map(mapSystemUpdate)
+}
+
+export async function markUpdateAsRead(userId: string, updateId: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('system_update_reads').upsert({
+    user_id: userId,
+    update_id: updateId,
+    read_at: new Date().toISOString()
+  })
+}
+
+function mapSystemUpdate(row: any): SystemUpdate {
+  return {
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    type: row.type || "feature",
+    version: row.version || undefined,
+    image_url: row.image_url || undefined,
+    createdAt: row.created_at
+  }
 }

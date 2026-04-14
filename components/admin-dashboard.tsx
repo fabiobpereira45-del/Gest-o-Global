@@ -25,6 +25,7 @@ import {
   getProfessorSession, getStudentGrades, saveStudentGrade, deleteStudentGrade, getStudents,
   saveProfessorSession,
   type Semester, type StudyMaterial, type ClassRoom, type ClassSchedule,
+  type SystemUpdate, getUnreadSystemUpdates, markUpdateAsRead
 } from "@/lib/store"
 import { printStudentPDF, printAnswerKeyPDF } from "@/lib/pdf"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -50,6 +51,7 @@ import { OverviewTab } from "./admin/tabs/OverviewTab"
 import { SubmissionsTab } from "./admin/tabs/SubmissionsTab"
 import { AssessmentsTab } from "./admin/tabs/AssessmentsTab"
 import { SettingsTab } from "./admin/tabs/SettingsTab"
+import { SystemUpdateModal } from "./admin/SystemUpdateModal"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -82,6 +84,11 @@ export function AdminDashboard({ onLogout }: Props) {
   const [disciplines, setDisciplines] = useState<Discipline[]>([])
   const [loading, setLoading] = useState(true)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  
+  // Notificações de Updates
+  const [unreadUpdates, setUnreadUpdates] = useState<SystemUpdate[]>([])
+  const [currentUpdate, setCurrentUpdate] = useState<SystemUpdate | null>(null)
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
 
   const [username, setUsername] = useState("")
   const [userEmail, setUserEmail] = useState("")
@@ -150,6 +157,36 @@ export function AdminDashboard({ onLogout }: Props) {
     }
     fetchUser()
   }, [supabase.auth, session?.professorId])
+
+  // Verificação de Atualizações de Sistema para Master
+  useEffect(() => {
+    if (isMaster && session?.professorId) {
+      async function checkUpdates() {
+        try {
+          const updates = await getUnreadSystemUpdates(session!.professorId)
+          if (updates.length > 0) {
+            setUnreadUpdates(updates)
+            setCurrentUpdate(updates[0])
+            setIsUpdateModalOpen(true)
+          }
+        } catch (err) {
+          console.error("Erro ao verificar atualizações:", err)
+        }
+      }
+      checkUpdates()
+    }
+  }, [isMaster, session?.professorId])
+
+  const handleNextUpdate = () => {
+    if (unreadUpdates.length > 1) {
+      const next = unreadUpdates.slice(1)
+      setUnreadUpdates(next)
+      setCurrentUpdate(next[0])
+    } else {
+      setIsUpdateModalOpen(false)
+      setCurrentUpdate(null)
+    }
+  }
 
   const menuGroups = [
     {
@@ -395,6 +432,20 @@ export function AdminDashboard({ onLogout }: Props) {
           )}
         </main>
       </div>
+
+      {currentUpdate && (
+        <SystemUpdateModal
+          update={currentUpdate}
+          isOpen={isUpdateModalOpen}
+          onClose={() => setIsUpdateModalOpen(false)}
+          onMarkAsRead={async () => {
+            if (session?.professorId) {
+              await markUpdateAsRead(session.professorId, currentUpdate.id)
+              handleNextUpdate()
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -421,7 +421,7 @@ export function printProfessorReceiptPDF(transaction: FinancialTransaction, prof
     safePrint(getModernTemplate(content, "Recibo de Pro-labore", hubName, "receipt"), existingWin)
 }
 
-export function printFinancialDRE_PDF(transactions: FinancialTransaction[], competencia: string, hubName?: string, existingWin?: Window | null): void {
+export function printFinancialDRE_PDF(transactions: FinancialTransaction[], competencia: string, hubName?: string, existingWin?: Window | null, customTitle?: string): void {
     const list = Array.isArray(transactions) ? transactions : []
     const incomes = list.filter(t => t.type === 'income' && t.status === 'realized')
     const expenses = list.filter(t => t.type === 'expense' && t.status === 'realized')
@@ -464,7 +464,8 @@ export function printFinancialDRE_PDF(transactions: FinancialTransaction[], comp
             <tbody>${expenseRows || '<tr><td colspan="2" style="text-align:center;">Nenhuma despesa registrada</td></tr>'}</tbody>
         </table>
     `
-    safePrint(getModernTemplate(content, `DRE - Competência ${competencia}`, hubName), existingWin)
+    const title = customTitle || `DRE - Competência ${competencia}`
+    safePrint(getModernTemplate(content, title, hubName), existingWin)
 }
 
 export function printTuitionReportPDF(tuitions: StudentTuition[], students: StudentProfile[], hubName?: string, existingWin?: Window | null): void {
@@ -807,4 +808,48 @@ export function printOverviewPDF({ assessments, submissions, questions }: { asse
       </table>
     `
     safePrint(getModernTemplate(content, "Relatório Geral de Avaliações", hubName), existingWin)
+}
+
+export function printInstallmentsReportPDF(transactions: FinancialTransaction[], hubName?: string, existingWin?: Window | null): void {
+  const list = (Array.isArray(transactions) ? transactions : []).filter(t => t.type === 'expense' && t.status === 'planned')
+  
+  const rows = list.sort((a,b) => a.date.localeCompare(b.date)).map((t, i) => `
+    <tr>
+        <td>${i + 1}</td>
+        <td>${t.date.split('T')[0].split('-').reverse().join('/')}</td>
+        <td class="row-accent">${t.description}</td>
+        <td><span class="badge" style="background:#e2e8f0; color:#475569;">${t.category}</span></td>
+        <td class="row-accent" style="text-align:right;">${formatCurrency(t.amount)}</td>
+    </tr>
+  `).join('')
+
+  const total = list.reduce((acc, t) => acc + t.amount, 0)
+
+  const content = `
+    <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <p style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Total em Projeção</p>
+            <p style="font-size: 24px; font-weight: 800; color: #1e3a5f;">${formatCurrency(total)}</p>
+        </div>
+        <div style="text-align: right;">
+            <p style="font-size: 10px; color: #64748b; text-transform: uppercase;">Quantidade de Lançamentos</p>
+            <p style="font-size: 24px; font-weight: 800; color: #f97316;">${list.length}</p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th width="40">#</th>
+                <th width="100">Vencimento</th>
+                <th>Descrição</th>
+                <th width="120">Categoria</th>
+                <th style="text-align:right;">Valor</th>
+            </tr>
+        </thead>
+        <tbody>${rows || '<tr><td colspan="5" style="text-align:center;">Nenhum parcelamento futuro encontrado</td></tr>'}</tbody>
+    </table>
+  `
+  
+  safePrint(getModernTemplate(content, "Relatório de Projeções e Parcelamentos", hubName), existingWin)
 }
