@@ -65,6 +65,7 @@ ALTER TABLE public.student_tuition ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.professor_disciplines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.board_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.professor_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.attendance_finalizations ENABLE ROW LEVEL SECURITY;
 
 DO $$ 
 BEGIN
@@ -96,5 +97,10 @@ BEGIN
     -- Política para professores
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all for prof_accounts' AND tablename = 'professor_accounts') THEN
         CREATE POLICY "Allow all for prof_accounts" ON public.professor_accounts FOR ALL USING (true) WITH CHECK (true);
+    END IF;
+
+    -- Política para trancamento de chamada
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'anon_all_attendance_finalizations' AND tablename = 'attendance_finalizations') THEN
+        CREATE POLICY "anon_all_attendance_finalizations" ON public.attendance_finalizations FOR ALL USING (true) WITH CHECK (true);
     END IF;
 END $$;

@@ -11,5 +11,5 @@ CREATE TABLE IF NOT EXISTS public.attendance_finalizations (
 -- Enable RLS
 ALTER TABLE public.attendance_finalizations ENABLE ROW LEVEL SECURITY;
 
--- Policy: Allow all for authenticated users
-CREATE POLICY "Allow all for authenticated" ON public.attendance_finalizations FOR ALL USING (auth.role() = 'authenticated');
+-- Policy: Allow all (project default for anon/master access)
+CREATE POLICY "anon_all_attendance_finalizations" ON public.attendance_finalizations FOR ALL USING (true) WITH CHECK (true);
