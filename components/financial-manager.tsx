@@ -125,19 +125,18 @@ export function FinancialManager() {
 
     const pendingTuition = tuitionsThisMonth.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
     
-    // Projeção de pro-labore: disciplinas do mês × taxa configurada
-    const proLaboreProjected = disciplinesThisMonth.length > 0 
-      ? disciplinesThisMonth.length * settings.proLaboreRate 
+    // Projeção de pro-labore: total geral (todas as disciplinas × taxa configurada)
+    const proLaboreProjected = disciplines.length > 0 
+      ? disciplines.length * settings.proLaboreRate 
       : 0
     
-    // Receita projetada: soma das mensalidades do mês (baseado no que foi gerado)
-    // Se não houver mensalidades geradas ainda, estimamos: alunos ativos × mensalidade
+    // Receita projetada: total geral estimado (alunos ativos × mensalidade × total de disciplinas)
     const activeStudentCount = students.filter(s => s.status === 'active').length
     const expectedFromTuitions = tuitionsThisMonth.reduce((acc, tu) => acc + tu.amount, 0)
     
-    const revenueProjected = expectedFromTuitions > 0 
-      ? expectedFromTuitions 
-      : activeStudentCount * settings.tuitionRate
+    const revenueProjected = activeStudentCount > 0 && disciplines.length > 0
+      ? activeStudentCount * settings.tuitionRate * disciplines.length
+      : 0
 
     return {
       plannedIncome, realizedIncome,
@@ -208,7 +207,7 @@ export function FinancialManager() {
           </Button>
           <div className="flex gap-2 w-full sm:w-auto">
               <Button variant="outline" size="sm" className="flex-1 sm:flex-none border-primary text-primary h-9 text-xs" onClick={() => setIsConfigOpen(true)}>
-                 <Calculator className="h-4 w-4 mr-1.5" /> Valores
+                 <Calculator className="h-4 w-4 mr-1.5" /> Configurações
               </Button>
               <Button variant="outline" size="sm" className="flex-1 sm:flex-none h-9 text-xs" onClick={() => printFinancialDRE_PDF(transactions, competencia, "Cosme de Farias")}>
                 <Download className="h-4 w-4 mr-1.5" /> DRE
