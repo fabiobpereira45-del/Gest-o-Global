@@ -909,10 +909,10 @@ export function FinancialManager() {
         isOpen={isPaymentConfirmOpen}
         onClose={() => setIsPaymentConfirmOpen(false)}
         tuition={paymentTuition}
-        onConfirm={async (id, date, method) => {
+        onConfirm={async (id, date, method, receivedAmount) => {
           setLoading(true)
           try {
-            await processTuitionPayment(id, date, method)
+            await processTuitionPayment(id, date, method, receivedAmount)
             toast.success("Pagamento confirmado!")
             await loadData()
           } catch (err) {
@@ -980,7 +980,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
   disciplines: Discipline[];
   tuitions: StudentTuition[];
   onSync: (studentId: string) => Promise<void>;
-  onPayment: (tuitionId: string) => Promise<void>;
+  onPayment: (tuitionId: string, amount: number) => void;
   onRevert: (tuitionId: string) => Promise<void>;
   onUpdateDate: (tuitionId: string, customDate: string) => Promise<void>;
   onPrintReceipt: (tuition: StudentTuition, student: StudentProfile, discipline: Discipline) => void;
@@ -1077,7 +1077,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
                                           </Button>
                                         </>
                                      ) : (
-                                        <Button size="sm" className="h-8 shadow-sm hover:shadow-md transition-shadow bg-blue-600 hover:bg-blue-700" onClick={() => onPayment(tuition.id)}>
+                                        <Button size="sm" className="h-8 shadow-sm hover:shadow-md transition-shadow bg-blue-600 hover:bg-blue-700" onClick={() => onPayment(tuition.id, tuition.amount)}>
                                             <DollarSign className="h-3 w-3 sm:mr-2" /> <span className="hidden sm:inline">Confirmar Pgto</span>
                                         </Button>
                                      )}
@@ -1248,17 +1248,19 @@ function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: {
   isOpen: boolean, 
   onClose: () => void, 
   tuition: { id: string, amount: number, studentName: string } | null,
-  onConfirm: (id: string, date: string, method: string) => void
+  onConfirm: (id: string, date: string, method: string, receivedAmount: number) => void
 }) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [method, setMethod] = useState("Pix")
+  const [receivedAmount, setReceivedAmount] = useState(0)
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && tuition) {
       setDate(new Date().toISOString().split('T')[0])
       setMethod("Pix")
+      setReceivedAmount(tuition.amount ?? 0)
     }
-  }, [isOpen])
+  }, [isOpen, tuition])
 
   if (!tuition) return null
 
@@ -1275,9 +1277,25 @@ function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: {
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg border">
-            <span className="text-sm font-medium">Valor a Receber:</span>
-            <span className="text-lg font-black text-emerald-600">R$ {(tuition.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          <div className="grid gap-2">
+            <Label htmlFor="received-amount">Valor Recebido (R$)</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">R$</span>
+              <Input 
+                id="received-amount" 
+                type="number" 
+                step="0.01" 
+                min="0"
+                value={receivedAmount}
+                onChange={(e) => setReceivedAmount(Number(e.target.value))}
+                className="pl-10 text-lg font-black text-emerald-600"
+              />
+            </div>
+            {receivedAmount !== (tuition.amount ?? 0) && (
+              <p className="text-[10px] text-amber-600 font-bold flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" /> Valor original: R$ {(tuition.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} — alteração apenas neste recebimento.
+              </p>
+            )}
           </div>
           
           <div className="grid gap-2">
@@ -1321,7 +1339,8 @@ function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: {
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button 
             className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={() => onConfirm(tuition.id, date, method)}
+            onClick={() => onConfirm(tuition.id, date, method, receivedAmount)}
+            disabled={receivedAmount <= 0}
           >
             Confirmar Pagamento
           </Button>
