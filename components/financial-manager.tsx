@@ -57,7 +57,7 @@ const CATEGORIES = [
   "Pessoal", "Aluguel", "Energia/Água", "Internet", "Marketing", "Eventos", "Material Didático", "Outros"
 ]
 
-const COLORS = ["#f97316", "#1e3a5f", "#4c1d95", "#16a34a", "#dc2626", "#8b5cf6", "#eab308"]
+const COLORS = ["#f97316", "#0ea5e9", "#8b5cf6", "#10b981", "#f43f5e", "#eab308", "#6366f1", "#14b8a6", "#ec4899", "#475569"]
 
 export function FinancialManager() {
   const [tab, setTab] = useState<"dashboard" | "income" | "expenses" | "prolabore">("dashboard")
@@ -135,6 +135,14 @@ export function FinancialManager() {
     { name: "Receitas", Previsto: stats.plannedIncome + stats.realizedIncome, Realizado: stats.realizedIncome },
     { name: "Despesas", Previsto: stats.plannedExpense + stats.realizedExpense, Realizado: stats.realizedExpense },
   ], [stats])
+
+  const expenseDistribution = useMemo(() => {
+    const realization = transactions.filter(t => t.type === 'expense' && t.status === 'realized')
+    return CATEGORIES.map(cat => {
+      const total = realization.filter(t => t.category === cat).reduce((acc, t) => acc + t.amount, 0)
+      return { name: cat, value: total }
+    }).filter(d => d.value > 0)
+  }, [transactions])
 
   // --- Handlers ---
   async function handleAddExpense(data: any) {
@@ -265,25 +273,38 @@ export function FinancialManager() {
                   <TrendingUp className="h-4 w-4 text-primary" /> Distribuição de Gastos
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6 flex justify-center">
+              <CardContent className="pt-6 flex justify-center items-center">
                  <div className="h-[300px] w-full max-w-[400px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RePieChart>
-                        <Pie
-                          data={COLORS.map((c, i) => ({ name: CATEGORIES[i % CATEGORIES.length], value: Math.random() * 1000 + 500 }))}
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {COLORS.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(val: number) => `R$ ${val.toFixed(2)}`} />
-                        <Legend iconType="rect" layout="vertical" align="right" verticalAlign="middle" />
-                      </RePieChart>
-                    </ResponsiveContainer>
+                    {expenseDistribution.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RePieChart>
+                          <Pie
+                            data={expenseDistribution}
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                            animationBegin={0}
+                            animationDuration={1500}
+                          >
+                            {expenseDistribution.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #eee', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                            formatter={(val: number) => `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                          />
+                          <Legend iconType="circle" layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: '10px' }} />
+                        </RePieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-muted/5 rounded-xl border-2 border-dashed border-muted">
+                        <PieChart className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                        <p className="text-sm font-medium text-muted-foreground">Nenhuma despesa realizada</p>
+                        <p className="text-[10px] text-muted-foreground/60 italic">As despesas aparecem aqui após serem "Quitadas"</p>
+                      </div>
+                    )}
                  </div>
               </CardContent>
             </Card>

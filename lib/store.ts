@@ -1676,41 +1676,45 @@ export async function syncStudentTuition(studentId: string, settings?: Financial
   const supabase = createClient()
   const finalSettings = settings || await getFinancialSettings()
   const finalDisciplines = disciplines || await getDisciplines()
-  const sorted = finalDisciplines.sort((a, b) => a.order - b.order)
-  
-  // Get existing to avoid duplicates
-  const { data: existing } = await supabase.from('student_tuition').select('discipline_id').eq('student_id', studentId)
-  const existingIds = (existing || []).map((e: { discipline_id: string }) => e.discipline_id)
+  const sorted = [...finalDisciplines].sort((a, b) => a.order - b.order)
 
-  const toInsert = sorted
-    .filter(d => !existingIds.includes(d.id))
-    .map(d => ({
-      student_id: studentId,
-      discipline_id: d.id,
-      amount: finalSettings.tuitionRate,
-      due_date: d.executionDate ? `${d.executionDate}-10` : null,
-      status: 'pending',
-      created_at: new Date().toISOString()
-    }))
+  // Build the due_date from executionDate (format: YYYY-MM → YYYY-MM-10)
+  const toUpsert = sorted.map(d => ({
+    student_id: studentId,
+    discipline_id: d.id,
+    amount: finalSettings.tuitionRate,
+    due_date: d.executionDate ? `${d.executionDate}-10` : null,
+    status: 'pending',
+    created_at: new Date().toISOString()
+  }))
 
-  if (toInsert.length > 0) {
-    const { error } = await supabase.from('student_tuition').insert(toInsert)
-    if (error) {
-      console.error(`Erro ao sincronizar aluno ${studentId}:`, error)
-      throw error
-    }
+  if (toUpsert.length === 0) return
+
+  // Use upsert with onConflict to make sync idempotent - avoids UNIQUE constraint errors
+  // and eliminates the need for a fragile pre-existence check that was failing silently.
+  // ignoreDuplicates: true → preserves existing payment status (paid/overdue) unchanged.
+  const { error } = await supabase
+    .from('student_tuition')
+    .upsert(toUpsert, {
+      onConflict: 'student_id,discipline_id',
+      ignoreDuplicates: true
+    })
+
+  if (error) {
+    console.error(`[syncStudentTuition] Erro ao sincronizar aluno ${studentId}:`, JSON.stringify(error))
+    throw error
   }
 }
 
 export async function syncBatchTuitions(studentIds: string[]): Promise<void> {
     if (studentIds.length === 0) return
 
-    // Busca dados comuns uma única vez para o lote todo (Performance Boost)
+    // Fetch shared data once for the whole batch (performance optimization)
     const settings = await getFinancialSettings()
     const disciplines = await getDisciplines()
 
-    // Processa em lotes paralelos de 5 alunos por vez para evitar throttling
-    const chunkSize = 5
+    // Process in smaller chunks of 3 to reduce Supabase throttling/connection pressure
+    const chunkSize = 3
     for (let i = 0; i < studentIds.length; i += chunkSize) {
       const chunk = studentIds.slice(i, i + chunkSize)
       const results = await Promise.allSettled(
