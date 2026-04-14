@@ -119,15 +119,26 @@ export function FinancialManager() {
     const plannedExpense = transactions.filter(t => t.type === 'expense' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
     const realizedExpense = transactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
 
-    const pendingTuition = tuitions.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
+    // Filtramos mensalidades e disciplinas pela competência (mês) selecionada
+    const tuitionsThisMonth = tuitions.filter(tu => tu.dueDate?.startsWith(competencia))
+    const disciplinesThisMonth = disciplines.filter(d => d.executionDate?.startsWith(competencia))
+
+    const pendingTuition = tuitionsThisMonth.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
     
-    // Projeção de pro-labore: total de disciplinas × taxa configurada
-    const proLaboreProjected = disciplines.length * settings.proLaboreRate
+    // Projeção de pro-labore: disciplinas do mês × taxa configurada
+    const proLaboreProjected = disciplinesThisMonth.length > 0 
+      ? disciplinesThisMonth.length * settings.proLaboreRate 
+      : 0
     
-    // Receita projetada: alunos ativos × mensalidade × disciplinas
+    // Receita projetada: soma das mensalidades do mês (baseado no que foi gerado)
+    // Se não houver mensalidades geradas ainda, estimamos: alunos ativos × mensalidade
     const activeStudentCount = students.filter(s => s.status === 'active').length
-    const revenueProjected = activeStudentCount * settings.tuitionRate * disciplines.length
+    const expectedFromTuitions = tuitionsThisMonth.reduce((acc, tu) => acc + tu.amount, 0)
     
+    const revenueProjected = expectedFromTuitions > 0 
+      ? expectedFromTuitions 
+      : activeStudentCount * settings.tuitionRate
+
     return {
       plannedIncome, realizedIncome,
       plannedExpense, realizedExpense,
@@ -137,7 +148,7 @@ export function FinancialManager() {
       netPlanned: plannedIncome - plannedExpense,
       netRealized: realizedIncome - realizedExpense
     }
-  }, [transactions, tuitions, disciplines, settings, students])
+  }, [transactions, tuitions, disciplines, settings, students, competencia])
 
   const chartData = useMemo(() => [
     { name: "Receitas", Previsto: stats.plannedIncome + stats.realizedIncome, Realizado: stats.realizedIncome },
