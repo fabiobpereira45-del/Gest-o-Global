@@ -1822,19 +1822,20 @@ export async function updateTuition(id: string, data: Partial<StudentTuition>): 
   await supabase.from('student_tuition').update(dbData).eq('id', id)
 }
 
-export async function processTuitionPayment(tuitionId: string, paymentDate: string): Promise<void> {
+export async function processTuitionPayment(tuitionId: string, paymentDate: string, paymentMethod?: string): Promise<void> {
   const supabase = createClient()
   const { data: tuition } = await supabase.from('student_tuition').select('*').eq('id', tuitionId).single()
   if (!tuition) return
 
   // Usa o mês do pagamento como competência para refletir no DRE (Regime de Caixa)
   const competencia = paymentDate.substring(0, 7)
+  const methodSuffix = paymentMethod ? ` [${paymentMethod}]` : ''
 
   // 1. Create realized income transaction
   const transaction = await addFinancialTransaction({
     category: 'Mensalidade',
     type: 'income',
-    description: `Mensalidade paga - ID: ${tuitionId}`,
+    description: `Mensalidade paga${methodSuffix} - ID: ${tuitionId}`,
     amount: Number(tuition.amount),
     date: paymentDate,
     status: 'realized',
@@ -1846,7 +1847,7 @@ export async function processTuitionPayment(tuitionId: string, paymentDate: stri
   // 2. Update tuition record
   await supabase.from('student_tuition').update({
     status: 'paid',
-    paid_at: new Date().toISOString(),
+    paid_at: paymentDate, // Usa a data informada
     transaction_id: transaction.id
   }).eq('id', tuitionId)
 }

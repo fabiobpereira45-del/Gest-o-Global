@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { 
   BarChart3, TrendingUp, TrendingDown, DollarSign, Calendar, Filter, Download, Plus, 
   Trash2, CheckCircle2, AlertCircle, PieChart, Wallet, ArrowUpRight, ArrowDownRight,
-  MoreHorizontal, FileText, Printer, Calculator, RefreshCw, X, BookOpen, Briefcase, ChevronDown, ChevronUp, Undo2, QrCode
+  MoreHorizontal, FileText, Printer, Calculator, RefreshCw, X, BookOpen, Briefcase, ChevronDown, ChevronUp, Undo2, QrCode, CreditCard
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -71,12 +71,17 @@ export function FinancialManager() {
   const [settings, setSettings] = useState<FinancialSettings>({ tuitionRate: 300, proLaboreRate: 300 })
   const [loading, setLoading] = useState(true)
   const [competencia, setCompetencia] = useState(new Date().toISOString().substring(0, 7)) // YYYY-MM
-  
+  const [viewScope, setViewScope] = useState<"month" | "year" | "all">("month")
+
   // States for Modals
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
   const [isInstallmentModalOpen, setIsInstallmentModalOpen] = useState(false)
   const [isSyncOpen, setIsSyncOpen] = useState(false)
   const [isConfigOpen, setIsConfigOpen] = useState(false)
+  
+  // Payment Confirmation State
+  const [paymentTuition, setPaymentTuition] = useState<{id: string, amount: number, studentName: string} | null>(null)
+  const [isPaymentConfirmOpen, setIsPaymentConfirmOpen] = useState(false)
 
   // Local draft state for the config dialog — always mirrors the last persisted settings
   const [configDraft, setConfigDraft] = useState({
@@ -117,33 +122,49 @@ export function FinancialManager() {
 
   // --- Calculations ---
   const stats = useMemo(() => {
-    const plannedIncome = transactions.filter(t => t.type === 'income' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
-    const realizedIncome = transactions.filter(t => t.type === 'income' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
-    const plannedExpense = transactions.filter(t => t.type === 'expense' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
-    const realizedExpense = transactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+    // Escopo de Filtragem Principal
+    const currentYear = competencia.substring(0, 4)
+    const scopeTransactions = allTransactions.filter(t => {
+      if (viewScope === 'month') return t.competencia === competencia
+      if (viewScope === 'year') return t.competencia?.startsWith(currentYear)
+      return true // 'all'
+    })
 
-    // Filtramos mensalidades e disciplinas pela competência (mês) selecionada
-    const tuitionsThisMonth = tuitions.filter(tu => tu.dueDate?.startsWith(competencia))
-    const disciplinesThisMonth = disciplines.filter(d => d.executionDate?.startsWith(competencia))
+    const plannedIncome = scopeTransactions.filter(t => t.type === 'income' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
+    const realizedIncome = scopeTransactions.filter(t => t.type === 'income' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+    const plannedExpense = scopeTransactions.filter(t => t.type === 'expense' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
+    const realizedExpense = scopeTransactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
 
-    const pendingTuition = tuitionsThisMonth.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
+    // Filtramos mensalidades e disciplinas pela competência baseada no escopo
+    const tuitionsScope = tuitions.filter(tu => {
+      if (!tu.dueDate) return false
+      if (viewScope === 'month') return tu.dueDate.startsWith(competencia)
+      if (viewScope === 'year') return tu.dueDate.startsWith(currentYear)
+      return true
+    })
+
+    const pendingTuition = tuitionsScope.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
     
-    // Projeção de pro-labore: total geral (todas as disciplinas × taxa configurada)
-    const proLaboreProjected = disciplines.length > 0 
-      ? disciplines.length * settings.proLaboreRate 
+    // Projeção de pro-labore (mantido por agora para o escopo selecionado)
+    const disciplinesScope = disciplines.filter(d => {
+      if (!d.executionDate) return false
+      if (viewScope === 'month') return d.executionDate.startsWith(competencia)
+      if (viewScope === 'year') return d.executionDate.startsWith(currentYear)
+      return true
+    })
+
+    const proLaboreProjected = disciplinesScope.length > 0 
+      ? disciplinesScope.length * settings.proLaboreRate 
       : 0
     
-    // Receita projetada: Total das mensalidades já geradas + (saldo de mensalidades não geradas × taxa padrão selecionada)
+    // Receita projetada: Baseada no escopo
     const activeStudents = students.filter(s => s.status === 'active')
     const activeStudentIds = new Set(activeStudents.map(s => s.id))
-    const tuitionsActive = tuitions.filter(tu => activeStudentIds.has(tu.studentId))
+    const tuitionsActive = tuitionsScope.filter(tu => activeStudentIds.has(tu.studentId))
     
     const generatedAmount = tuitionsActive.reduce((acc, tu) => acc + tu.amount, 0)
-    const totalExpectedCount = activeStudents.length * disciplines.length
-    const generatedCount = tuitionsActive.length
-    const remainingCount = Math.max(0, totalExpectedCount - generatedCount)
-    
-    const revenueProjected = generatedAmount + (remainingCount * settings.tuitionRate)
+    // Para simplificar a projeção futura em escopos maiores, mantemos a lógica base baseada no que foi filtrado
+    const revenueProjected = generatedAmount 
 
     const netRealized = realizedIncome - realizedExpense
 
@@ -170,18 +191,62 @@ export function FinancialManager() {
     }
   }, [allTransactions, tuitions, disciplines, settings, students, competencia])
 
-  const chartData = useMemo(() => [
-    { name: "Receitas", Previsto: stats.plannedIncome + stats.realizedIncome, Realizado: stats.realizedIncome },
-    { name: "Despesas", Previsto: stats.plannedExpense + stats.realizedExpense, Realizado: stats.realizedExpense },
-  ], [stats])
+  const chartData = useMemo(() => {
+    if (viewScope === 'month') {
+      return [
+        { name: "Receitas", Previsto: stats.plannedIncome + stats.realizedIncome, Realizado: stats.realizedIncome },
+        { name: "Despesas", Previsto: stats.plannedExpense + stats.realizedExpense, Realizado: stats.realizedExpense }
+      ]
+    }
 
-  const expenseDistribution = useMemo(() => {
-    const realization = transactions.filter(t => t.type === 'expense' && t.status === 'realized')
+    if (viewScope === 'year') {
+      const year = competencia.substring(0, 4)
+      const data = []
+      const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+      
+      for (let m = 1; m <= 12; m++) {
+        const comp = `${year}-${m.toString().padStart(2, '0')}`
+        const monthTransactions = allTransactions.filter(t => t.competencia === comp)
+        
+        const income = monthTransactions.filter(t => t.type === 'income' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+        const expense = monthTransactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+        const pIncome = monthTransactions.filter(t => t.type === 'income' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
+        const pExpense = monthTransactions.filter(t => t.type === 'expense' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
+
+        data.push({
+          name: monthNames[m-1],
+          Receitas: income,
+          Despesas: expense,
+          Previsto: pIncome + pExpense // Consolidated projection for simplicity
+        })
+      }
+      return data
+    }
+
+    // viewScope === 'all'
+    const years = Array.from(new Set(allTransactions.map(t => t.competencia?.substring(0, 4)).filter(Boolean))).sort()
+    return years.map(year => {
+      const yearTransactions = allTransactions.filter(t => t.competencia?.startsWith(year))
+      const income = yearTransactions.filter(t => t.type === 'income' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+      const expense = yearTransactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+      return { name: year, Receitas: income, Despesas: expense }
+    })
+  }, [viewScope, stats, allTransactions, competencia])
+
+  const categoryData = useMemo(() => {
+    const scopeYear = competencia.substring(0, 4)
+    const realization = allTransactions.filter(t => {
+      if (t.type !== 'expense' || t.status !== 'realized') return false
+      if (viewScope === 'month') return t.competencia === competencia
+      if (viewScope === 'year') return t.competencia?.startsWith(scopeYear)
+      return true
+    })
+
     return CATEGORIES.map(cat => {
       const total = realization.filter(t => t.category === cat).reduce((acc, t) => acc + t.amount, 0)
       return { name: cat, value: total }
     }).filter(d => d.value > 0)
-  }, [transactions])
+  }, [allTransactions, viewScope, competencia])
 
   // --- Handlers ---
   async function handleAddExpense(data: any) {
@@ -210,10 +275,26 @@ export function FinancialManager() {
   return (
     <div className="flex flex-col gap-6">
       {/* Header section with Stats Cards */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-navy to-orange bg-clip-text text-transparent">Gestão Financeira</h1>
-          <p className="text-muted-foreground text-xs lg:text-sm">Controle de caixa, mensalidades e projeções.</p>
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-foreground flex items-center gap-4 flex-wrap">
+            Gestão Financeira
+            <div className="flex bg-muted p-1 rounded-lg border text-[10px] uppercase font-bold tracking-wider">
+              <button 
+                onClick={() => setViewScope('month')}
+                className={cn("px-4 py-1.5 rounded-md transition-all", viewScope === 'month' ? "bg-background shadow-sm text-orange" : "text-muted-foreground hover:text-foreground")}
+              >Mês</button>
+              <button 
+                onClick={() => setViewScope('year')}
+                className={cn("px-4 py-1.5 rounded-md transition-all border-x", viewScope === 'year' ? "bg-background shadow-sm text-orange" : "text-muted-foreground hover:text-foreground")}
+              >Ano</button>
+              <button 
+                onClick={() => setViewScope('all')}
+                className={cn("px-4 py-1.5 rounded-md transition-all", viewScope === 'all' ? "bg-background shadow-sm text-orange" : "text-muted-foreground hover:text-foreground")}
+              >Geral</button>
+            </div>
+          </h1>
+          <p className="text-muted-foreground text-sm">Controle de caixa, mensalidades e projeções.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
@@ -380,7 +461,10 @@ export function FinancialManager() {
                            disciplines={disciplines} 
                            tuitions={tuitions.filter(t => t.studentId === student.id)} 
                            onSync={async (id) => { await syncStudentTuition(id); await loadData(); }}
-                           onPayment={async (id) => { await processTuitionPayment(id, new Date().toISOString().split('T')[0]); await loadData(); }}
+                           onPayment={(id, amount) => { 
+                             setPaymentTuition({ id, amount, studentName: student.name }); 
+                             setIsPaymentConfirmOpen(true); 
+                           }}
                            onRevert={async (id) => { await revertTuitionPayment(id); await loadData(); }}
                            onUpdateDate={async (id, dt) => { await updateTuition(id, { dueDate: dt }); await loadData(); }}
                            onPrintReceipt={(tu, st, ds) => printReceiptPDF(tu, st, ds, "Cosme de Farias")}
@@ -813,6 +897,25 @@ export function FinancialManager() {
           }
         }}
       />
+
+      <PaymentConfirmationModal
+        isOpen={isPaymentConfirmOpen}
+        onClose={() => setIsPaymentConfirmOpen(false)}
+        tuition={paymentTuition}
+        onConfirm={async (id, date, method) => {
+          setLoading(true)
+          try {
+            await processTuitionPayment(id, date, method)
+            toast.success("Pagamento confirmado!")
+            await loadData()
+          } catch (err) {
+            toast.error("Erro ao confirmar pagamento.")
+          } finally {
+            setLoading(false)
+            setIsPaymentConfirmOpen(false)
+          }
+        }}
+      />
     </div>
   )
 }
@@ -1126,6 +1229,95 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
            >
              Gerar e Lançar Parcelas
            </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// --- Modal de Confirmação de Pagamento ---
+
+function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  tuition: { id: string, amount: number, studentName: string } | null,
+  onConfirm: (id: string, date: string, method: string) => void
+}) {
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [method, setMethod] = useState("Pix")
+
+  useEffect(() => {
+    if (isOpen) {
+      setDate(new Date().toISOString().split('T')[0])
+      setMethod("Pix")
+    }
+  }, [isOpen])
+
+  if (!tuition) return null
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" /> Confirmar Recebimento
+          </DialogTitle>
+          <DialogDescription>
+            Confirme os detalhes do pagamento de <strong>{tuition.studentName}</strong>.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-4">
+          <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg border">
+            <span className="text-sm font-medium">Valor a Receber:</span>
+            <span className="text-lg font-black text-emerald-600">R$ {tuition.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          </div>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="payment-date">Data do Pagamento</Label>
+            <Input 
+              id="payment-date" 
+              type="date" 
+              value={date} 
+              onChange={(e) => setDate(e.target.value)} 
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="payment-method">Meio de Pagamento</Label>
+            <Select value={method} onValueChange={setMethod}>
+              <SelectTrigger id="payment-method">
+                <SelectValue placeholder="Selecione o meio" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Pix">
+                  <div className="flex items-center gap-2">
+                    <QrCode className="h-3.5 w-3.5 text-emerald-600" /> Pix
+                  </div>
+                </SelectItem>
+                <SelectItem value="Espécie">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-3.5 w-3.5 text-orange" /> Espécie
+                  </div>
+                </SelectItem>
+                <SelectItem value="Cartão">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-3.5 w-3.5 text-blue-600" /> Cartão
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button 
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            onClick={() => onConfirm(tuition.id, date, method)}
+          >
+            Confirmar Pagamento
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
