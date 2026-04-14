@@ -119,9 +119,18 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                         </div>
                                                         <div>
                                                             <p className="text-2xl font-black text-foreground leading-tight">{disc?.name || "Disciplina"}</p>
-                                                            <p className="text-sm text-amber-700 font-bold uppercase tracking-tighter mt-1">
-                                                                {DAY_LABEL[sched.dayOfWeek] || sched.dayOfWeek} — {sched.timeStart} às {sched.timeEnd}
-                                                            </p>
+                                                            <div className="flex flex-col mt-1">
+                                                                <p className="text-sm text-amber-700 font-bold uppercase tracking-tighter">
+                                                                    {DAY_LABEL[sched.dayOfWeek] || sched.dayOfWeek} — {sched.timeStart} às {sched.timeEnd}
+                                                                </p>
+                                                                {sched.startDate && (
+                                                                    <p className="text-[11px] text-amber-600 font-bold flex items-center gap-1.5">
+                                                                        <CalendarDays className="h-3.5 w-3.5" />
+                                                                        {new Date(sched.startDate + "T12:00:00").toLocaleDateString('pt-BR')} 
+                                                                        {sched.endDate && sched.endDate !== sched.startDate && ` a ${new Date(sched.endDate + "T12:00:00").toLocaleDateString('pt-BR')}`}
+                                                                    </p>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div className="flex flex-col gap-2">
@@ -267,12 +276,17 @@ export function ClassInfoTab({ myClass, classmates, mySchedules, disciplines, of
                                                     <GraduationCap className="h-3 w-3 opacity-40" /> {disc.professorName || "Docente Central"}
                                                 </p>
 
-                                                {/* Datas Específicas no Histórico/Próximas */}
                                                 {(() => {
                                                     const sched = mySchedules.find(s => s.disciplineId === disc.id)
-                                                    if (!sched || (!sched.onlineClassDate && !sched.videoLessonDate && !sched.examDate)) return null
+                                                    if (!sched) return null
                                                     return (
                                                         <div className="flex flex-col gap-1.5 mt-4">
+                                                            {sched.startDate && (
+                                                                <div className="flex items-center gap-2 text-[10px] font-bold text-amber-600 leading-tight">
+                                                                    <CalendarDays className="h-3 w-3" /> Presencial: {new Date(sched.startDate + "T12:00:00").toLocaleDateString('pt-BR')} 
+                                                                    {sched.endDate && sched.endDate !== sched.startDate && ` a ${new Date(sched.endDate + "T12:00:00").toLocaleDateString('pt-BR')}`}
+                                                                </div>
+                                                            )}
                                                             {sched.onlineClassDate && (
                                                                 <div className="flex items-center gap-2 text-[10px] font-bold text-primary leading-tight">
                                                                     <MonitorPlay className="h-3 w-3" /> Online: {formatDateTime(sched.onlineClassDate)}
