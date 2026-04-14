@@ -123,7 +123,7 @@ export function FinancialManager() {
     const tuitionsThisMonth = tuitions.filter(tu => tu.dueDate?.startsWith(competencia))
     const disciplinesThisMonth = disciplines.filter(d => d.executionDate?.startsWith(competencia))
 
-    const pendingTuition = tuitions.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
+    const pendingTuition = tuitionsThisMonth.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
     
     // Projeção de pro-labore: total geral (todas as disciplinas × taxa configurada)
     const proLaboreProjected = disciplines.length > 0 
@@ -248,7 +248,7 @@ export function FinancialManager() {
         <StatCard 
           title="Mensalidades em Aberto" 
           value={stats.pendingTuition} 
-          subtitle="Previsão Total de Recebimento"
+          subtitle="Previsão de Recebimento"
           icon={<Calculator className="text-orange" />}
         />
       </div>
