@@ -351,11 +351,24 @@ export function FinancialManager() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard 
+          title="Mensalidades em Aberto" 
+          value={stats.pendingTuition} 
+          subtitle={viewScope === 'month' ? 'Previsão do mês' : viewScope === 'year' ? `Previsão do ano ${competencia.substring(0, 4)}` : 'Previsão geral'}
+          icon={<Calculator className="text-orange" />}
+        />
+        <StatCard 
           title="Receita Realizada" 
           value={stats.realizedIncome} 
           subtitle={viewScope === 'month' ? `No mês. Acumulado: R$ ${(stats.accumulatedIncome ?? 0).toLocaleString('pt-BR')}` : viewScope === 'year' ? `Acumulado do ano ${competencia.substring(0, 4)}` : 'Acumulado geral (todas as operações)'}
           icon={<ArrowUpRight className="text-emerald-500" />}
           trend="positive"
+        />
+        <StatCard 
+          title="Despesas Projetadas" 
+          value={stats.plannedExpenseTotal} 
+          subtitle={viewScope === 'month' ? 'Previsto no mês' : viewScope === 'year' ? `Previsto no ano ${competencia.substring(0, 4)}` : 'Previsto total acumulado'}
+          icon={<TrendingDown className="text-rose-400" />}
+          trend="negative"
         />
         <StatCard 
           title="Despesa Realizada" 
@@ -370,19 +383,6 @@ export function FinancialManager() {
           subtitle={viewScope === 'month' ? 'Entradas - Saídas (mês)' : viewScope === 'year' ? `Entradas - Saídas (${competencia.substring(0, 4)})` : 'Entradas - Saídas (geral)'}
           icon={<Wallet className="text-primary" />}
           highlight
-        />
-        <StatCard 
-          title="Mensalidades em Aberto" 
-          value={stats.pendingTuition} 
-          subtitle={viewScope === 'month' ? 'Previsão do mês' : viewScope === 'year' ? `Previsão do ano ${competencia.substring(0, 4)}` : 'Previsão geral'}
-          icon={<Calculator className="text-orange" />}
-        />
-        <StatCard 
-          title="Despesas Projetadas" 
-          value={stats.plannedExpenseTotal} 
-          subtitle={viewScope === 'month' ? 'Previsto no mês' : viewScope === 'year' ? `Previsto no ano ${competencia.substring(0, 4)}` : 'Previsto total acumulado'}
-          icon={<TrendingDown className="text-rose-400" />}
-          trend="negative"
         />
       </div>
 
