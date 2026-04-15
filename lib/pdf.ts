@@ -468,15 +468,15 @@ export function printFinancialDRE_PDF(transactions: FinancialTransaction[], comp
     safePrint(getModernTemplate(content, title, hubName), existingWin)
 }
 
-export function printTuitionReportPDF(tuitions: StudentTuition[], students: StudentProfile[], hubName?: string, existingWin?: Window | null): void {
-    const tList = Array.isArray(tuitions) ? tuitions : []
+export function printTuitionReportPDF(tuitions: StudentTuition[], students: StudentProfile[], hubName?: string, existingWin?: Window | null, filters?: { studentId?: string; status?: string }): void {
+    let tList = Array.isArray(tuitions) ? [...tuitions] : []
     const sList = Array.isArray(students) ? students : []
-
+    if (filters?.studentId && filters.studentId !== 'all') tList = tList.filter(t => t.studentId === filters.studentId)
+    if (filters?.status && filters.status !== 'all') tList = tList.filter(t => t.status === filters.status)
     const rows = tList.map(t => {
         const student = sList.find(s => s.id === t.studentId)
         const statusClass = t.status === 'paid' ? 'badge-success' : (t.status === 'overdue' ? 'badge-danger' : 'badge-warning')
         const statusLabel = t.status === 'paid' ? 'PAGO' : (t.status === 'overdue' ? 'ATRASADO' : 'PENDENTE')
-        
         return `<tr>
             <td class="row-accent">${student?.name || '—'}</td>
             <td>${formatDate(t.dueDate)}</td>
@@ -484,16 +484,16 @@ export function printTuitionReportPDF(tuitions: StudentTuition[], students: Stud
             <td><span class="badge ${statusClass}">${statusLabel}</span></td>
         </tr>`
     }).join('')
-
+    const total = tList.reduce((acc, t) => acc + (t.amount || 0), 0)
     const content = `
-        <table>
-            <thead>
-                <tr><th>Aluno</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr>
-            </thead>
-            <tbody>${rows || '<tr><td colspan="4" style="text-align:center;">Nenhuma mensalidade encontrada</td></tr>'}</tbody>
-        </table>
+        <div style="background:#f8fafc;padding:20px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:30px;display:flex;justify-content:space-between;align-items:center;">
+            <div><p style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Total de Registros</p><p style="font-size:24px;font-weight:800;color:#1e3a5f;">${tList.length}</p></div>
+            <div style="text-align:right;"><p style="font-size:10px;color:#64748b;text-transform:uppercase;">Valor Total</p><p style="font-size:24px;font-weight:800;color:#f97316;">${formatCurrency(total)}</p></div>
+        </div>
+        <table><thead><tr><th>Aluno</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4" style="text-align:center;">Nenhuma mensalidade encontrada</td></tr>'}</tbody></table>
     `
-    safePrint(getModernTemplate(content, "Relatório de Recebíveis", hubName), existingWin)
+    safePrint(getModernTemplate(content, "Relatório de Mensalidades", hubName), existingWin)
 }
 
 export function printAttendanceReportPDF(attendances: Attendance[], students: StudentProfile[], disciplineName: string, hubName?: string, existingWin?: Window | null): void {
@@ -810,8 +810,11 @@ export function printOverviewPDF({ assessments, submissions, questions }: { asse
     safePrint(getModernTemplate(content, "Relatório Geral de Avaliações", hubName), existingWin)
 }
 
-export function printInstallmentsReportPDF(transactions: FinancialTransaction[], hubName?: string, existingWin?: Window | null): void {
-  const list = (Array.isArray(transactions) ? transactions : []).filter(t => t.type === 'expense' && t.status === 'planned')
+export function printInstallmentsReportPDF(transactions: FinancialTransaction[], hubName?: string, existingWin?: Window | null, filters?: { category?: string; status?: string; monthYear?: string }): void {
+  let list = (Array.isArray(transactions) ? transactions : []).filter(t => t.type === 'expense')
+  if (filters?.category && filters.category !== 'all') list = list.filter(t => t.category === filters.category)
+  if (filters?.status && filters.status !== 'all') list = list.filter(t => t.status === filters.status)
+  if (filters?.monthYear) list = list.filter(t => t.competencia === filters.monthYear)
   
   const rows = list.sort((a,b) => a.date.localeCompare(b.date)).map((t, i) => `
     <tr>
@@ -852,4 +855,87 @@ export function printInstallmentsReportPDF(transactions: FinancialTransaction[],
   `
   
   safePrint(getModernTemplate(content, "Relatório de Projeções e Parcelamentos", hubName), existingWin)
+}
+
+// ——— New Report Functions ——————————————————————————————————————————————————————
+
+export function printRevenueReportPDF(transactions: FinancialTransaction[], hubName?: string, existingWin?: Window | null, filters?: { monthYear?: string; minValue?: number; maxValue?: number }): void {
+  let list = (Array.isArray(transactions) ? transactions : []).filter(t => t.type === 'income' && t.status === 'realized')
+  if (filters?.monthYear) list = list.filter(t => t.competencia === filters.monthYear)
+  if (filters?.minValue && filters.minValue > 0) list = list.filter(t => t.amount >= filters.minValue!)
+  if (filters?.maxValue && filters.maxValue > 0) list = list.filter(t => t.amount <= filters.maxValue!)
+  list.sort((a, b) => a.date.localeCompare(b.date))
+  const total = list.reduce((acc, t) => acc + t.amount, 0)
+  const rows = list.map((t, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${t.date.split('T')[0].split('-').reverse().join('/')}</td>
+      <td class="row-accent">${t.description}</td>
+      <td><span class="badge" style="background:#e2e8f0;color:#475569;">${t.category}</span></td>
+      <td class="row-accent" style="text-align:right;color:#16a34a;">${formatCurrency(t.amount)}</td>
+    </tr>`).join('')
+  const content = `
+    <div style="background:#f0fdf4;padding:20px;border-radius:12px;border:1px solid #bbf7d0;margin-bottom:30px;display:flex;justify-content:space-between;align-items:center;">
+      <div><p style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Total de Entradas</p><p style="font-size:24px;font-weight:800;color:#16a34a;">${formatCurrency(total)}</p></div>
+      <div style="text-align:right;"><p style="font-size:10px;color:#64748b;text-transform:uppercase;">Registros</p><p style="font-size:24px;font-weight:800;color:#1e3a5f;">${list.length}</p></div>
+    </div>
+    <table><thead><tr><th>#</th><th>Data</th><th>Descrição</th><th>Categoria</th><th style="text-align:right;">Valor</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5" style="text-align:center;">Nenhuma receita encontrada com os filtros aplicados</td></tr>'}</tbody></table>`
+  safePrint(getModernTemplate(content, `Receita Realizada${filters?.monthYear ? ' — ' + filters.monthYear : ''}`, hubName), existingWin)
+}
+
+export function printExpensesReportPDF(transactions: FinancialTransaction[], hubName?: string, existingWin?: Window | null, filters?: { category?: string; monthYear?: string; status?: string }): void {
+  let list = (Array.isArray(transactions) ? transactions : []).filter(t => t.type === 'expense')
+  if (filters?.category && filters.category !== 'all') list = list.filter(t => t.category === filters.category)
+  if (filters?.monthYear) list = list.filter(t => t.competencia === filters.monthYear)
+  if (filters?.status && filters.status !== 'all') list = list.filter(t => t.status === filters.status)
+  list.sort((a, b) => a.date.localeCompare(b.date))
+  const totalPlanned = list.filter(t => t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
+  const totalRealized = list.filter(t => t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+  const rows = list.map((t, i) => {
+    const sc = t.status === 'realized' ? 'badge-success' : 'badge-warning'
+    const sl = t.status === 'realized' ? 'REALIZADO' : 'PREVISTO'
+    return `<tr><td>${i+1}</td><td>${t.date.split('T')[0].split('-').reverse().join('/')}</td><td class="row-accent">${t.description}</td><td><span class="badge" style="background:#e2e8f0;color:#475569;">${t.category}</span></td><td class="row-accent" style="text-align:right;color:#dc2626;">${formatCurrency(t.amount)}</td><td><span class="badge ${sc}">${sl}</span></td></tr>`
+  }).join('')
+  const content = `
+    <div style="background:#f8fafc;padding:20px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:30px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
+      <div style="text-align:center;"><p style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Previsto</p><p style="font-size:20px;font-weight:800;color:#f97316;">${formatCurrency(totalPlanned)}</p></div>
+      <div style="text-align:center;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;"><p style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Realizado</p><p style="font-size:20px;font-weight:800;color:#dc2626;">${formatCurrency(totalRealized)}</p></div>
+      <div style="text-align:center;"><p style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Total</p><p style="font-size:20px;font-weight:800;color:#1e3a5f;">${formatCurrency(totalPlanned + totalRealized)}</p></div>
+    </div>
+    <table><thead><tr><th>#</th><th>Data</th><th>Descrição</th><th>Categoria</th><th style="text-align:right;">Valor</th><th>Status</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="6" style="text-align:center;">Nenhuma despesa encontrada com os filtros aplicados</td></tr>'}</tbody></table>`
+  safePrint(getModernTemplate(content, `Relatório de Despesas${filters?.monthYear ? ' — ' + filters.monthYear : ''}`, hubName), existingWin)
+}
+
+export function printProLaboreReportPDF(disciplines: Discipline[], transactions: FinancialTransaction[], professors: ProfessorAccount[], profLinks: ProfessorDiscipline[], hubName?: string, existingWin?: Window | null, filters?: { professorId?: string; monthYear?: string; status?: 'all' | 'pending' | 'paid' }): void {
+  const realizedByDisc: Record<string, FinancialTransaction> = {}
+  transactions.filter(t => t.type === 'expense' && t.category === 'Professores' && t.status === 'realized' && t.disciplineId)
+    .forEach(t => { realizedByDisc[t.disciplineId!] = t })
+  let discList = Array.isArray(disciplines) ? [...disciplines] : []
+  if (filters?.monthYear) discList = discList.filter(d => d.executionDate?.substring(0, 7) === filters.monthYear)
+  if (filters?.professorId && filters.professorId !== 'all') {
+    const ids = (Array.isArray(profLinks) ? profLinks : []).filter(l => l.professorId === filters.professorId).map(l => l.disciplineId)
+    discList = discList.filter(d => ids.includes(d.id))
+  }
+  if (filters?.status === 'paid') discList = discList.filter(d => !!realizedByDisc[d.id])
+  if (filters?.status === 'pending') discList = discList.filter(d => !realizedByDisc[d.id])
+  const totalPaid = discList.filter(d => realizedByDisc[d.id]).reduce((acc, d) => acc + (realizedByDisc[d.id]?.amount || 0), 0)
+  const rows = discList.sort((a, b) => (a.order || 0) - (b.order || 0)).map((d, i) => {
+    const link = (Array.isArray(profLinks) ? profLinks : []).find(l => l.disciplineId === d.id)
+    const prof = (Array.isArray(professors) ? professors : []).find(p => p.id === link?.professorId)
+    const tx = realizedByDisc[d.id]
+    const sc = tx ? 'badge-success' : 'badge-warning'
+    const sl = tx ? 'PAGO' : 'PENDENTE'
+    return `<tr><td>${i+1}</td><td>${d.executionDate || '—'}</td><td class="row-accent">${d.name}</td><td>${prof?.name || d.professorName || '—'}</td><td class="row-accent" style="text-align:right;color:#dc2626;">${tx ? formatCurrency(tx.amount) : '—'}</td><td><span class="badge ${sc}">${sl}</span></td></tr>`
+  }).join('')
+  const content = `
+    <div style="background:#f8fafc;padding:20px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:30px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
+      <div style="text-align:center;"><p style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Disciplinas</p><p style="font-size:20px;font-weight:800;color:#1e3a5f;">${discList.length}</p></div>
+      <div style="text-align:center;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;"><p style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Total Pago</p><p style="font-size:20px;font-weight:800;color:#16a34a;">${formatCurrency(totalPaid)}</p></div>
+      <div style="text-align:center;"><p style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Pagas</p><p style="font-size:20px;font-weight:800;color:#f97316;">${discList.filter(d => !!realizedByDisc[d.id]).length}</p></div>
+    </div>
+    <table><thead><tr><th>#</th><th>Período</th><th>Disciplina</th><th>Professor</th><th style="text-align:right;">Valor Pago</th><th>Status</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="6" style="text-align:center;">Nenhum registro encontrado</td></tr>'}</tbody></table>`
+  safePrint(getModernTemplate(content, `Relatório de Pro-labore${filters?.monthYear ? ' — ' + filters.monthYear : ''}`, hubName), existingWin)
 }

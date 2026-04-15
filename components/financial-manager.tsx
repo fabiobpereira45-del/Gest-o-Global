@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo } from "react"
 import { 
@@ -49,7 +49,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { printFinancialDRE_PDF, printTuitionReportPDF, printReceiptPDF, printProfessorReceiptPDF, printInstallmentsReportPDF } from "@/lib/pdf"
+import { printFinancialDRE_PDF, printTuitionReportPDF, printReceiptPDF, printProfessorReceiptPDF, printInstallmentsReportPDF, printRevenueReportPDF, printExpensesReportPDF, printProLaboreReportPDF } from "@/lib/pdf"
 
 // --- Constants ---
 const CATEGORIES = [
@@ -60,7 +60,7 @@ const CATEGORIES = [
 const COLORS = ["#f97316", "#0ea5e9", "#8b5cf6", "#10b981", "#f43f5e", "#eab308", "#6366f1", "#14b8a6", "#ec4899", "#475569"]
 
 export function FinancialManager() {
-  const [tab, setTab] = useState<"dashboard" | "income" | "expenses" | "prolabore">("dashboard")
+  const [tab, setTab] = useState<"dashboard" | "income" | "expenses" | "prolabore" | "reports">("dashboard")
   const [allTransactions, setAllTransactions] = useState<FinancialTransaction[]>([])
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([])
   const [tuitions, setTuitions] = useState<StudentTuition[]>([])
@@ -341,18 +341,6 @@ export function FinancialManager() {
               <Button variant="outline" size="sm" className="flex-1 sm:flex-none border-primary text-primary h-9 text-xs" onClick={() => setIsConfigOpen(true)}>
                  <Calculator className="h-4 w-4 mr-1.5" /> Configurações
               </Button>
-              <Button variant="outline" size="sm" className="flex-1 sm:flex-none h-9 text-xs" onClick={() => printFinancialDRE_PDF(transactions, competencia, "Cosme de Farias")}>
-                <Download className="h-4 w-4 mr-1.5" /> DRE
-              </Button>
-              <Button variant="outline" size="sm" className="flex-1 sm:flex-none h-9 text-xs border-primary/40 text-primary" onClick={() => {
-                const accTransactions = allTransactions.filter(t => !t.competencia || t.competencia <= competencia)
-                printFinancialDRE_PDF(accTransactions, competencia, "Cosme de Farias", null, `DRE ACUMULADO - Até ${competencia}`)
-              }}>
-                <Download className="h-4 w-4 mr-1.5" /> DRE Acumulado
-              </Button>
-              <Button variant="outline" size="sm" className="flex-1 sm:flex-none h-9 text-xs" onClick={() => printTuitionReportPDF(tuitions, students, "Cosme de Farias")}>
-                <Printer className="h-4 w-4 mr-1.5" /> Relatório
-              </Button>
           </div>
         </div>
       </div>
@@ -401,6 +389,7 @@ export function FinancialManager() {
           <TabButton active={tab === "income"} onClick={() => setTab("income")} icon={<DollarSign className="h-4 w-4" />}>Receitas</TabButton>
           <TabButton active={tab === "expenses"} onClick={() => setTab("expenses")} icon={<TrendingDown className="h-4 w-4" />}>Despesas</TabButton>
           <TabButton active={tab === "prolabore"} onClick={() => setTab("prolabore")} icon={<Briefcase className="h-4 w-4" />}>Pro-labore</TabButton>
+          <TabButton active={tab === "reports"} onClick={() => setTab("reports")} icon={<FileText className="h-4 w-4" />}>Relatórios</TabButton>
         </div>
       </div>
 
@@ -794,6 +783,18 @@ export function FinancialManager() {
                  </div>
               </CardContent>
            </Card>
+        )}
+
+        {tab === "reports" && (
+          <ReportsTab
+            allTransactions={allTransactions}
+            tuitions={tuitions}
+            students={students}
+            disciplines={disciplines}
+            professors={professors}
+            profLinks={profLinks}
+            hubName="Cosme de Farias"
+          />
         )}
       </div>
 
@@ -1417,5 +1418,327 @@ function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ——— ReportsTab Component ——————————————————————————————————————————————————————
+
+interface ReportsTabProps {
+  allTransactions: FinancialTransaction[]
+  tuitions: StudentTuition[]
+  students: StudentProfile[]
+  disciplines: Discipline[]
+  professors: ProfessorAccount[]
+  profLinks: ProfessorDiscipline[]
+  hubName: string
+}
+
+function ReportsTab({ allTransactions, tuitions, students, disciplines, professors, profLinks, hubName }: ReportsTabProps) {
+  // — Mensalidades filters —
+  const [rTuitionStudent, setRTuitionStudent] = useState("all")
+  const [rTuitionStatus, setRTuitionStatus] = useState("all")
+
+  // — Receita Realizada filters —
+  const [rRevenueMonth, setRRevenueMonth] = useState("")
+  const [rRevenueMin, setRRevenueMin] = useState("")
+  const [rRevenueMax, setRRevenueMax] = useState("")
+
+  // — Despesas filters —
+  const [rExpCat, setRExpCat] = useState("all")
+  const [rExpMonth, setRExpMonth] = useState("")
+  const [rExpStatus, setRExpStatus] = useState("all")
+
+  // — DRE filters —
+  const [rDreMonth, setRDreMonth] = useState(new Date().toISOString().substring(0, 7))
+  const [rDreAccumulated, setRDreAccumulated] = useState(false)
+
+  // — Parcelamentos filters —
+  const [rInstCat, setRInstCat] = useState("all")
+  const [rInstStatus, setRInstStatus] = useState("all")
+  const [rInstMonth, setRInstMonth] = useState("")
+
+  // — Pro-labore filters —
+  const [rProfId, setRProfId] = useState("all")
+  const [rProfMonth, setRProfMonth] = useState("")
+  const [rProfStatus, setRProfStatus] = useState<"all" | "pending" | "paid">("all")
+
+  const EXPENSE_CATEGORIES = [
+    "Alimento", "Limpeza", "Professores", "Material de Escritório", "Transporte",
+    "Pessoal", "Aluguel", "Energia/Água", "Internet", "Marketing", "Eventos", "Material Didático", "Outros"
+  ]
+
+  function handleDRE() {
+    if (rDreAccumulated) {
+      const accumulated = allTransactions.filter(t => t.competencia && t.competencia <= rDreMonth)
+      printFinancialDRE_PDF(accumulated, rDreMonth, hubName, undefined, `DRE Acumulado até ${rDreMonth}`)
+    } else {
+      const monthly = allTransactions.filter(t => t.competencia === rDreMonth)
+      printFinancialDRE_PDF(monthly, rDreMonth, hubName)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {/* Card 1: Mensalidades */}
+        <Card className="premium-shadow border-t-4 border-t-orange">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              <FileText className="h-4 w-4 text-orange" /> Mensalidades
+            </CardTitle>
+            <CardDescription className="text-xs">Relatório por aluno e situação de pagamento.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Aluno</label>
+                <Select value={rTuitionStudent} onValueChange={setRTuitionStudent}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Alunos</SelectItem>
+                    {students.filter(s => s.status === "active").sort((a, b) => a.name.localeCompare(b.name)).map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Status</label>
+                <Select value={rTuitionStatus} onValueChange={setRTuitionStatus}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="paid">Pago</SelectItem>
+                    <SelectItem value="overdue">Atrasado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button
+              size="sm" className="w-full bg-orange/10 text-orange hover:bg-orange/20 border border-orange/30"
+              onClick={() => printTuitionReportPDF(tuitions, students, hubName, undefined, { studentId: rTuitionStudent, status: rTuitionStatus })}
+            >
+              <Printer className="h-4 w-4 mr-2" /> Imprimir PDF
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Receita Realizada */}
+        <Card className="premium-shadow border-t-4 border-t-emerald-500">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              <ArrowUpRight className="h-4 w-4 text-emerald-600" /> Receita Realizada
+            </CardTitle>
+            <CardDescription className="text-xs">Entradas confirmadas com filtros por período e valor.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-3 space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
+                <Input type="month" value={rRevenueMonth} onChange={e => setRRevenueMonth(e.target.value)} className="h-9 text-xs" />
+              </div>
+              <div className="col-span-1.5 space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor Mín (R$)</label>
+                <Input type="number" placeholder="0,00" value={rRevenueMin} onChange={e => setRRevenueMin(e.target.value)} className="h-9 text-xs" />
+              </div>
+              <div className="col-span-1.5 space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor Máx (R$)</label>
+                <Input type="number" placeholder="∞" value={rRevenueMax} onChange={e => setRRevenueMax(e.target.value)} className="h-9 text-xs" />
+              </div>
+            </div>
+            <Button
+              size="sm" className="w-full bg-emerald-600/10 text-emerald-700 hover:bg-emerald-600/20 border border-emerald-300"
+              onClick={() => printRevenueReportPDF(allTransactions, hubName, undefined, {
+                monthYear: rRevenueMonth || undefined,
+                minValue: rRevenueMin ? Number(rRevenueMin) : undefined,
+                maxValue: rRevenueMax ? Number(rRevenueMax) : undefined
+              })}
+            >
+              <Printer className="h-4 w-4 mr-2" /> Imprimir PDF
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Despesas */}
+        <Card className="premium-shadow border-t-4 border-t-rose-500">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              <ArrowDownRight className="h-4 w-4 text-rose-600" /> Despesas
+            </CardTitle>
+            <CardDescription className="text-xs">Projetadas e realizadas com filtros por categoria e período.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Categoria</label>
+                <Select value={rExpCat} onValueChange={setRExpCat}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {EXPENSE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Status</label>
+                <Select value={rExpStatus} onValueChange={setRExpStatus}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="planned">Previsto</SelectItem>
+                    <SelectItem value="realized">Realizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2 space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
+                <Input type="month" value={rExpMonth} onChange={e => setRExpMonth(e.target.value)} className="h-9 text-xs" />
+              </div>
+            </div>
+            <Button
+              size="sm" className="w-full bg-rose-600/10 text-rose-700 hover:bg-rose-600/20 border border-rose-300"
+              onClick={() => printExpensesReportPDF(allTransactions, hubName, undefined, {
+                category: rExpCat,
+                monthYear: rExpMonth || undefined,
+                status: rExpStatus
+              })}
+            >
+              <Printer className="h-4 w-4 mr-2" /> Imprimir PDF
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: DRE */}
+        <Card className="premium-shadow border-t-4 border-t-primary">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-primary" /> DRE — Demonstrativo de Resultado
+            </CardTitle>
+            <CardDescription className="text-xs">Receitas vs despesas de um mês ou acumulado.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Competência</label>
+              <Input type="month" value={rDreMonth} onChange={e => setRDreMonth(e.target.value)} className="h-9 text-xs" />
+            </div>
+            <div className="flex items-center gap-2 p-2 rounded-md border bg-muted/30 cursor-pointer" onClick={() => setRDreAccumulated(v => !v)}>
+              <div className={cn("w-4 h-4 rounded border-2 flex items-center justify-center transition-colors", rDreAccumulated ? "bg-primary border-primary" : "border-muted-foreground")}>
+                {rDreAccumulated && <span className="text-white font-black text-[10px]">✓</span>}
+              </div>
+              <span className="text-xs font-medium">Acumulado até este mês</span>
+            </div>
+            <Button
+              size="sm" className="w-full"
+              onClick={handleDRE}
+            >
+              <Printer className="h-4 w-4 mr-2" /> Imprimir PDF
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Card 5: Parcelamentos */}
+        <Card className="premium-shadow border-t-4 border-t-purple-500">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-purple-600" /> Parcelamentos e Projeções
+            </CardTitle>
+            <CardDescription className="text-xs">Despesas parceladas e previstas por categoria e período.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Categoria</label>
+                <Select value={rInstCat} onValueChange={setRInstCat}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {EXPENSE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Status</label>
+                <Select value={rInstStatus} onValueChange={setRInstStatus}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="planned">Previsto</SelectItem>
+                    <SelectItem value="realized">Realizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2 space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
+                <Input type="month" value={rInstMonth} onChange={e => setRInstMonth(e.target.value)} className="h-9 text-xs" />
+              </div>
+            </div>
+            <Button
+              size="sm" className="w-full bg-purple-600/10 text-purple-700 hover:bg-purple-600/20 border border-purple-300"
+              onClick={() => printInstallmentsReportPDF(allTransactions, hubName, undefined, {
+                category: rInstCat,
+                status: rInstStatus,
+                monthYear: rInstMonth || undefined
+              })}
+            >
+              <Printer className="h-4 w-4 mr-2" /> Imprimir PDF
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Card 6: Pro-labore */}
+        <Card className="premium-shadow border-t-4 border-t-blue-500">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-blue-600" /> Pro-labore
+            </CardTitle>
+            <CardDescription className="text-xs">Pagamentos por professor, mês e status.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Professor</label>
+                <Select value={rProfId} onValueChange={setRProfId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {professors.filter(p => p.active).sort((a, b) => a.name.localeCompare(b.name)).map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Status</label>
+                <Select value={rProfStatus} onValueChange={v => setRProfStatus(v as "all" | "pending" | "paid")}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="paid">Pago</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2 space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
+                <Input type="month" value={rProfMonth} onChange={e => setRProfMonth(e.target.value)} className="h-9 text-xs" />
+              </div>
+            </div>
+            <Button
+              size="sm" className="w-full bg-blue-600/10 text-blue-700 hover:bg-blue-600/20 border border-blue-300"
+              onClick={() => printProLaboreReportPDF(disciplines, allTransactions, professors, profLinks, hubName, undefined, {
+                professorId: rProfId,
+                monthYear: rProfMonth || undefined,
+                status: rProfStatus
+              })}
+            >
+              <Printer className="h-4 w-4 mr-2" /> Imprimir PDF
+            </Button>
+          </CardContent>
+        </Card>
+
+      </div>
+    </div>
   )
 }

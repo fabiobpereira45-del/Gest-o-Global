@@ -1556,7 +1556,7 @@ export async function syncGradesForDiscipline(disciplineId: string) {
 
   const recordsToSave = Object.entries(syncResults).map(([identifier, data]) => {
     // Busca registro existente por identificador (E-mail, CPF ou Matrícula)
-    const existing = (currentGrades || []).find(g => {
+    const existing = (currentGrades || []).find((g: any) => {
         const gid = String(g.student_identifier || "").trim().toLowerCase();
         
         // Match exato
