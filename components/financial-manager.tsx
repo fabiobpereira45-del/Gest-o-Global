@@ -179,13 +179,17 @@ export function FinancialManager() {
     const netRealized = realizedIncome - realizedExpense
 
     // Acumulado: Soma de todas as transações realizadas ATÉ a competência atual
-    // Ordenamos as competências alfabeticamente para o filtro (YYYY-MM)
     const accumulatedIncome = allTransactions
       .filter(t => t.type === 'income' && t.status === 'realized' && (!t.competencia || t.competencia <= competencia))
       .reduce((acc, t) => acc + t.amount, 0)
     
     const accumulatedExpense = allTransactions
       .filter(t => t.type === 'expense' && t.status === 'realized' && (!t.competencia || t.competencia <= competencia))
+      .reduce((acc, t) => acc + t.amount, 0)
+
+    // Total de despesas projetadas (planned) no escopo selecionado
+    const plannedExpenseTotal = scopeTransactions
+      .filter(t => t.type === 'expense' && t.status === 'planned')
       .reduce((acc, t) => acc + t.amount, 0)
 
     return {
@@ -196,6 +200,7 @@ export function FinancialManager() {
       revenueProjected,
       accumulatedIncome,
       accumulatedExpense,
+      plannedExpenseTotal,
       netPlanned: plannedIncome - plannedExpense,
       netRealized
     }
@@ -344,7 +349,7 @@ export function FinancialManager() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard 
           title="Receita Realizada" 
           value={stats.realizedIncome} 
@@ -371,6 +376,13 @@ export function FinancialManager() {
           value={stats.pendingTuition} 
           subtitle={viewScope === 'month' ? 'Previsão do mês' : viewScope === 'year' ? `Previsão do ano ${competencia.substring(0, 4)}` : 'Previsão geral'}
           icon={<Calculator className="text-orange" />}
+        />
+        <StatCard 
+          title="Despesas Projetadas" 
+          value={stats.plannedExpenseTotal} 
+          subtitle={viewScope === 'month' ? 'Previsto no mês' : viewScope === 'year' ? `Previsto no ano ${competencia.substring(0, 4)}` : 'Previsto total acumulado'}
+          icon={<TrendingDown className="text-rose-400" />}
+          trend="negative"
         />
       </div>
 
@@ -580,32 +592,72 @@ export function FinancialManager() {
                           {transactions.filter(t => t.type === 'expense').length === 0 ? (
                              <tr><td colSpan={6} className="p-20 text-center text-muted-foreground">Nenhuma despesa registrada para este período.</td></tr>
                           ) : (
-                             transactions.filter(t => t.type === 'expense').map(t => (
+                             transactions.filter(t => t.type === 'expense').map(t => {
+                               const installMatch = t.description?.match(/^(.+?)\s*\((\d+)\/(\d+)\)$/)
+                               const isInstallment = !!installMatch
+                               const installBase = installMatch ? installMatch[1].trim() : null
+                               const installTotal = installMatch ? parseInt(installMatch[3]) : 0
+                               return (
                                <tr key={t.id} className="border-b hover:bg-muted/10">
                                  <td className="p-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
                                  <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{t.category}</span></td>
-                                 <td className="p-4">{t.description}</td>
+                                 <td className="p-4">
+                                   {t.description}
+                                   {isInstallment && (
+                                     <span className="ml-2 text-[9px] bg-orange/10 text-orange border border-orange/20 px-1.5 py-0.5 rounded-full font-bold">{installTotal}x</span>
+                                   )}
+                                 </td>
                                  <td className="p-4 text-rose-600 font-bold">R$ {(t.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                                  <td className="p-4">
                                     <StatusBadge status={t.status} />
                                  </td>
                                  <td className="p-4">
-                                    {t.status === 'planned' && (
-                                      <Button size="sm" variant="ghost" onClick={() => updateFinancialTransaction(t.id, { status: 'realized' })} title="Dar Baixa">
-                                         <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                    <div className="flex gap-1 items-center">
+                                      {t.status === 'planned' && (
+                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Dar Baixa" onClick={async () => { await updateFinancialTransaction(t.id, { status: 'realized' }); await loadData(); }}>
+                                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                        </Button>
+                                      )}
+                                      {t.status === 'realized' && (
+                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Estornar para Previsto" onClick={async () => {
+                                          if (confirm('Estornar esta despesa para status "Previsto"?')) {
+                                            await updateFinancialTransaction(t.id, { status: 'planned' });
+                                            await loadData();
+                                          }
+                                        }}>
+                                           <Undo2 className="h-4 w-4 text-amber-500" />
+                                        </Button>
+                                      )}
+                                      {isInstallment && (
+                                        <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-rose-500 hover:bg-rose-50" title={`Excluir todas as ${installTotal} parcelas`}
+                                          onClick={async () => {
+                                            if (confirm(`Excluir TODAS as ${installTotal} parcelas de "${installBase}"?\nEsta ação não pode ser desfeita.`)) {
+                                              const safeBase = installBase?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') ?? ''
+                                              const toDelete = allTransactions.filter(tx =>
+                                                tx.type === 'expense' &&
+                                                new RegExp(`^${safeBase}\\s*\\(\\d+\\/${installTotal}\\)$`).test(tx.description ?? '')
+                                              )
+                                              for (const tx of toDelete) { await deleteFinancialTransaction(tx.id) }
+                                              await loadData();
+                                            }
+                                          }}
+                                        >
+                                          <Trash2 className="h-3 w-3 mr-1" />{installTotal}x
+                                        </Button>
+                                      )}
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" title="Excluir este lançamento" onClick={async () => {
+                                         if (confirm('Excluir permanentemente este lançamento?')) {
+                                            await deleteFinancialTransaction(t.id);
+                                            await loadData();
+                                         }
+                                      }}>
+                                         <Trash2 className="h-4 w-4" />
                                       </Button>
-                                    )}
-                                    <Button size="sm" variant="ghost" className="text-destructive" onClick={async () => {
-                                       if (confirm('Deseja excluir permanentemente este lançamento?')) {
-                                          await deleteFinancialTransaction(t.id);
-                                          await loadData();
-                                       }
-                                    }}>
-                                       <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                    </div>
                                  </td>
                                </tr>
-                             ))
+                               )
+                             })
                           )}
                        </tbody>
                     </table>
