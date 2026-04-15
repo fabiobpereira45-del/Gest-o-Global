@@ -199,7 +199,7 @@ export function FinancialManager() {
       netPlanned: plannedIncome - plannedExpense,
       netRealized
     }
-  }, [allTransactions, tuitions, disciplines, settings, students, competencia])
+  }, [allTransactions, tuitions, disciplines, settings, students, competencia, viewScope])
 
   const chartData = useMemo(() => {
     if (viewScope === 'month') {
@@ -348,28 +348,28 @@ export function FinancialManager() {
         <StatCard 
           title="Receita Realizada" 
           value={stats.realizedIncome} 
-          subtitle={`No mês. Acumulado: R$ ${(stats.accumulatedIncome ?? 0).toLocaleString('pt-BR')}`}
+          subtitle={viewScope === 'month' ? `No mês. Acumulado: R$ ${(stats.accumulatedIncome ?? 0).toLocaleString('pt-BR')}` : viewScope === 'year' ? `Acumulado do ano ${competencia.substring(0, 4)}` : 'Acumulado geral (todas as operações)'}
           icon={<ArrowUpRight className="text-emerald-500" />}
           trend="positive"
         />
         <StatCard 
           title="Despesa Realizada" 
           value={stats.realizedExpense} 
-          subtitle={`No mês. Acumulado: R$ ${(stats.accumulatedExpense ?? 0).toLocaleString('pt-BR')}`}
+          subtitle={viewScope === 'month' ? `No mês. Acumulado: R$ ${(stats.accumulatedExpense ?? 0).toLocaleString('pt-BR')}` : viewScope === 'year' ? `Acumulado do ano ${competencia.substring(0, 4)}` : 'Acumulado geral (todas as operações)'}
           icon={<ArrowDownRight className="text-rose-500" />}
           trend="negative"
         />
         <StatCard 
           title="Saldo Líquido (Real)" 
           value={stats.netRealized} 
-          subtitle="Entradas - Saídas"
+          subtitle={viewScope === 'month' ? 'Entradas - Saídas (mês)' : viewScope === 'year' ? `Entradas - Saídas (${competencia.substring(0, 4)})` : 'Entradas - Saídas (geral)'}
           icon={<Wallet className="text-primary" />}
           highlight
         />
         <StatCard 
           title="Mensalidades em Aberto" 
           value={stats.pendingTuition} 
-          subtitle="Previsão de Recebimento"
+          subtitle={viewScope === 'month' ? 'Previsão do mês' : viewScope === 'year' ? `Previsão do ano ${competencia.substring(0, 4)}` : 'Previsão geral'}
           icon={<Calculator className="text-orange" />}
         />
       </div>
