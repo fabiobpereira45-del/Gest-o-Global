@@ -187,10 +187,18 @@ export function FinancialManager() {
       .filter(t => t.type === 'expense' && t.status === 'realized' && (!t.competencia || t.competencia <= competencia))
       .reduce((acc, t) => acc + t.amount, 0)
 
-    // Total de despesas projetadas (planned) no escopo selecionado
+    // Total de despesas projetadas (planned) no escopo selecionado + pro-labore pendente
+    const realizedProlaboreDiscIds = new Set(
+      allTransactions
+        .filter(t => t.type === 'expense' && t.category === 'Professores' && t.status === 'realized' && t.disciplineId)
+        .map(t => t.disciplineId as string)
+    )
+    const pendingProLaboreCount = disciplinesScope.filter(d => !realizedProlaboreDiscIds.has(d.id)).length
+    const pendingProLaboreTotal = pendingProLaboreCount * settings.proLaboreRate
+
     const plannedExpenseTotal = scopeTransactions
       .filter(t => t.type === 'expense' && t.status === 'planned')
-      .reduce((acc, t) => acc + t.amount, 0)
+      .reduce((acc, t) => acc + t.amount, 0) + pendingProLaboreTotal
 
     return {
       plannedIncome, realizedIncome,
