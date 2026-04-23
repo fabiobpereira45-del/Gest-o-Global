@@ -23,8 +23,13 @@ import {
   type Discipline, type Question, type QuestionType, type Choice, type MatchingPair,
   getDisciplines, addDiscipline, updateDiscipline, deleteDiscipline,
   getQuestionsByDiscipline, addQuestion, updateQuestion, deleteQuestion, uid, getDisciplineQuestionCounts,
+  deleteQuestions, deleteQuestionsByDiscipline
 } from "@/lib/store"
+import { Checkbox } from "@/components/ui/checkbox"
+
 import { AIQuestionGenerator } from "./ai-question-generator"
+import { cn } from "@/lib/utils"
+
 
 // ─── Type Labels ──────────────────────────────────────────────────────────────
 
@@ -684,6 +689,13 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
   const [aiModal, setAiModal] = useState(false)
   const [importModal, setImportModal] = useState(false)
 
+  // Seleção e Ações em Lote
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkDeleteModal, setBulkDeleteModal] = useState(false)
+  const [emptyDiscModal, setEmptyDiscModal] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+
   async function reload(discIdToSelect?: string) {
     const discs = await getDisciplines()
     setDisciplines(discs)
@@ -738,7 +750,53 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
       reload(selectedDiscipline.id)
     }
     setDeleteQId(null)
+    setSelectedIds(prev => prev.filter(sid => sid !== id))
   }
+
+  async function handleBulkDelete() {
+    if (selectedIds.length === 0) return
+    setIsDeleting(true)
+    try {
+      await deleteQuestions(selectedIds)
+      if (selectedDiscipline) reload(selectedDiscipline.id)
+      setSelectedIds([])
+      setBulkDeleteModal(false)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  async function handleEmptyDiscipline() {
+    if (!selectedDiscipline) return
+    setIsDeleting(true)
+    try {
+      await deleteQuestionsByDiscipline(selectedDiscipline.id)
+      reload(selectedDiscipline.id)
+      setSelectedIds([])
+      setEmptyDiscModal(false)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === questions.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(questions.map(q => q.id))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]
+    )
+  }
+
 
   const discToDelete = disciplines.find((d) => d.id === deleteDiscId)
   const qToDelete = questions.find((q) => q.id === deleteQId)
@@ -810,41 +868,82 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
 
       {/* Right: Questions */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-          <div>
-            <span className="text-sm font-semibold text-foreground">
-              {selectedDiscipline ? selectedDiscipline.name : "Selecione uma disciplina"}
-            </span>
-            {selectedDiscipline?.description && (
-              <p className="text-xs text-muted-foreground">{selectedDiscipline.description}</p>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/5">
+          <div className="flex items-center gap-3">
+            {questions.length > 0 && (
+              <div className="flex items-center gap-2 pr-3 border-r border-border">
+                <Checkbox 
+                  checked={selectedIds.length === questions.length && questions.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Selecionar todas as questões"
+                />
+              </div>
             )}
+            <div>
+              <span className="text-sm font-semibold text-foreground">
+                {selectedDiscipline ? selectedDiscipline.name : "Selecione uma disciplina"}
+              </span>
+              {selectedDiscipline?.description && (
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">{selectedDiscipline.description}</p>
+              )}
+            </div>
           </div>
           {selectedDiscipline && (
             <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
-                onClick={() => setAiModal(true)}
-              >
-                <Sparkles className="h-4 w-4 mr-1.5" /> Gerar com IA
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setImportModal(true)}
-              >
-                <Upload className="h-4 w-4 mr-1.5" /> Importar Lote
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => { setEditingQ(null); setQModal(true) }}
-              >
-                <Plus className="h-4 w-4 mr-1.5" /> Nova Questão
-              </Button>
+              {selectedIds.length > 0 ? (
+                <div className="flex items-center gap-2 mr-2 animate-in fade-in slide-in-from-right-2">
+                  <span className="text-xs font-bold text-primary mr-2">{selectedIds.length} selecionada{selectedIds.length !== 1 ? 's' : ''}</span>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-8"
+                    onClick={() => setBulkDeleteModal(true)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Excluir
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 mr-2">
+                  {questions.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-destructive h-8 text-[11px] font-bold"
+                      onClick={() => setEmptyDiscModal(true)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Esvaziar
+                    </Button>
+                  )}
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2 border-l border-border pl-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+                  onClick={() => setAiModal(true)}
+                >
+                  <Sparkles className="h-4 w-4 mr-1.5" /> Gerar com IA
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setImportModal(true)}
+                >
+                  <Upload className="h-4 w-4 mr-1.5" /> Importar Lote
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => { setEditingQ(null); setQModal(true) }}
+                >
+                  <Plus className="h-4 w-4 mr-1.5" /> Nova Questão
+                </Button>
+              </div>
             </div>
           )}
         </div>
+
 
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
           {!selectedDiscipline ? (
@@ -864,11 +963,27 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
             questions.map((q, i) => (
               <div
                 key={q.id}
-                className="group flex items-start gap-3 p-4 rounded-lg border border-border bg-background hover:border-primary/30 transition-colors"
+                className={cn(
+                  "group flex items-start gap-3 p-4 rounded-xl border transition-all duration-200",
+                  selectedIds.includes(q.id) 
+                    ? "border-primary bg-primary/5 shadow-sm" 
+                    : "border-border bg-background hover:border-primary/30"
+                )}
               >
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
-                  {i + 1}
+                <div className="flex flex-col items-center gap-3">
+                  <Checkbox 
+                    checked={selectedIds.includes(q.id)}
+                    onCheckedChange={() => toggleSelect(q.id)}
+                    className="mt-1"
+                  />
+                  <div className={cn(
+                    "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors",
+                    selectedIds.includes(q.id) ? "bg-primary text-white" : "bg-primary/10 text-primary"
+                  )}>
+                    {i + 1}
+                  </div>
                 </div>
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${q.type === "multiple-choice" ? "bg-blue-100 text-blue-700" :
@@ -1026,6 +1141,51 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Delete Confirm */}
+      <AlertDialog open={bulkDeleteModal} onOpenChange={setBulkDeleteModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir questões selecionadas</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir as <strong>{selectedIds.length} questões</strong> selecionadas? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Excluindo..." : "Excluir Selecionadas"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Empty Discipline Confirm */}
+      <AlertDialog open={emptyDiscModal} onOpenChange={setEmptyDiscModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Esvaziar disciplina</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>TODAS</strong> as questões da disciplina <strong>{selectedDiscipline?.name}</strong>? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleEmptyDiscipline}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Esvaziando..." : "Esvaziar Tudo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+
   )
 }

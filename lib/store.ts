@@ -721,6 +721,19 @@ export async function deleteQuestion(id: string): Promise<void> {
   await supabase.from('questions').delete().eq('id', id)
 }
 
+export async function deleteQuestions(ids: string[]): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('questions').delete().in('id', ids)
+  if (error) throw new Error(`Erro ao excluir questões em lote: ${error.message}`)
+}
+
+export async function deleteQuestionsByDiscipline(disciplineId: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('questions').delete().eq('discipline_id', disciplineId)
+  if (error) throw new Error(`Erro ao esvaziar disciplina: ${error.message}`)
+}
+
+
 export async function getAssessments(): Promise<Assessment[]> {
   const supabase = createClient()
   const { data } = await supabase.from('assessments').select('*').order('created_at', { ascending: false })
