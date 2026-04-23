@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo } from "react"
 import { 
@@ -53,8 +53,8 @@ import { printFinancialDRE_PDF, printTuitionReportPDF, printReceiptPDF, printPro
 
 // --- Constants ---
 const CATEGORIES = [
-  "Alimento", "Limpeza", "Professores", "Material de Escritório", "Transporte", 
-  "Pessoal", "Aluguel", "Energia/Água", "Internet", "Marketing", "Eventos", "Material Didático", "Outros"
+  "Alimento", "Limpeza", "Professores", "Material de EscritÃ³rio", "Transporte", 
+  "Pessoal", "Aluguel", "Energia/Ãgua", "Internet", "Marketing", "Eventos", "Material DidÃ¡tico", "Outros"
 ]
 
 const COLORS = ["#f97316", "#0ea5e9", "#8b5cf6", "#10b981", "#f43f5e", "#eab308", "#6366f1", "#14b8a6", "#ec4899", "#475569"]
@@ -83,7 +83,7 @@ export function FinancialManager() {
   const [paymentTuition, setPaymentTuition] = useState<{id: string, amount: number, studentName: string} | null>(null)
   const [isPaymentConfirmOpen, setIsPaymentConfirmOpen] = useState(false)
 
-  // Local draft state for the config dialog — always mirrors the last persisted settings
+  // Local draft state for the config dialog â€” always mirrors the last persisted settings
   const [configDraft, setConfigDraft] = useState({
     tuitionRate: settings.tuitionRate,
     proLaboreRate: settings.proLaboreRate,
@@ -114,7 +114,7 @@ export function FinancialManager() {
         getAllProfessorDisciplines()
       ])
       setAllTransactions(allT)
-      setTransactions(allT.filter(t => t.competencia === competencia))
+      setTransactions(allT.filter(t => tx.competencia === competencia))
       setTuitions(tu)
       setStudents(st)
       setDisciplines(di)
@@ -135,17 +135,17 @@ export function FinancialManager() {
     // Escopo de Filtragem Principal
     const currentYear = competencia.substring(0, 4)
     const scopeTransactions = allTransactions.filter(t => {
-      if (viewScope === 'month') return t.competencia === competencia
-      if (viewScope === 'year') return t.competencia?.startsWith(currentYear)
+      if (viewScope === 'month') return tx.competencia === competencia
+      if (viewScope === 'year') return tx.competencia?.startsWith(currentYear)
       return true // 'all'
     })
 
-    const plannedIncome = scopeTransactions.filter(t => t.type === 'income' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
-    const realizedIncome = scopeTransactions.filter(t => t.type === 'income' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
-    const plannedExpense = scopeTransactions.filter(t => t.type === 'expense' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
-    const realizedExpense = scopeTransactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+    const plannedIncome = scopeTransactions.filter(t => t.type === 'income' && tx.status === 'planned').reduce((acc, t) => acc + tx.amount, 0)
+    const realizedIncome = scopeTransactions.filter(t => t.type === 'income' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
+    const plannedExpense = scopeTransactions.filter(t => t.type === 'expense' && tx.status === 'planned').reduce((acc, t) => acc + tx.amount, 0)
+    const realizedExpense = scopeTransactions.filter(t => t.type === 'expense' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
 
-    // Filtramos mensalidades e disciplinas pela competência baseada no escopo
+    // Filtramos mensalidades e disciplinas pela competÃªncia baseada no escopo
     const tuitionsScope = tuitions.filter(tu => {
       if (!tu.dueDate) return false
       if (viewScope === 'month') return tu.dueDate.startsWith(competencia)
@@ -155,7 +155,7 @@ export function FinancialManager() {
 
     const pendingTuition = tuitionsScope.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
     
-    // Projeção de pro-labore (mantido por agora para o escopo selecionado)
+    // ProjeÃ§Ã£o de pro-labore (mantido por agora para o escopo selecionado)
     const disciplinesScope = disciplines.filter(d => {
       if (!d.executionDate) return false
       if (viewScope === 'month') return d.executionDate.startsWith(competencia)
@@ -173,32 +173,32 @@ export function FinancialManager() {
     const tuitionsActive = tuitionsScope.filter(tu => activeStudentIds.has(tu.studentId))
     
     const generatedAmount = tuitionsActive.reduce((acc, tu) => acc + tu.amount, 0)
-    // Para simplificar a projeção futura em escopos maiores, mantemos a lógica base baseada no que foi filtrado
+    // Para simplificar a projeÃ§Ã£o futura em escopos maiores, mantemos a lÃ³gica base baseada no que foi filtrado
     const revenueProjected = generatedAmount 
 
     const netRealized = realizedIncome - realizedExpense
 
-    // Acumulado: Soma de todas as transações realizadas ATÉ a competência atual
+    // Acumulado: Soma de todas as transaÃ§Ãµes realizadas ATÃ‰ a competÃªncia atual
     const accumulatedIncome = allTransactions
-      .filter(t => t.type === 'income' && t.status === 'realized' && (!t.competencia || t.competencia <= competencia))
-      .reduce((acc, t) => acc + t.amount, 0)
+      .filter(t => t.type === 'income' && tx.status === 'realized' && (!tx.competencia || tx.competencia <= competencia))
+      .reduce((acc, t) => acc + tx.amount, 0)
     
     const accumulatedExpense = allTransactions
-      .filter(t => t.type === 'expense' && t.status === 'realized' && (!t.competencia || t.competencia <= competencia))
-      .reduce((acc, t) => acc + t.amount, 0)
+      .filter(t => t.type === 'expense' && tx.status === 'realized' && (!tx.competencia || tx.competencia <= competencia))
+      .reduce((acc, t) => acc + tx.amount, 0)
 
     // Total de despesas projetadas (planned) no escopo selecionado + pro-labore pendente
     const realizedProlaboreDiscIds = new Set(
       allTransactions
-        .filter(t => t.type === 'expense' && t.category === 'Professores' && t.status === 'realized' && t.disciplineId)
+        .filter(t => t.type === 'expense' && t.category === 'Professores' && tx.status === 'realized' && t.disciplineId)
         .map(t => t.disciplineId as string)
     )
     const pendingProLaboreCount = disciplinesScope.filter(d => !realizedProlaboreDiscIds.has(d.id)).length
     const pendingProLaboreTotal = pendingProLaboreCount * settings.proLaboreRate
 
     const plannedExpenseTotal = scopeTransactions
-      .filter(t => t.type === 'expense' && t.status === 'planned')
-      .reduce((acc, t) => acc + t.amount, 0) + pendingProLaboreTotal
+      .filter(t => t.type === 'expense' && tx.status === 'planned')
+      .reduce((acc, t) => acc + tx.amount, 0) + pendingProLaboreTotal
 
     return {
       plannedIncome, realizedIncome,
@@ -229,12 +229,12 @@ export function FinancialManager() {
       
       for (let m = 1; m <= 12; m++) {
         const comp = `${year}-${m.toString().padStart(2, '0')}`
-        const monthTransactions = allTransactions.filter(t => t.competencia === comp)
+        const monthTransactions = allTransactions.filter(t => tx.competencia === comp)
         
-        const income = monthTransactions.filter(t => t.type === 'income' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
-        const expense = monthTransactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
-        const pIncome = monthTransactions.filter(t => t.type === 'income' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
-        const pExpense = monthTransactions.filter(t => t.type === 'expense' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
+        const income = monthTransactions.filter(t => t.type === 'income' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
+        const expense = monthTransactions.filter(t => t.type === 'expense' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
+        const pIncome = monthTransactions.filter(t => t.type === 'income' && tx.status === 'planned').reduce((acc, t) => acc + tx.amount, 0)
+        const pExpense = monthTransactions.filter(t => t.type === 'expense' && tx.status === 'planned').reduce((acc, t) => acc + tx.amount, 0)
 
         data.push({
           name: monthNames[m-1],
@@ -248,15 +248,15 @@ export function FinancialManager() {
     }
 
     // viewScope === 'all'
-    const years = Array.from(new Set(allTransactions.map(t => t.competencia?.substring(0, 4)).filter(Boolean))).sort()
+    const years = Array.from(new Set(allTransactions.map(t => tx.competencia?.substring(0, 4)).filter(Boolean))).sort()
     return years.map(year => {
-      const yearTransactions = allTransactions.filter(t => t.competencia?.startsWith(year))
-      const income = yearTransactions.filter(t => t.type === 'income' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
-      const expense = yearTransactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+      const yearTransactions = allTransactions.filter(t => tx.competencia?.startsWith(year))
+      const income = yearTransactions.filter(t => t.type === 'income' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
+      const expense = yearTransactions.filter(t => t.type === 'expense' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
       return { 
         name: year, 
         Realizado: income, 
-        Previsto: expense, // Usando Previsto como "Despesa" para manter compatibilidade com as cores do gráfico original
+        Previsto: expense, // Usando Previsto como "Despesa" para manter compatibilidade com as cores do grÃ¡fico original
         originalReceita: income,
         originalDespesa: expense
       }
@@ -266,14 +266,14 @@ export function FinancialManager() {
   const expenseDistribution = useMemo(() => {
     const scopeYear = competencia.substring(0, 4)
     const realization = allTransactions.filter(t => {
-      if (t.type !== 'expense' || t.status !== 'realized') return false
-      if (viewScope === 'month') return t.competencia === competencia
-      if (viewScope === 'year') return t.competencia?.startsWith(scopeYear)
+      if (t.type !== 'expense' || tx.status !== 'realized') return false
+      if (viewScope === 'month') return tx.competencia === competencia
+      if (viewScope === 'year') return tx.competencia?.startsWith(scopeYear)
       return true
     })
 
     return CATEGORIES.map(cat => {
-      const total = realization.filter(t => t.category === cat).reduce((acc, t) => acc + t.amount, 0)
+      const total = realization.filter(t => t.category === cat).reduce((acc, t) => acc + tx.amount, 0)
       return { name: cat, value: total }
     }).filter(d => d.value > 0)
   }, [allTransactions, viewScope, competencia])
@@ -293,21 +293,22 @@ export function FinancialManager() {
     setLoading(true)
     try {
        await syncBatchTuitions(students.filter(s => s.status === 'active').map(s => s.id))
-       toast.success("Sincronização concluída com sucesso!")
+       toast.success("SincronizaÃ§Ã£o concluÃ­da com sucesso!")
     } catch (e) {
-       toast.error("Erro na sincronização!")
+       toast.error("Erro na sincronizaÃ§Ã£o!")
     }
     await loadData()
     setLoading(false)
     setIsSyncOpen(false)
   }
 
-  async function handleDeleteIncome(t: FinancialTransaction) {
-    const tuitionMatch = t.description?.match(/ID:\s*([a-f0-9-]{36})/)
+  async function handleDeleteIncome(tx: FinancialTransaction) {
+    console.log("handleDeleteIncome called for:", tx.id)
+    const tuitionMatch = tx.description?.match(/ID:\s*([a-f0-9-]{36})/)
     const tuitionId = tuitionMatch ? tuitionMatch[1] : null
 
     if (tuitionId) {
-      if (confirm(`Esta receita está vinculada a uma mensalidade (ID: ${tuitionId.substring(0,8)}...).\n\nDeseja estornar este pagamento? A mensalidade do aluno voltará ao status "Pendente".`)) {
+      if (confirm(`Esta receita estÃ¡ vinculada a uma mensalidade (ID: ${tuitionId.substring(0,8)}...).\n\nDeseja estornar este pagamento? A mensalidade do aluno voltarÃ¡ ao status "Pendente".`)) {
         setLoading(true)
         try {
           await revertTuitionPayment(tuitionId)
@@ -324,8 +325,8 @@ export function FinancialManager() {
       if (confirm('Deseja excluir permanentemente este registro de receita?')) {
         setLoading(true)
         try {
-          await deleteFinancialTransaction(t.id)
-          toast.success("Receita excluída.")
+          await deleteFinancialTransaction(tx.id)
+          toast.success("Receita excluÃ­da.")
           await loadData()
         } catch (err) {
           toast.error("Erro ao excluir receita.")
@@ -343,12 +344,12 @@ export function FinancialManager() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black tracking-tight text-foreground flex items-center gap-4 flex-wrap">
-            Gestão Financeira
+            GestÃ£o Financeira
             <div className="flex bg-muted p-1 rounded-lg border text-[10px] uppercase font-bold tracking-wider">
               <button 
                 onClick={() => setViewScope('month')}
                 className={cn("px-4 py-1.5 rounded-md transition-all", viewScope === 'month' ? "bg-background shadow-sm text-orange" : "text-muted-foreground hover:text-foreground")}
-              >Mês</button>
+              >MÃªs</button>
               <button 
                 onClick={() => setViewScope('year')}
                 className={cn("px-4 py-1.5 rounded-md transition-all border-x", viewScope === 'year' ? "bg-background shadow-sm text-orange" : "text-muted-foreground hover:text-foreground")}
@@ -359,7 +360,7 @@ export function FinancialManager() {
               >Geral</button>
             </div>
           </h1>
-          <p className="text-muted-foreground text-sm">Controle de caixa, mensalidades e projeções.</p>
+          <p className="text-muted-foreground text-sm">Controle de caixa, mensalidades e projeÃ§Ãµes.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
@@ -374,7 +375,7 @@ export function FinancialManager() {
           </Button>
           <div className="flex gap-2 w-full sm:w-auto">
               <Button variant="outline" size="sm" className="flex-1 sm:flex-none border-primary text-primary h-9 text-xs" onClick={() => setIsConfigOpen(true)}>
-                 <Calculator className="h-4 w-4 mr-1.5" /> Configurações
+                 <Calculator className="h-4 w-4 mr-1.5" /> ConfiguraÃ§Ãµes
               </Button>
           </div>
         </div>
@@ -384,34 +385,34 @@ export function FinancialManager() {
         <StatCard 
           title="Mensalidades em Aberto" 
           value={stats.pendingTuition} 
-          subtitle={viewScope === 'month' ? 'Previsão do mês' : viewScope === 'year' ? `Previsão do ano ${competencia.substring(0, 4)}` : 'Previsão geral'}
+          subtitle={viewScope === 'month' ? 'PrevisÃ£o do mÃªs' : viewScope === 'year' ? `PrevisÃ£o do ano ${competencia.substring(0, 4)}` : 'PrevisÃ£o geral'}
           icon={<Calculator className="text-orange" />}
         />
         <StatCard 
           title="Receita Realizada" 
           value={stats.realizedIncome} 
-          subtitle={viewScope === 'month' ? `No mês. Acumulado: R$ ${(stats.accumulatedIncome ?? 0).toLocaleString('pt-BR')}` : viewScope === 'year' ? `Acumulado do ano ${competencia.substring(0, 4)}` : 'Acumulado geral (todas as operações)'}
+          subtitle={viewScope === 'month' ? `No mÃªs. Acumulado: R$ ${(stats.accumulatedIncome ?? 0).toLocaleString('pt-BR')}` : viewScope === 'year' ? `Acumulado do ano ${competencia.substring(0, 4)}` : 'Acumulado geral (todas as operaÃ§Ãµes)'}
           icon={<ArrowUpRight className="text-emerald-500" />}
           trend="positive"
         />
         <StatCard 
           title="Despesas Projetadas" 
           value={stats.plannedExpenseTotal} 
-          subtitle={viewScope === 'month' ? 'Previsto no mês' : viewScope === 'year' ? `Previsto no ano ${competencia.substring(0, 4)}` : 'Previsto total acumulado'}
+          subtitle={viewScope === 'month' ? 'Previsto no mÃªs' : viewScope === 'year' ? `Previsto no ano ${competencia.substring(0, 4)}` : 'Previsto total acumulado'}
           icon={<TrendingDown className="text-rose-400" />}
           trend="negative"
         />
         <StatCard 
           title="Despesa Realizada" 
           value={stats.realizedExpense} 
-          subtitle={viewScope === 'month' ? `No mês. Acumulado: R$ ${(stats.accumulatedExpense ?? 0).toLocaleString('pt-BR')}` : viewScope === 'year' ? `Acumulado do ano ${competencia.substring(0, 4)}` : 'Acumulado geral (todas as operações)'}
+          subtitle={viewScope === 'month' ? `No mÃªs. Acumulado: R$ ${(stats.accumulatedExpense ?? 0).toLocaleString('pt-BR')}` : viewScope === 'year' ? `Acumulado do ano ${competencia.substring(0, 4)}` : 'Acumulado geral (todas as operaÃ§Ãµes)'}
           icon={<ArrowDownRight className="text-rose-500" />}
           trend="negative"
         />
         <StatCard 
-          title="Saldo Líquido (Real)" 
+          title="Saldo LÃ­quido (Real)" 
           value={stats.netRealized} 
-          subtitle={viewScope === 'month' ? 'Entradas - Saídas (mês)' : viewScope === 'year' ? `Entradas - Saídas (${competencia.substring(0, 4)})` : 'Entradas - Saídas (geral)'}
+          subtitle={viewScope === 'month' ? 'Entradas - SaÃ­das (mÃªs)' : viewScope === 'year' ? `Entradas - SaÃ­das (${competencia.substring(0, 4)})` : 'Entradas - SaÃ­das (geral)'}
           icon={<Wallet className="text-primary" />}
           highlight
         />
@@ -424,7 +425,7 @@ export function FinancialManager() {
           <TabButton active={tab === "income"} onClick={() => setTab("income")} icon={<DollarSign className="h-4 w-4" />}>Receitas</TabButton>
           <TabButton active={tab === "expenses"} onClick={() => setTab("expenses")} icon={<TrendingDown className="h-4 w-4" />}>Despesas</TabButton>
           <TabButton active={tab === "prolabore"} onClick={() => setTab("prolabore")} icon={<Briefcase className="h-4 w-4" />}>Pro-labore</TabButton>
-          <TabButton active={tab === "reports"} onClick={() => setTab("reports")} icon={<FileText className="h-4 w-4" />}>Relatórios</TabButton>
+          <TabButton active={tab === "reports"} onClick={() => setTab("reports")} icon={<FileText className="h-4 w-4" />}>RelatÃ³rios</TabButton>
         </div>
       </div>
 
@@ -461,7 +462,7 @@ export function FinancialManager() {
             <Card className="premium-shadow">
               <CardHeader className="bg-muted/30">
                 <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-primary" /> Distribuição de Gastos
+                  <TrendingUp className="h-4 w-4 text-primary" /> DistribuiÃ§Ã£o de Gastos
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6 flex justify-center items-center">
@@ -493,7 +494,7 @@ export function FinancialManager() {
                       <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-muted/5 rounded-xl border-2 border-dashed border-muted">
                         <PieChart className="h-8 w-8 text-muted-foreground/30 mb-2" />
                         <p className="text-sm font-medium text-muted-foreground">Nenhuma despesa realizada</p>
-                        <p className="text-[10px] text-muted-foreground/60 italic">As despesas aparecem aqui após serem "Quitadas"</p>
+                        <p className="text-[10px] text-muted-foreground/60 italic">As despesas aparecem aqui apÃ³s serem "Quitadas"</p>
                       </div>
                     )}
                  </div>
@@ -540,7 +541,7 @@ export function FinancialManager() {
               </CardContent>
            </Card>
 
-           {/* Tabela de Entradas Confirmadas - transações income */}
+           {/* Tabela de Entradas Confirmadas - transaÃ§Ãµes income */}
            <Card className="premium-shadow">
               <CardContent className="p-0">
                  <div className="p-4 border-b flex justify-between items-center bg-emerald-50">
@@ -552,30 +553,30 @@ export function FinancialManager() {
                        <thead className="bg-muted/30 border-b">
                           <tr>
                              <th className="p-4 font-bold">Data</th>
-                             <th className="p-4 font-bold">Descrição</th>
+                             <th className="p-4 font-bold">DescriÃ§Ã£o</th>
                              <th className="p-4 font-bold">Valor</th>
-                             <th className="p-4 font-bold">Competência</th>
+                             <th className="p-4 font-bold">CompetÃªncia</th>
                              <th className="p-4 font-bold">Status</th>
-                             <th className="p-4">Ação</th>
+                             <th className="p-4">AÃ§Ã£o</th>
                           </tr>
                        </thead>
                        <tbody>
                           {transactions.filter(t => t.type === 'income').length === 0 ? (
-                             <tr><td colSpan={6} className="p-12 text-center text-muted-foreground">Nenhuma entrada de receita registrada. Este painel será preenchido automaticamente quando pagamentos forem confirmados.</td></tr>
+                             <tr><td colSpan={6} className="p-12 text-center text-muted-foreground">Nenhuma entrada de receita registrada. Este painel serÃ¡ preenchido automaticamente quando pagamentos forem confirmados.</td></tr>
                           ) : (
-                             transactions.filter(t => t.type === 'income').map(t => (
-                               <tr key={t.id} className="border-b hover:bg-muted/10">
-                                 <td className="p-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
-                                 <td className="p-4 text-xs">{t.description}</td>
-                                 <td className="p-4 text-emerald-600 font-bold">R$ {(t.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                                 <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{t.competencia || '---'}</span></td>
-                                 <td className="p-4"><StatusBadge status={t.status} /></td>
+                             transactions.filter(t => t.type === 'income').map(tx => (
+                               <tr key={tx.id} className="border-b hover:bg-muted/10">
+                                 <td className="p-4">{new Date(tx.date).toLocaleDateString('pt-BR')}</td>
+                                 <td className="p-4 text-xs">{tx.description}</td>
+                                 <td className="p-4 text-emerald-600 font-bold">R$ {(tx.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                 <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{tx.competencia || '---'}</span></td>
+                                 <td className="p-4"><StatusBadge status={tx.status} /></td>
                                  <td className="p-4">
                                     <Button 
                                       size="sm" 
                                       variant="ghost" 
                                       className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" 
-                                      onClick={() => handleDeleteIncome(t)}
+                                      onClick={() => handleDeleteIncome(tx)}
                                       title="Excluir ou Estornar"
                                     >
                                        <Trash2 className="h-4 w-4" />
@@ -599,7 +600,7 @@ export function FinancialManager() {
                     <h3 className="font-bold flex items-center gap-2"><ArrowDownRight className="h-4 w-4 text-rose-600" /> Despesas de Custeio</h3>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => printInstallmentsReportPDF(allTransactions, "Cosme de Farias")}>
-                        <Download className="h-4 w-4 mr-2" /> Relatório Projeções
+                        <Download className="h-4 w-4 mr-2" /> RelatÃ³rio ProjeÃ§Ãµes
                       </Button>
                       <Button size="sm" onClick={() => setIsInstallmentModalOpen(true)} variant="secondary" className="bg-orange/10 text-orange hover:bg-orange/20 border-orange/20">
                         <Calendar className="h-4 w-4 mr-2" /> Despesas Parceladas
@@ -615,43 +616,43 @@ export function FinancialManager() {
                           <tr>
                              <th className="p-4 font-bold">Data</th>
                              <th className="p-4 font-bold">Categoria</th>
-                             <th className="p-4 font-bold">Descrição</th>
+                             <th className="p-4 font-bold">DescriÃ§Ã£o</th>
                              <th className="p-4 font-bold">Valor</th>
                              <th className="p-4 font-bold">Status</th>
-                             <th className="p-4">Ação</th>
+                             <th className="p-4">AÃ§Ã£o</th>
                           </tr>
                        </thead>
                        <tbody>
                           {transactions.filter(t => t.type === 'expense').length === 0 ? (
-                             <tr><td colSpan={6} className="p-20 text-center text-muted-foreground">Nenhuma despesa registrada para este período.</td></tr>
+                             <tr><td colSpan={6} className="p-20 text-center text-muted-foreground">Nenhuma despesa registrada para este perÃ­odo.</td></tr>
                           ) : (
                              transactions.filter(t => t.type === 'expense').map(t => {
-                               const installMatch = t.description?.match(/^(.+?)\s*\((\d+)\/(\d+)\)$/)
+                               const installMatch = tx.description?.match(/^(.+?)\s*\((\d+)\/(\d+)\)$/)
                                const isInstallment = !!installMatch
                                const installBase = installMatch ? installMatch[1].trim() : null
                                const installTotal = installMatch ? parseInt(installMatch[3]) : 0
                                return (
-                               <tr key={t.id} className="border-b hover:bg-muted/10">
-                                 <td className="p-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                               <tr key={tx.id} className="border-b hover:bg-muted/10">
+                                 <td className="p-4">{new Date(tx.date).toLocaleDateString('pt-BR')}</td>
                                  <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{t.category}</span></td>
                                  <td className="p-4">
-                                   {t.description}
+                                   {tx.description}
                                    {isInstallment && (
                                      <span className="ml-2 text-[9px] bg-orange/10 text-orange border border-orange/20 px-1.5 py-0.5 rounded-full font-bold">{installTotal}x</span>
                                    )}
                                  </td>
-                                 <td className="p-4 text-rose-600 font-bold">R$ {(t.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                 <td className="p-4 text-rose-600 font-bold">R$ {(tx.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                                  <td className="p-4">
-                                    <StatusBadge status={t.status} />
+                                    <StatusBadge status={tx.status} />
                                  </td>
                                  <td className="p-4">
                                     <div className="flex gap-1 items-center">
-                                      {t.status === 'planned' && (
+                                      {tx.status === 'planned' && (
                                         <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Dar Baixa" onClick={async () => { await updateFinancialTransaction(t.id, { status: 'realized' }); await loadData(); }}>
                                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                                         </Button>
                                       )}
-                                      {t.status === 'realized' && (
+                                      {tx.status === 'realized' && (
                                         <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Estornar para Previsto" onClick={async () => {
                                           if (confirm('Estornar esta despesa para status "Previsto"?')) {
                                             await updateFinancialTransaction(t.id, { status: 'planned' });
@@ -664,7 +665,7 @@ export function FinancialManager() {
                                       {isInstallment && (
                                         <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-rose-500 hover:bg-rose-50" title={`Excluir todas as ${installTotal} parcelas`}
                                           onClick={async () => {
-                                            if (confirm(`Excluir TODAS as ${installTotal} parcelas de "${installBase}"?\nEsta ação não pode ser desfeita.`)) {
+                                            if (confirm(`Excluir TODAS as ${installTotal} parcelas de "${installBase}"?\nEsta aÃ§Ã£o nÃ£o pode ser desfeita.`)) {
                                               const safeBase = installBase?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') ?? ''
                                               const toDelete = allTransactions.filter(tx =>
                                                 tx.type === 'expense' &&
@@ -678,8 +679,8 @@ export function FinancialManager() {
                                           <Trash2 className="h-3 w-3 mr-1" />{installTotal}x
                                         </Button>
                                       )}
-                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" title="Excluir este lançamento" onClick={async () => {
-                                         if (confirm('Excluir permanentemente este lançamento?')) {
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" title="Excluir este lanÃ§amento" onClick={async () => {
+                                         if (confirm('Excluir permanentemente este lanÃ§amento?')) {
                                             await deleteFinancialTransaction(t.id);
                                             await loadData();
                                          }
@@ -704,25 +705,25 @@ export function FinancialManager() {
               <CardContent className="p-0">
                  <div className="p-4 border-b flex justify-between items-center bg-muted/20">
                     <h3 className="font-bold flex items-center gap-2"><Briefcase className="h-4 w-4 text-blue-600" /> Pro-labore (Pagamento Professores)</h3>
-                    <p className="text-[10px] text-muted-foreground">Vinculado à Grade Curricular</p>
+                    <p className="text-[10px] text-muted-foreground">Vinculado Ã  Grade Curricular</p>
                  </div>
                  <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
                        <thead className="bg-muted/30 border-b">
                           <tr>
-                             <th className="p-4 font-bold">Mês/Ano</th>
+                             <th className="p-4 font-bold">MÃªs/Ano</th>
                              <th className="p-4 font-bold">Disciplina</th>
                              <th className="p-4 font-bold">Professor</th>
-                             <th className="p-4 font-bold">Custo Provisório</th>
+                             <th className="p-4 font-bold">Custo ProvisÃ³rio</th>
                              <th className="p-4 font-bold">Status</th>
-                             <th className="p-4">Ação</th>
+                             <th className="p-4">AÃ§Ã£o</th>
                           </tr>
                        </thead>
                        <tbody>
                           {disciplines.sort((a,b) => (a.order || 0) - (b.order || 0)).map((d, index) => {
                              const link = profLinks.find(l => l.disciplineId === d.id)
                              const prof = professors.find(p => p.id === link?.professorId)
-                             const alreadyPaid = transactions.find(t => t.type === 'expense' && t.category === 'Professores' && t.disciplineId === d.id && t.status === 'realized')
+                             const alreadyPaid = transactions.find(t => t.type === 'expense' && t.category === 'Professores' && t.disciplineId === d.id && tx.status === 'realized')
                              
                              return (
                               <tr key={d.id} className="border-b transition-colors hover:bg-muted/10">
@@ -730,7 +731,7 @@ export function FinancialManager() {
                                 <td className="p-4 font-medium"><span className="text-muted-foreground mr-2">{index + 1}.</span> {d.name}</td>
                                 <td className="p-4">
                                    <div className="flex flex-col">
-                                      <span className="font-semibold">{prof?.name || d.professorName || "Não definido"}</span>
+                                      <span className="font-semibold">{prof?.name || d.professorName || "NÃ£o definido"}</span>
                                       {prof?.pix_key && <span className="text-[10px] text-muted-foreground">PIX: {prof.pix_key}</span>}
                                    </div>
                                 </td>
@@ -768,9 +769,9 @@ export function FinancialManager() {
                                          variant="outline"
                                          className="text-muted-foreground hover:text-emerald-700 hover:border-emerald-500/50"
                                          disabled={!prof}
-                                         title="Baixa isenta de taxa (Voluntário)"
+                                         title="Baixa isenta de taxa (VoluntÃ¡rio)"
                                          onClick={async () => {
-                                            if (!prof || !confirm(`Dar baixa administrativa em ${d.name} para o professor voluntário ${prof.name} (R$ 0,00)?\nNenhuma despesa de caixa será gerada.`)) return
+                                            if (!prof || !confirm(`Dar baixa administrativa em ${d.name} para o professor voluntÃ¡rio ${prof.name} (R$ 0,00)?\nNenhuma despesa de caixa serÃ¡ gerada.`)) return
                                             await processProfessorPayment({
                                               professorId: prof.id,
                                               disciplineId: d.id,
@@ -780,7 +781,7 @@ export function FinancialManager() {
                                             loadData()
                                          }}
                                        >
-                                          Voluntário
+                                          VoluntÃ¡rio
                                        </Button>
                                      </>
                                    )}
@@ -845,7 +846,7 @@ export function FinancialManager() {
         setIsConfigOpen(open)
       }}>
         <DialogContent className="max-w-md">
-           <DialogHeader><DialogTitle>Configurações Financeiras</DialogTitle></DialogHeader>
+           <DialogHeader><DialogTitle>ConfiguraÃ§Ãµes Financeiras</DialogTitle></DialogHeader>
            <form onSubmit={async (e) => {
               e.preventDefault();
               await updateFinancialSettings({
@@ -856,7 +857,7 @@ export function FinancialManager() {
               });
               setIsConfigOpen(false);
               await loadData(); // await so state is fresh before any re-render
-              toast.success('Configurações salvas com sucesso!');
+              toast.success('ConfiguraÃ§Ãµes salvas com sucesso!');
            }} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
@@ -891,7 +892,7 @@ export function FinancialManager() {
                  </h4>
                  <div className="space-y-3">
                     <div className="space-y-1">
-                       <Label className="text-[11px]">Chave PIX (E-mail, CPF, Tel ou Aleatória)</Label>
+                       <Label className="text-[11px]">Chave PIX (E-mail, CPF, Tel ou AleatÃ³ria)</Label>
                        <Input
                          value={configDraft.pixKey}
                          onChange={e => setConfigDraft(d => ({ ...d, pixKey: e.target.value }))}
@@ -899,21 +900,21 @@ export function FinancialManager() {
                        />
                     </div>
                     <div className="space-y-1">
-                       <Label className="text-[11px]">Código PIX Copia e Cola (Payload)</Label>
+                       <Label className="text-[11px]">CÃ³digo PIX Copia e Cola (Payload)</Label>
                        <textarea
                           value={configDraft.pixQRCode}
                           onChange={e => setConfigDraft(d => ({ ...d, pixQRCode: e.target.value }))}
-                          placeholder="Cole aqui o payload do seu QR Code estático..."
+                          placeholder="Cole aqui o payload do seu QR Code estÃ¡tico..."
                           className="w-full min-h-[80px] text-xs p-2 rounded-md border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary"
                        />
-                       <p className="text-[9px] text-muted-foreground">Este código permite que o aluno utilize a função "Copia e Cola" no app do banco.</p>
+                       <p className="text-[9px] text-muted-foreground">Este cÃ³digo permite que o aluno utilize a funÃ§Ã£o "Copia e Cola" no app do banco.</p>
                     </div>
                  </div>
               </div>
 
               <DialogFooter className="pt-2">
                  <Button type="button" variant="ghost" onClick={() => setIsConfigOpen(false)}>Cancelar</Button>
-                 <Button type="submit" className="accent-gradient">Salvar Configurações</Button>
+                 <Button type="submit" className="accent-gradient">Salvar ConfiguraÃ§Ãµes</Button>
               </DialogFooter>
            </form>
         </DialogContent>
@@ -943,8 +944,8 @@ export function FinancialManager() {
                  </Select>
               </div>
               <div className="space-y-1">
-                 <Label>Descrição</Label>
-                 <Input name="description" required placeholder="Ex: Compra de café e papel higiênico" />
+                 <Label>DescriÃ§Ã£o</Label>
+                 <Input name="description" required placeholder="Ex: Compra de cafÃ© e papel higiÃªnico" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1">
@@ -958,7 +959,7 @@ export function FinancialManager() {
               </div>
               <DialogFooter>
                  <Button type="button" variant="ghost" onClick={() => setIsAddExpenseOpen(false)}>Cancelar</Button>
-                 <Button type="submit">Salvar Projeção</Button>
+                 <Button type="submit">Salvar ProjeÃ§Ã£o</Button>
               </DialogFooter>
            </form>
         </DialogContent>
@@ -968,7 +969,7 @@ export function FinancialManager() {
         <DialogContent>
            <DialogHeader><DialogTitle>Sincronizar Mensalidades em Lote</DialogTitle></DialogHeader>
            <div className="space-y-4 pt-2">
-              <p className="text-sm text-muted-foreground">Esta ação irá verificar o currículo de todos os alunos ativos e gerar faturamentos pendentes para quaisquer disciplinas que ainda não possuam mensalidade lançada. Nenhum pagamento já faturado será duplicado ou afetado.</p>
+              <p className="text-sm text-muted-foreground">Esta aÃ§Ã£o irÃ¡ verificar o currÃ­culo de todos os alunos ativos e gerar faturamentos pendentes para quaisquer disciplinas que ainda nÃ£o possuam mensalidade lanÃ§ada. Nenhum pagamento jÃ¡ faturado serÃ¡ duplicado ou afetado.</p>
               <DialogFooter>
                  <Button type="button" variant="ghost" onClick={() => setIsSyncOpen(false)}>Cancelar</Button>
                  <Button onClick={async () => {
@@ -979,14 +980,14 @@ export function FinancialManager() {
                       toast.loading('Sincronizando mensalidades...', { id: 'sync' })
                       await syncBatchTuitions(activeStudents.map(s => s.id))
                       await loadData()
-                      toast.success(`Sincronização concluída! ${activeStudents.length} alunos processados.`, { id: 'sync' })
+                      toast.success(`SincronizaÃ§Ã£o concluÃ­da! ${activeStudents.length} alunos processados.`, { id: 'sync' })
                     } catch (e) {
                       console.error(e)
-                      toast.error('Ocorreu um erro durante a sincronização.', { id: 'sync' })
+                      toast.error('Ocorreu um erro durante a sincronizaÃ§Ã£o.', { id: 'sync' })
                     } finally {
                       setLoading(false)
                     }
-                 }}>Confirmar Sincronização</Button>
+                 }}>Confirmar SincronizaÃ§Ã£o</Button>
               </DialogFooter>
            </div>
         </DialogContent>
@@ -1001,10 +1002,10 @@ export function FinancialManager() {
             for (const item of installments) {
               await addFinancialTransaction(item)
             }
-            toast.success(`${installments.length} parcelas lançadas com sucesso!`)
+            toast.success(`${installments.length} parcelas lanÃ§adas com sucesso!`)
             await loadData()
           } catch (err) {
-            toast.error("Erro ao lançar parcelas.")
+            toast.error("Erro ao lanÃ§ar parcelas.")
           } finally {
             setLoading(false)
             setIsInstallmentModalOpen(false)
@@ -1110,9 +1111,9 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
              <div className="font-bold text-left text-sm sm:text-base text-navy">{student.name}</div>
              <div className="text-xs text-muted-foreground mr-4 text-left font-mono">{student.enrollment_number || student.cpf}</div>
              <div className="flex gap-2 mt-1 sm:mt-0">
-                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 uppercase border border-slate-200 shadow-sm">{tuitions.length} Lançamentos</span>
-                 {tuitions.filter(t => t.status === 'overdue').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-50 text-rose-700 uppercase font-bold border border-rose-200">{tuitions.filter(t => t.status === 'overdue').length} em atraso</span>}
-                 {tuitions.filter(t => t.status === 'paid').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 uppercase font-bold border border-emerald-200">{tuitions.filter(t => t.status === 'paid').length} pagos</span>}
+                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 uppercase border border-slate-200 shadow-sm">{tuitions.length} LanÃ§amentos</span>
+                 {tuitions.filter(t => tx.status === 'overdue').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-50 text-rose-700 uppercase font-bold border border-rose-200">{tuitions.filter(t => tx.status === 'overdue').length} em atraso</span>}
+                 {tuitions.filter(t => tx.status === 'paid').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 uppercase font-bold border border-emerald-200">{tuitions.filter(t => tx.status === 'paid').length} pagos</span>}
              </div>
           </div>
           <div className="ml-4 p-2 rounded-full bg-muted/50 text-muted-foreground hover:bg-primary hover:text-white transition-colors">
@@ -1125,7 +1126,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-0 mb-4 gap-4">
                 <div>
                    <h4 className="font-bold text-sm text-navy uppercase tracking-widest flex items-center gap-2"><PieChart className="w-4 h-4 text-orange" /> Panorama Financeiro</h4>
-                   <p className="text-xs text-muted-foreground">Visão geral do faturamento disciplinar deste aluno ativo.</p>
+                   <p className="text-xs text-muted-foreground">VisÃ£o geral do faturamento disciplinar deste aluno ativo.</p>
                 </div>
                 <Button size="sm" variant="outline" className="w-full sm:w-auto shadow-sm" onClick={handleSync} disabled={isSyncing}>
                    <RefreshCw className={cn("h-3 w-3 mr-2", isSyncing && "animate-spin")} />
@@ -1141,7 +1142,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
                          <th className="p-3 font-extrabold uppercase text-navy border-b">Vencimento</th>
                          <th className="p-3 font-extrabold uppercase text-navy border-b">Valor</th>
                          <th className="p-3 font-extrabold uppercase text-navy border-b">Status</th>
-                         <th className="p-3 font-extrabold uppercase text-navy border-b">Ação</th>
+                         <th className="p-3 font-extrabold uppercase text-navy border-b">AÃ§Ã£o</th>
                       </tr>
                    </thead>
                    <tbody>
@@ -1173,7 +1174,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
                                      {tuition.status === 'paid' ? (
                                         <>
                                           <Button size="sm" variant="outline" className="h-8 shadow-sm hover:shadow-md transition-shadow focus:ring-2 focus:ring-emerald-500/20" onClick={() => onPrintReceipt(tuition, student, d)}>
-                                              <Printer className="h-3 w-3 sm:mr-2" /> <span className="hidden sm:inline">Emissão Recibo</span>
+                                              <Printer className="h-3 w-3 sm:mr-2" /> <span className="hidden sm:inline">EmissÃ£o Recibo</span>
                                           </Button>
                                           <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={async () => {
                                             if (confirm('Tem certeza que deseja estornar este pagamento?')) {
@@ -1193,7 +1194,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
                                 </>
                               ) : (
                                 <>
-                                 <td className="p-3 text-muted-foreground/70 italic text-[11px]" colSpan={4}>Faturamento não gerado para esta matéria. Sincronize para criar.</td>
+                                 <td className="p-3 text-muted-foreground/70 italic text-[11px]" colSpan={4}>Faturamento nÃ£o gerado para esta matÃ©ria. Sincronize para criar.</td>
                                 </>
                               )}
                            </tr>
@@ -1255,15 +1256,15 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-orange" /> Lançamento de Despesas Parceladas
+            <Calendar className="h-5 w-5 text-orange" /> LanÃ§amento de Despesas Parceladas
           </DialogTitle>
-          <DialogDescription>As parcelas serão criadas como despesas previstas no DRE dos meses correspondentes.</DialogDescription>
+          <DialogDescription>As parcelas serÃ£o criadas como despesas previstas no DRE dos meses correspondentes.</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
           <div className="space-y-4">
             <div className="space-y-1">
-              <Label>Descrição da Despesa</Label>
+              <Label>DescriÃ§Ã£o da Despesa</Label>
               <Input 
                  placeholder="Ex: Compra de Equipamentos"
                  value={formData.description}
@@ -1289,7 +1290,7 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
                  />
                </div>
                <div className="space-y-1">
-                 <Label>Nº Parcelas</Label>
+                 <Label>NÂº Parcelas</Label>
                  <Input 
                    type="number"
                    value={formData.installmentsCount || ''}
@@ -1298,7 +1299,7 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
                </div>
             </div>
             <div className="space-y-1">
-               <Label>Data 1º Vencimento</Label>
+               <Label>Data 1Âº Vencimento</Label>
                <Input 
                  type="date"
                  value={formData.firstDueDate}
@@ -1309,7 +1310,7 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
 
           <div className="flex flex-col border rounded-lg bg-muted/20 overflow-hidden">
              <div className="p-2 bg-muted font-bold text-[10px] uppercase tracking-wider flex justify-between">
-                <span>Pré-visualização</span>
+                <span>PrÃ©-visualizaÃ§Ã£o</span>
                 <span>{preview.length} Parcelas</span>
              </div>
              <ScrollArea className="flex-1 h-[280px] p-3">
@@ -1341,7 +1342,7 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
              disabled={!formData.description || !formData.totalAmount || preview.length === 0}
              onClick={() => onSave(preview)}
            >
-             Gerar e Lançar Parcelas
+             Gerar e LanÃ§ar Parcelas
            </Button>
         </DialogFooter>
       </DialogContent>
@@ -1349,7 +1350,7 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
   )
 }
 
-// --- Modal de Confirmação de Pagamento ---
+// --- Modal de ConfirmaÃ§Ã£o de Pagamento ---
 
 function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: { 
   isOpen: boolean, 
@@ -1400,7 +1401,7 @@ function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: {
             </div>
             {receivedAmount !== (tuition.amount ?? 0) && (
               <p className="text-[10px] text-amber-600 font-bold flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" /> Valor original: R$ {(tuition.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} — alteração apenas neste recebimento.
+                <AlertCircle className="h-3 w-3" /> Valor original: R$ {(tuition.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} â€” alteraÃ§Ã£o apenas neste recebimento.
               </p>
             )}
           </div>
@@ -1427,14 +1428,14 @@ function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: {
                     <QrCode className="h-3.5 w-3.5 text-emerald-600" /> Pix
                   </div>
                 </SelectItem>
-                <SelectItem value="Espécie">
+                <SelectItem value="EspÃ©cie">
                   <div className="flex items-center gap-2">
-                    <DollarSign className="h-3.5 w-3.5 text-orange" /> Espécie
+                    <DollarSign className="h-3.5 w-3.5 text-orange" /> EspÃ©cie
                   </div>
                 </SelectItem>
-                <SelectItem value="Cartão">
+                <SelectItem value="CartÃ£o">
                   <div className="flex items-center gap-2">
-                    <CreditCard className="h-3.5 w-3.5 text-blue-600" /> Cartão
+                    <CreditCard className="h-3.5 w-3.5 text-blue-600" /> CartÃ£o
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -1457,7 +1458,7 @@ function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: {
   )
 }
 
-// ——— ReportsTab Component ——————————————————————————————————————————————————————
+// â€”â€”â€” ReportsTab Component â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 
 interface ReportsTabProps {
   allTransactions: FinancialTransaction[]
@@ -1470,45 +1471,45 @@ interface ReportsTabProps {
 }
 
 function ReportsTab({ allTransactions, tuitions, students, disciplines, professors, profLinks, hubName }: ReportsTabProps) {
-  // — Mensalidades filters —
+  // â€” Mensalidades filters â€”
   const [rTuitionStudent, setRTuitionStudent] = useState("all")
   const [rTuitionStatus, setRTuitionStatus] = useState("all")
 
-  // — Receita Realizada filters —
+  // â€” Receita Realizada filters â€”
   const [rRevenueMonth, setRRevenueMonth] = useState("")
   const [rRevenueMin, setRRevenueMin] = useState("")
   const [rRevenueMax, setRRevenueMax] = useState("")
 
-  // — Despesas filters —
+  // â€” Despesas filters â€”
   const [rExpCat, setRExpCat] = useState("all")
   const [rExpMonth, setRExpMonth] = useState("")
   const [rExpStatus, setRExpStatus] = useState("all")
 
-  // — DRE filters —
+  // â€” DRE filters â€”
   const [rDreMonth, setRDreMonth] = useState(new Date().toISOString().substring(0, 7))
   const [rDreAccumulated, setRDreAccumulated] = useState(false)
 
-  // — Parcelamentos filters —
+  // â€” Parcelamentos filters â€”
   const [rInstCat, setRInstCat] = useState("all")
   const [rInstStatus, setRInstStatus] = useState("all")
   const [rInstMonth, setRInstMonth] = useState("")
 
-  // — Pro-labore filters —
+  // â€” Pro-labore filters â€”
   const [rProfId, setRProfId] = useState("all")
   const [rProfMonth, setRProfMonth] = useState("")
   const [rProfStatus, setRProfStatus] = useState<"all" | "pending" | "paid">("all")
 
   const EXPENSE_CATEGORIES = [
-    "Alimento", "Limpeza", "Professores", "Material de Escritório", "Transporte",
-    "Pessoal", "Aluguel", "Energia/Água", "Internet", "Marketing", "Eventos", "Material Didático", "Outros"
+    "Alimento", "Limpeza", "Professores", "Material de EscritÃ³rio", "Transporte",
+    "Pessoal", "Aluguel", "Energia/Ãgua", "Internet", "Marketing", "Eventos", "Material DidÃ¡tico", "Outros"
   ]
 
   function handleDRE() {
     if (rDreAccumulated) {
-      const accumulated = allTransactions.filter(t => t.competencia && t.competencia <= rDreMonth)
-      printFinancialDRE_PDF(accumulated, rDreMonth, hubName, undefined, `DRE Acumulado até ${rDreMonth}`)
+      const accumulated = allTransactions.filter(t => tx.competencia && tx.competencia <= rDreMonth)
+      printFinancialDRE_PDF(accumulated, rDreMonth, hubName, undefined, `DRE Acumulado atÃ© ${rDreMonth}`)
     } else {
-      const monthly = allTransactions.filter(t => t.competencia === rDreMonth)
+      const monthly = allTransactions.filter(t => tx.competencia === rDreMonth)
       printFinancialDRE_PDF(monthly, rDreMonth, hubName)
     }
   }
@@ -1523,7 +1524,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <FileText className="h-4 w-4 text-orange" /> Mensalidades
             </CardTitle>
-            <CardDescription className="text-xs">Relatório por aluno e situação de pagamento.</CardDescription>
+            <CardDescription className="text-xs">RelatÃ³rio por aluno e situaÃ§Ã£o de pagamento.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1567,20 +1568,20 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <ArrowUpRight className="h-4 w-4 text-emerald-600" /> Receita Realizada
             </CardTitle>
-            <CardDescription className="text-xs">Entradas confirmadas com filtros por período e valor.</CardDescription>
+            <CardDescription className="text-xs">Entradas confirmadas com filtros por perÃ­odo e valor.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-3 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">MÃªs/Ano</label>
                 <Input type="month" value={rRevenueMonth} onChange={e => setRRevenueMonth(e.target.value)} className="h-9 text-xs" />
               </div>
               <div className="col-span-1.5 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor Mín (R$)</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor MÃ­n (R$)</label>
                 <Input type="number" placeholder="0,00" value={rRevenueMin} onChange={e => setRRevenueMin(e.target.value)} className="h-9 text-xs" />
               </div>
               <div className="col-span-1.5 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor Máx (R$)</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor MÃ¡x (R$)</label>
                 <Input type="number" placeholder="8" value={rRevenueMax} onChange={e => setRRevenueMax(e.target.value)} className="h-9 text-xs" />
               </div>
             </div>
@@ -1603,7 +1604,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <ArrowDownRight className="h-4 w-4 text-rose-600" /> Despesas
             </CardTitle>
-            <CardDescription className="text-xs">Projetadas e realizadas com filtros por categoria e período.</CardDescription>
+            <CardDescription className="text-xs">Projetadas e realizadas com filtros por categoria e perÃ­odo.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1629,7 +1630,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
                 </Select>
               </div>
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">MÃªs/Ano</label>
                 <Input type="month" value={rExpMonth} onChange={e => setRExpMonth(e.target.value)} className="h-9 text-xs" />
               </div>
             </div>
@@ -1650,20 +1651,20 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
         <Card className="premium-shadow border-t-4 border-t-primary">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-primary" /> DRE — Demonstrativo de Resultado
+              <BarChart3 className="h-4 w-4 text-primary" /> DRE â€” Demonstrativo de Resultado
             </CardTitle>
-            <CardDescription className="text-xs">Receitas vs despesas de um mês ou acumulado.</CardDescription>
+            <CardDescription className="text-xs">Receitas vs despesas de um mÃªs ou acumulado.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-muted-foreground">Competência</label>
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">CompetÃªncia</label>
               <Input type="month" value={rDreMonth} onChange={e => setRDreMonth(e.target.value)} className="h-9 text-xs" />
             </div>
             <div className="flex items-center gap-2 p-2 rounded-md border bg-muted/30 cursor-pointer" onClick={() => setRDreAccumulated(v => !v)}>
               <div className={cn("w-4 h-4 rounded border-2 flex items-center justify-center transition-colors", rDreAccumulated ? "bg-primary border-primary" : "border-muted-foreground")}>
                 {rDreAccumulated && <span className="text-white font-black text-[10px]">?</span>}
               </div>
-              <span className="text-xs font-medium">Acumulado até este mês</span>
+              <span className="text-xs font-medium">Acumulado atÃ© este mÃªs</span>
             </div>
             <Button
               size="sm" className="w-full"
@@ -1678,9 +1679,9 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
         <Card className="premium-shadow border-t-4 border-t-purple-500">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-purple-600" /> Parcelamentos e Projeções
+              <Calendar className="h-4 w-4 text-purple-600" /> Parcelamentos e ProjeÃ§Ãµes
             </CardTitle>
-            <CardDescription className="text-xs">Despesas parceladas e previstas por categoria e período.</CardDescription>
+            <CardDescription className="text-xs">Despesas parceladas e previstas por categoria e perÃ­odo.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1706,7 +1707,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
                 </Select>
               </div>
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">MÃªs/Ano</label>
                 <Input type="month" value={rInstMonth} onChange={e => setRInstMonth(e.target.value)} className="h-9 text-xs" />
               </div>
             </div>
@@ -1729,7 +1730,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <Briefcase className="h-4 w-4 text-blue-600" /> Pro-labore
             </CardTitle>
-            <CardDescription className="text-xs">Pagamentos por professor, mês e status.</CardDescription>
+            <CardDescription className="text-xs">Pagamentos por professor, mÃªs e status.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1757,7 +1758,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
                 </Select>
               </div>
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">MÃªs/Ano</label>
                 <Input type="month" value={rProfMonth} onChange={e => setRProfMonth(e.target.value)} className="h-9 text-xs" />
               </div>
             </div>
