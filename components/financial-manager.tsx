@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useMemo } from "react"
 import { 
@@ -114,7 +114,7 @@ export function FinancialManager() {
         getAllProfessorDisciplines()
       ])
       setAllTransactions(allT)
-      setTransactions(allT.filter(t => tx.competencia === competencia))
+      setTransactions(allT.filter(t => t.competencia === competencia))
       setTuitions(tu)
       setStudents(st)
       setDisciplines(di)
@@ -135,15 +135,15 @@ export function FinancialManager() {
     // Escopo de Filtragem Principal
     const currentYear = competencia.substring(0, 4)
     const scopeTransactions = allTransactions.filter(t => {
-      if (viewScope === 'month') return tx.competencia === competencia
-      if (viewScope === 'year') return tx.competencia?.startsWith(currentYear)
+      if (viewScope === 'month') return t.competencia === competencia
+      if (viewScope === 'year') return t.competencia?.startsWith(currentYear)
       return true // 'all'
     })
 
-    const plannedIncome = scopeTransactions.filter(t => t.type === 'income' && tx.status === 'planned').reduce((acc, t) => acc + tx.amount, 0)
-    const realizedIncome = scopeTransactions.filter(t => t.type === 'income' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
-    const plannedExpense = scopeTransactions.filter(t => t.type === 'expense' && tx.status === 'planned').reduce((acc, t) => acc + tx.amount, 0)
-    const realizedExpense = scopeTransactions.filter(t => t.type === 'expense' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
+    const plannedIncome = scopeTransactions.filter(t => t.type === 'income' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
+    const realizedIncome = scopeTransactions.filter(t => t.type === 'income' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+    const plannedExpense = scopeTransactions.filter(t => t.type === 'expense' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
+    const realizedExpense = scopeTransactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
 
     // Filtramos mensalidades e disciplinas pela competÃªncia baseada no escopo
     const tuitionsScope = tuitions.filter(tu => {
@@ -180,25 +180,25 @@ export function FinancialManager() {
 
     // Acumulado: Soma de todas as transaÃ§Ãµes realizadas ATÃ‰ a competÃªncia atual
     const accumulatedIncome = allTransactions
-      .filter(t => t.type === 'income' && tx.status === 'realized' && (!tx.competencia || tx.competencia <= competencia))
-      .reduce((acc, t) => acc + tx.amount, 0)
+      .filter(t => t.type === 'income' && t.status === 'realized' && (!t.competencia || t.competencia <= competencia))
+      .reduce((acc, t) => acc + t.amount, 0)
     
     const accumulatedExpense = allTransactions
-      .filter(t => t.type === 'expense' && tx.status === 'realized' && (!tx.competencia || tx.competencia <= competencia))
-      .reduce((acc, t) => acc + tx.amount, 0)
+      .filter(t => t.type === 'expense' && t.status === 'realized' && (!t.competencia || t.competencia <= competencia))
+      .reduce((acc, t) => acc + t.amount, 0)
 
     // Total de despesas projetadas (planned) no escopo selecionado + pro-labore pendente
     const realizedProlaboreDiscIds = new Set(
       allTransactions
-        .filter(t => t.type === 'expense' && t.category === 'Professores' && tx.status === 'realized' && t.disciplineId)
+        .filter(t => t.type === 'expense' && t.category === 'Professores' && t.status === 'realized' && t.disciplineId)
         .map(t => t.disciplineId as string)
     )
     const pendingProLaboreCount = disciplinesScope.filter(d => !realizedProlaboreDiscIds.has(d.id)).length
     const pendingProLaboreTotal = pendingProLaboreCount * settings.proLaboreRate
 
     const plannedExpenseTotal = scopeTransactions
-      .filter(t => t.type === 'expense' && tx.status === 'planned')
-      .reduce((acc, t) => acc + tx.amount, 0) + pendingProLaboreTotal
+      .filter(t => t.type === 'expense' && t.status === 'planned')
+      .reduce((acc, t) => acc + t.amount, 0) + pendingProLaboreTotal
 
     return {
       plannedIncome, realizedIncome,
@@ -229,12 +229,12 @@ export function FinancialManager() {
       
       for (let m = 1; m <= 12; m++) {
         const comp = `${year}-${m.toString().padStart(2, '0')}`
-        const monthTransactions = allTransactions.filter(t => tx.competencia === comp)
+        const monthTransactions = allTransactions.filter(t => t.competencia === comp)
         
-        const income = monthTransactions.filter(t => t.type === 'income' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
-        const expense = monthTransactions.filter(t => t.type === 'expense' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
-        const pIncome = monthTransactions.filter(t => t.type === 'income' && tx.status === 'planned').reduce((acc, t) => acc + tx.amount, 0)
-        const pExpense = monthTransactions.filter(t => t.type === 'expense' && tx.status === 'planned').reduce((acc, t) => acc + tx.amount, 0)
+        const income = monthTransactions.filter(t => t.type === 'income' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+        const expense = monthTransactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+        const pIncome = monthTransactions.filter(t => t.type === 'income' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
+        const pExpense = monthTransactions.filter(t => t.type === 'expense' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
 
         data.push({
           name: monthNames[m-1],
@@ -248,11 +248,11 @@ export function FinancialManager() {
     }
 
     // viewScope === 'all'
-    const years = Array.from(new Set(allTransactions.map(t => tx.competencia?.substring(0, 4)).filter(Boolean))).sort()
+    const years = Array.from(new Set(allTransactions.map(t => t.competencia?.substring(0, 4)).filter(Boolean))).sort()
     return years.map(year => {
-      const yearTransactions = allTransactions.filter(t => tx.competencia?.startsWith(year))
-      const income = yearTransactions.filter(t => t.type === 'income' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
-      const expense = yearTransactions.filter(t => t.type === 'expense' && tx.status === 'realized').reduce((acc, t) => acc + tx.amount, 0)
+      const yearTransactions = allTransactions.filter(t => t.competencia?.startsWith(year))
+      const income = yearTransactions.filter(t => t.type === 'income' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
+      const expense = yearTransactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
       return { 
         name: year, 
         Realizado: income, 
@@ -266,14 +266,14 @@ export function FinancialManager() {
   const expenseDistribution = useMemo(() => {
     const scopeYear = competencia.substring(0, 4)
     const realization = allTransactions.filter(t => {
-      if (t.type !== 'expense' || tx.status !== 'realized') return false
-      if (viewScope === 'month') return tx.competencia === competencia
-      if (viewScope === 'year') return tx.competencia?.startsWith(scopeYear)
+      if (t.type !== 'expense' || t.status !== 'realized') return false
+      if (viewScope === 'month') return t.competencia === competencia
+      if (viewScope === 'year') return t.competencia?.startsWith(scopeYear)
       return true
     })
 
     return CATEGORIES.map(cat => {
-      const total = realization.filter(t => t.category === cat).reduce((acc, t) => acc + tx.amount, 0)
+      const total = realization.filter(t => t.category === cat).reduce((acc, t) => acc + t.amount, 0)
       return { name: cat, value: total }
     }).filter(d => d.value > 0)
   }, [allTransactions, viewScope, competencia])
@@ -626,7 +626,7 @@ export function FinancialManager() {
                           {transactions.filter(t => t.type === 'expense').length === 0 ? (
                              <tr><td colSpan={6} className="p-20 text-center text-muted-foreground">Nenhuma despesa registrada para este perÃ­odo.</td></tr>
                           ) : (
-                             transactions.filter(t => t.type === 'expense').map(t => {
+                             transactions.filter(t => t.type === 'expense').map(tx => {
                                const installMatch = tx.description?.match(/^(.+?)\s*\((\d+)\/(\d+)\)$/)
                                const isInstallment = !!installMatch
                                const installBase = installMatch ? installMatch[1].trim() : null
@@ -634,7 +634,7 @@ export function FinancialManager() {
                                return (
                                <tr key={tx.id} className="border-b hover:bg-muted/10">
                                  <td className="p-4">{new Date(tx.date).toLocaleDateString('pt-BR')}</td>
-                                 <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{t.category}</span></td>
+                                 <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{tx.category}</span></td>
                                  <td className="p-4">
                                    {tx.description}
                                    {isInstallment && (
@@ -648,14 +648,14 @@ export function FinancialManager() {
                                  <td className="p-4">
                                     <div className="flex gap-1 items-center">
                                       {tx.status === 'planned' && (
-                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Dar Baixa" onClick={async () => { await updateFinancialTransaction(t.id, { status: 'realized' }); await loadData(); }}>
+                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Dar Baixa" onClick={async () => { await updateFinancialTransaction(tx.id, { status: 'realized' }); await loadData(); }}>
                                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                                         </Button>
                                       )}
                                       {tx.status === 'realized' && (
                                         <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Estornar para Previsto" onClick={async () => {
                                           if (confirm('Estornar esta despesa para status "Previsto"?')) {
-                                            await updateFinancialTransaction(t.id, { status: 'planned' });
+                                            await updateFinancialTransaction(tx.id, { status: 'planned' });
                                             await loadData();
                                           }
                                         }}>
@@ -681,7 +681,7 @@ export function FinancialManager() {
                                       )}
                                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" title="Excluir este lanÃ§amento" onClick={async () => {
                                          if (confirm('Excluir permanentemente este lanÃ§amento?')) {
-                                            await deleteFinancialTransaction(t.id);
+                                            await deleteFinancialTransaction(tx.id);
                                             await loadData();
                                          }
                                       }}>
@@ -723,7 +723,7 @@ export function FinancialManager() {
                           {disciplines.sort((a,b) => (a.order || 0) - (b.order || 0)).map((d, index) => {
                              const link = profLinks.find(l => l.disciplineId === d.id)
                              const prof = professors.find(p => p.id === link?.professorId)
-                             const alreadyPaid = transactions.find(t => t.type === 'expense' && t.category === 'Professores' && t.disciplineId === d.id && tx.status === 'realized')
+                             const alreadyPaid = transactions.find(t => t.type === 'expense' && t.category === 'Professores' && t.disciplineId === d.id && t.status === 'realized')
                              
                              return (
                               <tr key={d.id} className="border-b transition-colors hover:bg-muted/10">
@@ -1112,8 +1112,8 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
              <div className="text-xs text-muted-foreground mr-4 text-left font-mono">{student.enrollment_number || student.cpf}</div>
              <div className="flex gap-2 mt-1 sm:mt-0">
                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 uppercase border border-slate-200 shadow-sm">{tuitions.length} LanÃ§amentos</span>
-                 {tuitions.filter(t => tx.status === 'overdue').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-50 text-rose-700 uppercase font-bold border border-rose-200">{tuitions.filter(t => tx.status === 'overdue').length} em atraso</span>}
-                 {tuitions.filter(t => tx.status === 'paid').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 uppercase font-bold border border-emerald-200">{tuitions.filter(t => tx.status === 'paid').length} pagos</span>}
+                 {tuitions.filter(t => t.status === 'overdue').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-50 text-rose-700 uppercase font-bold border border-rose-200">{tuitions.filter(t => t.status === 'overdue').length} em atraso</span>}
+                 {tuitions.filter(t => t.status === 'paid').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 uppercase font-bold border border-emerald-200">{tuitions.filter(t => t.status === 'paid').length} pagos</span>}
              </div>
           </div>
           <div className="ml-4 p-2 rounded-full bg-muted/50 text-muted-foreground hover:bg-primary hover:text-white transition-colors">
@@ -1506,10 +1506,10 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
 
   function handleDRE() {
     if (rDreAccumulated) {
-      const accumulated = allTransactions.filter(t => tx.competencia && tx.competencia <= rDreMonth)
+      const accumulated = allTransactions.filter(t => t.competencia && t.competencia <= rDreMonth)
       printFinancialDRE_PDF(accumulated, rDreMonth, hubName, undefined, `DRE Acumulado atÃ© ${rDreMonth}`)
     } else {
-      const monthly = allTransactions.filter(t => tx.competencia === rDreMonth)
+      const monthly = allTransactions.filter(t => t.competencia === rDreMonth)
       printFinancialDRE_PDF(monthly, rDreMonth, hubName)
     }
   }
