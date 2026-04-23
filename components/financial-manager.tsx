@@ -53,8 +53,8 @@ import { printFinancialDRE_PDF, printTuitionReportPDF, printReceiptPDF, printPro
 
 // --- Constants ---
 const CATEGORIES = [
-  "Alimento", "Limpeza", "Professores", "Material de EscritÃ³rio", "Transporte", 
-  "Pessoal", "Aluguel", "Energia/Ãgua", "Internet", "Marketing", "Eventos", "Material DidÃ¡tico", "Outros"
+  "Alimento", "Limpeza", "Professores", "Material de Escritório", "Transporte", 
+  "Pessoal", "Aluguel", "Energia/Ãgua", "Internet", "Marketing", "Eventos", "Material Didático", "Outros"
 ]
 
 const COLORS = ["#f97316", "#0ea5e9", "#8b5cf6", "#10b981", "#f43f5e", "#eab308", "#6366f1", "#14b8a6", "#ec4899", "#475569"]
@@ -145,7 +145,7 @@ export function FinancialManager() {
     const plannedExpense = scopeTransactions.filter(t => t.type === 'expense' && t.status === 'planned').reduce((acc, t) => acc + t.amount, 0)
     const realizedExpense = scopeTransactions.filter(t => t.type === 'expense' && t.status === 'realized').reduce((acc, t) => acc + t.amount, 0)
 
-    // Filtramos mensalidades e disciplinas pela competÃªncia baseada no escopo
+    // Filtramos mensalidades e disciplinas pela competência baseada no escopo
     const tuitionsScope = tuitions.filter(tu => {
       if (!tu.dueDate) return false
       if (viewScope === 'month') return tu.dueDate.startsWith(competencia)
@@ -155,7 +155,7 @@ export function FinancialManager() {
 
     const pendingTuition = tuitionsScope.filter(tu => tu.status === 'pending' || tu.status === 'overdue').reduce((acc, tu) => acc + tu.amount, 0)
     
-    // ProjeÃ§Ã£o de pro-labore (mantido por agora para o escopo selecionado)
+    // Projeção de pro-labore (mantido por agora para o escopo selecionado)
     const disciplinesScope = disciplines.filter(d => {
       if (!d.executionDate) return false
       if (viewScope === 'month') return d.executionDate.startsWith(competencia)
@@ -173,12 +173,12 @@ export function FinancialManager() {
     const tuitionsActive = tuitionsScope.filter(tu => activeStudentIds.has(tu.studentId))
     
     const generatedAmount = tuitionsActive.reduce((acc, tu) => acc + tu.amount, 0)
-    // Para simplificar a projeÃ§Ã£o futura em escopos maiores, mantemos a lÃ³gica base baseada no que foi filtrado
+    // Para simplificar a projeção futura em escopos maiores, mantemos a lógica base baseada no que foi filtrado
     const revenueProjected = generatedAmount 
 
     const netRealized = realizedIncome - realizedExpense
 
-    // Acumulado: Soma de todas as transaÃ§Ãµes realizadas ATÃ‰ a competÃªncia atual
+    // Acumulado: Soma de todas as transações realizadas ATÉ a competência atual
     const accumulatedIncome = allTransactions
       .filter(t => t.type === 'income' && t.status === 'realized' && (!t.competencia || t.competencia <= competencia))
       .reduce((acc, t) => acc + t.amount, 0)
@@ -256,7 +256,7 @@ export function FinancialManager() {
       return { 
         name: year, 
         Realizado: income, 
-        Previsto: expense, // Usando Previsto como "Despesa" para manter compatibilidade com as cores do grÃ¡fico original
+        Previsto: expense, // Usando Previsto como "Despesa" para manter compatibilidade com as cores do gráfico original
         originalReceita: income,
         originalDespesa: expense
       }
@@ -293,9 +293,9 @@ export function FinancialManager() {
     setLoading(true)
     try {
        await syncBatchTuitions(students.filter(s => s.status === 'active').map(s => s.id))
-       toast.success("SincronizaÃ§Ã£o concluÃ­da com sucesso!")
+       toast.success("Sincronização concluída com sucesso!")
     } catch (e) {
-       toast.error("Erro na sincronizaÃ§Ã£o!")
+       toast.error("Erro na sincronização!")
     }
     await loadData()
     setLoading(false)
@@ -308,10 +308,11 @@ export function FinancialManager() {
     const tuitionId = tuitionMatch ? tuitionMatch[1] : null
 
     if (tuitionId) {
-      if (confirm(`Esta receita estÃ¡ vinculada a uma mensalidade (ID: ${tuitionId.substring(0,8)}...).\n\nDeseja estornar este pagamento? A mensalidade do aluno voltarÃ¡ ao status "Pendente".`)) {
+      if (confirm(`Esta receita está vinculada a uma mensalidade (ID: ${tuitionId.substring(0,8)}...).\n\nDeseja estornar este pagamento? A mensalidade do aluno voltará ao status "Pendente".`)) {
         setLoading(true)
         try {
           await revertTuitionPayment(tuitionId)
+          await deleteFinancialTransaction(tx.id) // Força a deleção da receita (garantia)
           toast.success("Pagamento estornado com sucesso!")
           await loadData()
         } catch (err) {
@@ -326,7 +327,7 @@ export function FinancialManager() {
         setLoading(true)
         try {
           await deleteFinancialTransaction(tx.id)
-          toast.success("Receita excluÃ­da.")
+          toast.success("Receita excluída.")
           await loadData()
         } catch (err) {
           toast.error("Erro ao excluir receita.")
@@ -344,12 +345,12 @@ export function FinancialManager() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black tracking-tight text-foreground flex items-center gap-4 flex-wrap">
-            GestÃ£o Financeira
+            Gestão Financeira
             <div className="flex bg-muted p-1 rounded-lg border text-[10px] uppercase font-bold tracking-wider">
               <button 
                 onClick={() => setViewScope('month')}
                 className={cn("px-4 py-1.5 rounded-md transition-all", viewScope === 'month' ? "bg-background shadow-sm text-orange" : "text-muted-foreground hover:text-foreground")}
-              >MÃªs</button>
+              >Mês</button>
               <button 
                 onClick={() => setViewScope('year')}
                 className={cn("px-4 py-1.5 rounded-md transition-all border-x", viewScope === 'year' ? "bg-background shadow-sm text-orange" : "text-muted-foreground hover:text-foreground")}
@@ -360,7 +361,7 @@ export function FinancialManager() {
               >Geral</button>
             </div>
           </h1>
-          <p className="text-muted-foreground text-sm">Controle de caixa, mensalidades e projeÃ§Ãµes.</p>
+          <p className="text-muted-foreground text-sm">Controle de caixa, mensalidades e projeções.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
@@ -375,7 +376,7 @@ export function FinancialManager() {
           </Button>
           <div className="flex gap-2 w-full sm:w-auto">
               <Button variant="outline" size="sm" className="flex-1 sm:flex-none border-primary text-primary h-9 text-xs" onClick={() => setIsConfigOpen(true)}>
-                 <Calculator className="h-4 w-4 mr-1.5" /> ConfiguraÃ§Ãµes
+                 <Calculator className="h-4 w-4 mr-1.5" /> Configurações
               </Button>
           </div>
         </div>
@@ -385,34 +386,34 @@ export function FinancialManager() {
         <StatCard 
           title="Mensalidades em Aberto" 
           value={stats.pendingTuition} 
-          subtitle={viewScope === 'month' ? 'PrevisÃ£o do mÃªs' : viewScope === 'year' ? `PrevisÃ£o do ano ${competencia.substring(0, 4)}` : 'PrevisÃ£o geral'}
+          subtitle={viewScope === 'month' ? 'Previsão do mês' : viewScope === 'year' ? `Previsão do ano ${competencia.substring(0, 4)}` : 'Previsão geral'}
           icon={<Calculator className="text-orange" />}
         />
         <StatCard 
           title="Receita Realizada" 
           value={stats.realizedIncome} 
-          subtitle={viewScope === 'month' ? `No mÃªs. Acumulado: R$ ${(stats.accumulatedIncome ?? 0).toLocaleString('pt-BR')}` : viewScope === 'year' ? `Acumulado do ano ${competencia.substring(0, 4)}` : 'Acumulado geral (todas as operaÃ§Ãµes)'}
+          subtitle={viewScope === 'month' ? `No mês. Acumulado: R$ ${(stats.accumulatedIncome ?? 0).toLocaleString('pt-BR')}` : viewScope === 'year' ? `Acumulado do ano ${competencia.substring(0, 4)}` : 'Acumulado geral (todas as operações)'}
           icon={<ArrowUpRight className="text-emerald-500" />}
           trend="positive"
         />
         <StatCard 
           title="Despesas Projetadas" 
           value={stats.plannedExpenseTotal} 
-          subtitle={viewScope === 'month' ? 'Previsto no mÃªs' : viewScope === 'year' ? `Previsto no ano ${competencia.substring(0, 4)}` : 'Previsto total acumulado'}
+          subtitle={viewScope === 'month' ? 'Previsto no mês' : viewScope === 'year' ? `Previsto no ano ${competencia.substring(0, 4)}` : 'Previsto total acumulado'}
           icon={<TrendingDown className="text-rose-400" />}
           trend="negative"
         />
         <StatCard 
           title="Despesa Realizada" 
           value={stats.realizedExpense} 
-          subtitle={viewScope === 'month' ? `No mÃªs. Acumulado: R$ ${(stats.accumulatedExpense ?? 0).toLocaleString('pt-BR')}` : viewScope === 'year' ? `Acumulado do ano ${competencia.substring(0, 4)}` : 'Acumulado geral (todas as operaÃ§Ãµes)'}
+          subtitle={viewScope === 'month' ? `No mês. Acumulado: R$ ${(stats.accumulatedExpense ?? 0).toLocaleString('pt-BR')}` : viewScope === 'year' ? `Acumulado do ano ${competencia.substring(0, 4)}` : 'Acumulado geral (todas as operações)'}
           icon={<ArrowDownRight className="text-rose-500" />}
           trend="negative"
         />
         <StatCard 
-          title="Saldo LÃ­quido (Real)" 
+          title="Saldo Líquido (Real)" 
           value={stats.netRealized} 
-          subtitle={viewScope === 'month' ? 'Entradas - SaÃ­das (mÃªs)' : viewScope === 'year' ? `Entradas - SaÃ­das (${competencia.substring(0, 4)})` : 'Entradas - SaÃ­das (geral)'}
+          subtitle={viewScope === 'month' ? 'Entradas - Saídas (mês)' : viewScope === 'year' ? `Entradas - Saídas (${competencia.substring(0, 4)})` : 'Entradas - Saídas (geral)'}
           icon={<Wallet className="text-primary" />}
           highlight
         />
@@ -425,7 +426,7 @@ export function FinancialManager() {
           <TabButton active={tab === "income"} onClick={() => setTab("income")} icon={<DollarSign className="h-4 w-4" />}>Receitas</TabButton>
           <TabButton active={tab === "expenses"} onClick={() => setTab("expenses")} icon={<TrendingDown className="h-4 w-4" />}>Despesas</TabButton>
           <TabButton active={tab === "prolabore"} onClick={() => setTab("prolabore")} icon={<Briefcase className="h-4 w-4" />}>Pro-labore</TabButton>
-          <TabButton active={tab === "reports"} onClick={() => setTab("reports")} icon={<FileText className="h-4 w-4" />}>RelatÃ³rios</TabButton>
+          <TabButton active={tab === "reports"} onClick={() => setTab("reports")} icon={<FileText className="h-4 w-4" />}>Relatórios</TabButton>
         </div>
       </div>
 
@@ -462,7 +463,7 @@ export function FinancialManager() {
             <Card className="premium-shadow">
               <CardHeader className="bg-muted/30">
                 <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-primary" /> DistribuiÃ§Ã£o de Gastos
+                  <TrendingUp className="h-4 w-4 text-primary" /> Distribuição de Gastos
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6 flex justify-center items-center">
@@ -494,7 +495,7 @@ export function FinancialManager() {
                       <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-muted/5 rounded-xl border-2 border-dashed border-muted">
                         <PieChart className="h-8 w-8 text-muted-foreground/30 mb-2" />
                         <p className="text-sm font-medium text-muted-foreground">Nenhuma despesa realizada</p>
-                        <p className="text-[10px] text-muted-foreground/60 italic">As despesas aparecem aqui apÃ³s serem "Quitadas"</p>
+                        <p className="text-[10px] text-muted-foreground/60 italic">As despesas aparecem aqui após serem "Quitadas"</p>
                       </div>
                     )}
                  </div>
@@ -541,7 +542,7 @@ export function FinancialManager() {
               </CardContent>
            </Card>
 
-           {/* Tabela de Entradas Confirmadas - transaÃ§Ãµes income */}
+           {/* Tabela de Entradas Confirmadas - transações income */}
            <Card className="premium-shadow">
               <CardContent className="p-0">
                  <div className="p-4 border-b flex justify-between items-center bg-emerald-50">
@@ -553,16 +554,16 @@ export function FinancialManager() {
                        <thead className="bg-muted/30 border-b">
                           <tr>
                              <th className="p-4 font-bold">Data</th>
-                             <th className="p-4 font-bold">DescriÃ§Ã£o</th>
+                             <th className="p-4 font-bold">Descrição</th>
                              <th className="p-4 font-bold">Valor</th>
-                             <th className="p-4 font-bold">CompetÃªncia</th>
+                             <th className="p-4 font-bold">Competência</th>
                              <th className="p-4 font-bold">Status</th>
-                             <th className="p-4">AÃ§Ã£o</th>
+                             <th className="p-4">Ação</th>
                           </tr>
                        </thead>
                        <tbody>
                           {transactions.filter(t => t.type === 'income').length === 0 ? (
-                             <tr><td colSpan={6} className="p-12 text-center text-muted-foreground">Nenhuma entrada de receita registrada. Este painel serÃ¡ preenchido automaticamente quando pagamentos forem confirmados.</td></tr>
+                             <tr><td colSpan={6} className="p-12 text-center text-muted-foreground">Nenhuma entrada de receita registrada. Este painel será preenchido automaticamente quando pagamentos forem confirmados.</td></tr>
                           ) : (
                              transactions.filter(t => t.type === 'income').map(tx => (
                                <tr key={tx.id} className="border-b hover:bg-muted/10">
@@ -600,7 +601,7 @@ export function FinancialManager() {
                     <h3 className="font-bold flex items-center gap-2"><ArrowDownRight className="h-4 w-4 text-rose-600" /> Despesas de Custeio</h3>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => printInstallmentsReportPDF(allTransactions, "Cosme de Farias")}>
-                        <Download className="h-4 w-4 mr-2" /> RelatÃ³rio ProjeÃ§Ãµes
+                        <Download className="h-4 w-4 mr-2" /> Relatório Projeções
                       </Button>
                       <Button size="sm" onClick={() => setIsInstallmentModalOpen(true)} variant="secondary" className="bg-orange/10 text-orange hover:bg-orange/20 border-orange/20">
                         <Calendar className="h-4 w-4 mr-2" /> Despesas Parceladas
@@ -616,15 +617,15 @@ export function FinancialManager() {
                           <tr>
                              <th className="p-4 font-bold">Data</th>
                              <th className="p-4 font-bold">Categoria</th>
-                             <th className="p-4 font-bold">DescriÃ§Ã£o</th>
+                             <th className="p-4 font-bold">Descrição</th>
                              <th className="p-4 font-bold">Valor</th>
                              <th className="p-4 font-bold">Status</th>
-                             <th className="p-4">AÃ§Ã£o</th>
+                             <th className="p-4">Ação</th>
                           </tr>
                        </thead>
                        <tbody>
                           {transactions.filter(t => t.type === 'expense').length === 0 ? (
-                             <tr><td colSpan={6} className="p-20 text-center text-muted-foreground">Nenhuma despesa registrada para este perÃ­odo.</td></tr>
+                             <tr><td colSpan={6} className="p-20 text-center text-muted-foreground">Nenhuma despesa registrada para este período.</td></tr>
                           ) : (
                              transactions.filter(t => t.type === 'expense').map(tx => {
                                const installMatch = tx.description?.match(/^(.+?)\s*\((\d+)\/(\d+)\)$/)
@@ -665,7 +666,7 @@ export function FinancialManager() {
                                       {isInstallment && (
                                         <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-rose-500 hover:bg-rose-50" title={`Excluir todas as ${installTotal} parcelas`}
                                           onClick={async () => {
-                                            if (confirm(`Excluir TODAS as ${installTotal} parcelas de "${installBase}"?\nEsta aÃ§Ã£o nÃ£o pode ser desfeita.`)) {
+                                            if (confirm(`Excluir TODAS as ${installTotal} parcelas de "${installBase}"?\nEsta ação não pode ser desfeita.`)) {
                                               const safeBase = installBase?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') ?? ''
                                               const toDelete = allTransactions.filter(tx =>
                                                 tx.type === 'expense' &&
@@ -679,8 +680,8 @@ export function FinancialManager() {
                                           <Trash2 className="h-3 w-3 mr-1" />{installTotal}x
                                         </Button>
                                       )}
-                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" title="Excluir este lanÃ§amento" onClick={async () => {
-                                         if (confirm('Excluir permanentemente este lanÃ§amento?')) {
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" title="Excluir este lançamento" onClick={async () => {
+                                         if (confirm('Excluir permanentemente este lançamento?')) {
                                             await deleteFinancialTransaction(tx.id);
                                             await loadData();
                                          }
@@ -711,12 +712,12 @@ export function FinancialManager() {
                     <table className="w-full text-sm text-left">
                        <thead className="bg-muted/30 border-b">
                           <tr>
-                             <th className="p-4 font-bold">MÃªs/Ano</th>
+                             <th className="p-4 font-bold">Mês/Ano</th>
                              <th className="p-4 font-bold">Disciplina</th>
                              <th className="p-4 font-bold">Professor</th>
-                             <th className="p-4 font-bold">Custo ProvisÃ³rio</th>
+                             <th className="p-4 font-bold">Custo Provisório</th>
                              <th className="p-4 font-bold">Status</th>
-                             <th className="p-4">AÃ§Ã£o</th>
+                             <th className="p-4">Ação</th>
                           </tr>
                        </thead>
                        <tbody>
@@ -731,7 +732,7 @@ export function FinancialManager() {
                                 <td className="p-4 font-medium"><span className="text-muted-foreground mr-2">{index + 1}.</span> {d.name}</td>
                                 <td className="p-4">
                                    <div className="flex flex-col">
-                                      <span className="font-semibold">{prof?.name || d.professorName || "NÃ£o definido"}</span>
+                                      <span className="font-semibold">{prof?.name || d.professorName || "Não definido"}</span>
                                       {prof?.pix_key && <span className="text-[10px] text-muted-foreground">PIX: {prof.pix_key}</span>}
                                    </div>
                                 </td>
@@ -769,9 +770,9 @@ export function FinancialManager() {
                                          variant="outline"
                                          className="text-muted-foreground hover:text-emerald-700 hover:border-emerald-500/50"
                                          disabled={!prof}
-                                         title="Baixa isenta de taxa (VoluntÃ¡rio)"
+                                         title="Baixa isenta de taxa (Voluntário)"
                                          onClick={async () => {
-                                            if (!prof || !confirm(`Dar baixa administrativa em ${d.name} para o professor voluntÃ¡rio ${prof.name} (R$ 0,00)?\nNenhuma despesa de caixa serÃ¡ gerada.`)) return
+                                            if (!prof || !confirm(`Dar baixa administrativa em ${d.name} para o professor voluntário ${prof.name} (R$ 0,00)?\nNenhuma despesa de caixa será gerada.`)) return
                                             await processProfessorPayment({
                                               professorId: prof.id,
                                               disciplineId: d.id,
@@ -781,7 +782,7 @@ export function FinancialManager() {
                                             loadData()
                                          }}
                                        >
-                                          VoluntÃ¡rio
+                                          Voluntário
                                        </Button>
                                      </>
                                    )}
@@ -846,7 +847,7 @@ export function FinancialManager() {
         setIsConfigOpen(open)
       }}>
         <DialogContent className="max-w-md">
-           <DialogHeader><DialogTitle>ConfiguraÃ§Ãµes Financeiras</DialogTitle></DialogHeader>
+           <DialogHeader><DialogTitle>Configurações Financeiras</DialogTitle></DialogHeader>
            <form onSubmit={async (e) => {
               e.preventDefault();
               await updateFinancialSettings({
@@ -857,7 +858,7 @@ export function FinancialManager() {
               });
               setIsConfigOpen(false);
               await loadData(); // await so state is fresh before any re-render
-              toast.success('ConfiguraÃ§Ãµes salvas com sucesso!');
+              toast.success('Configurações salvas com sucesso!');
            }} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
@@ -892,7 +893,7 @@ export function FinancialManager() {
                  </h4>
                  <div className="space-y-3">
                     <div className="space-y-1">
-                       <Label className="text-[11px]">Chave PIX (E-mail, CPF, Tel ou AleatÃ³ria)</Label>
+                       <Label className="text-[11px]">Chave PIX (E-mail, CPF, Tel ou Aleatória)</Label>
                        <Input
                          value={configDraft.pixKey}
                          onChange={e => setConfigDraft(d => ({ ...d, pixKey: e.target.value }))}
@@ -900,21 +901,21 @@ export function FinancialManager() {
                        />
                     </div>
                     <div className="space-y-1">
-                       <Label className="text-[11px]">CÃ³digo PIX Copia e Cola (Payload)</Label>
+                       <Label className="text-[11px]">Código PIX Copia e Cola (Payload)</Label>
                        <textarea
                           value={configDraft.pixQRCode}
                           onChange={e => setConfigDraft(d => ({ ...d, pixQRCode: e.target.value }))}
-                          placeholder="Cole aqui o payload do seu QR Code estÃ¡tico..."
+                          placeholder="Cole aqui o payload do seu QR Code estático..."
                           className="w-full min-h-[80px] text-xs p-2 rounded-md border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary"
                        />
-                       <p className="text-[9px] text-muted-foreground">Este cÃ³digo permite que o aluno utilize a funÃ§Ã£o "Copia e Cola" no app do banco.</p>
+                       <p className="text-[9px] text-muted-foreground">Este código permite que o aluno utilize a função "Copia e Cola" no app do banco.</p>
                     </div>
                  </div>
               </div>
 
               <DialogFooter className="pt-2">
                  <Button type="button" variant="ghost" onClick={() => setIsConfigOpen(false)}>Cancelar</Button>
-                 <Button type="submit" className="accent-gradient">Salvar ConfiguraÃ§Ãµes</Button>
+                 <Button type="submit" className="accent-gradient">Salvar Configurações</Button>
               </DialogFooter>
            </form>
         </DialogContent>
@@ -944,8 +945,8 @@ export function FinancialManager() {
                  </Select>
               </div>
               <div className="space-y-1">
-                 <Label>DescriÃ§Ã£o</Label>
-                 <Input name="description" required placeholder="Ex: Compra de cafÃ© e papel higiÃªnico" />
+                 <Label>Descrição</Label>
+                 <Input name="description" required placeholder="Ex: Compra de café e papel higiênico" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1">
@@ -959,7 +960,7 @@ export function FinancialManager() {
               </div>
               <DialogFooter>
                  <Button type="button" variant="ghost" onClick={() => setIsAddExpenseOpen(false)}>Cancelar</Button>
-                 <Button type="submit">Salvar ProjeÃ§Ã£o</Button>
+                 <Button type="submit">Salvar Projeção</Button>
               </DialogFooter>
            </form>
         </DialogContent>
@@ -969,7 +970,7 @@ export function FinancialManager() {
         <DialogContent>
            <DialogHeader><DialogTitle>Sincronizar Mensalidades em Lote</DialogTitle></DialogHeader>
            <div className="space-y-4 pt-2">
-              <p className="text-sm text-muted-foreground">Esta aÃ§Ã£o irÃ¡ verificar o currÃ­culo de todos os alunos ativos e gerar faturamentos pendentes para quaisquer disciplinas que ainda nÃ£o possuam mensalidade lanÃ§ada. Nenhum pagamento jÃ¡ faturado serÃ¡ duplicado ou afetado.</p>
+              <p className="text-sm text-muted-foreground">Esta ação irá verificar o currículo de todos os alunos ativos e gerar faturamentos pendentes para quaisquer disciplinas que ainda não possuam mensalidade lançada. Nenhum pagamento já faturado será duplicado ou afetado.</p>
               <DialogFooter>
                  <Button type="button" variant="ghost" onClick={() => setIsSyncOpen(false)}>Cancelar</Button>
                  <Button onClick={async () => {
@@ -980,14 +981,14 @@ export function FinancialManager() {
                       toast.loading('Sincronizando mensalidades...', { id: 'sync' })
                       await syncBatchTuitions(activeStudents.map(s => s.id))
                       await loadData()
-                      toast.success(`SincronizaÃ§Ã£o concluÃ­da! ${activeStudents.length} alunos processados.`, { id: 'sync' })
+                      toast.success(`Sincronização concluída! ${activeStudents.length} alunos processados.`, { id: 'sync' })
                     } catch (e) {
                       console.error(e)
-                      toast.error('Ocorreu um erro durante a sincronizaÃ§Ã£o.', { id: 'sync' })
+                      toast.error('Ocorreu um erro durante a sincronização.', { id: 'sync' })
                     } finally {
                       setLoading(false)
                     }
-                 }}>Confirmar SincronizaÃ§Ã£o</Button>
+                 }}>Confirmar Sincronização</Button>
               </DialogFooter>
            </div>
         </DialogContent>
@@ -1002,10 +1003,10 @@ export function FinancialManager() {
             for (const item of installments) {
               await addFinancialTransaction(item)
             }
-            toast.success(`${installments.length} parcelas lanÃ§adas com sucesso!`)
+            toast.success(`${installments.length} parcelas lançadas com sucesso!`)
             await loadData()
           } catch (err) {
-            toast.error("Erro ao lanÃ§ar parcelas.")
+            toast.error("Erro ao lançar parcelas.")
           } finally {
             setLoading(false)
             setIsInstallmentModalOpen(false)
@@ -1111,7 +1112,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
              <div className="font-bold text-left text-sm sm:text-base text-navy">{student.name}</div>
              <div className="text-xs text-muted-foreground mr-4 text-left font-mono">{student.enrollment_number || student.cpf}</div>
              <div className="flex gap-2 mt-1 sm:mt-0">
-                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 uppercase border border-slate-200 shadow-sm">{tuitions.length} LanÃ§amentos</span>
+                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 uppercase border border-slate-200 shadow-sm">{tuitions.length} Lançamentos</span>
                  {tuitions.filter(t => t.status === 'overdue').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-50 text-rose-700 uppercase font-bold border border-rose-200">{tuitions.filter(t => t.status === 'overdue').length} em atraso</span>}
                  {tuitions.filter(t => t.status === 'paid').length > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 uppercase font-bold border border-emerald-200">{tuitions.filter(t => t.status === 'paid').length} pagos</span>}
              </div>
@@ -1126,7 +1127,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-0 mb-4 gap-4">
                 <div>
                    <h4 className="font-bold text-sm text-navy uppercase tracking-widest flex items-center gap-2"><PieChart className="w-4 h-4 text-orange" /> Panorama Financeiro</h4>
-                   <p className="text-xs text-muted-foreground">VisÃ£o geral do faturamento disciplinar deste aluno ativo.</p>
+                   <p className="text-xs text-muted-foreground">Visão geral do faturamento disciplinar deste aluno ativo.</p>
                 </div>
                 <Button size="sm" variant="outline" className="w-full sm:w-auto shadow-sm" onClick={handleSync} disabled={isSyncing}>
                    <RefreshCw className={cn("h-3 w-3 mr-2", isSyncing && "animate-spin")} />
@@ -1142,7 +1143,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
                          <th className="p-3 font-extrabold uppercase text-navy border-b">Vencimento</th>
                          <th className="p-3 font-extrabold uppercase text-navy border-b">Valor</th>
                          <th className="p-3 font-extrabold uppercase text-navy border-b">Status</th>
-                         <th className="p-3 font-extrabold uppercase text-navy border-b">AÃ§Ã£o</th>
+                         <th className="p-3 font-extrabold uppercase text-navy border-b">Ação</th>
                       </tr>
                    </thead>
                    <tbody>
@@ -1174,7 +1175,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
                                      {tuition.status === 'paid' ? (
                                         <>
                                           <Button size="sm" variant="outline" className="h-8 shadow-sm hover:shadow-md transition-shadow focus:ring-2 focus:ring-emerald-500/20" onClick={() => onPrintReceipt(tuition, student, d)}>
-                                              <Printer className="h-3 w-3 sm:mr-2" /> <span className="hidden sm:inline">EmissÃ£o Recibo</span>
+                                              <Printer className="h-3 w-3 sm:mr-2" /> <span className="hidden sm:inline">Emissão Recibo</span>
                                           </Button>
                                           <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={async () => {
                                             if (confirm('Tem certeza que deseja estornar este pagamento?')) {
@@ -1194,7 +1195,7 @@ function StudentTuitionRow({ student, disciplines, tuitions, onSync, onPayment, 
                                 </>
                               ) : (
                                 <>
-                                 <td className="p-3 text-muted-foreground/70 italic text-[11px]" colSpan={4}>Faturamento nÃ£o gerado para esta matÃ©ria. Sincronize para criar.</td>
+                                 <td className="p-3 text-muted-foreground/70 italic text-[11px]" colSpan={4}>Faturamento não gerado para esta matéria. Sincronize para criar.</td>
                                 </>
                               )}
                            </tr>
@@ -1256,15 +1257,15 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-orange" /> LanÃ§amento de Despesas Parceladas
+            <Calendar className="h-5 w-5 text-orange" /> Lançamento de Despesas Parceladas
           </DialogTitle>
-          <DialogDescription>As parcelas serÃ£o criadas como despesas previstas no DRE dos meses correspondentes.</DialogDescription>
+          <DialogDescription>As parcelas serão criadas como despesas previstas no DRE dos meses correspondentes.</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
           <div className="space-y-4">
             <div className="space-y-1">
-              <Label>DescriÃ§Ã£o da Despesa</Label>
+              <Label>Descrição da Despesa</Label>
               <Input 
                  placeholder="Ex: Compra de Equipamentos"
                  value={formData.description}
@@ -1310,7 +1311,7 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
 
           <div className="flex flex-col border rounded-lg bg-muted/20 overflow-hidden">
              <div className="p-2 bg-muted font-bold text-[10px] uppercase tracking-wider flex justify-between">
-                <span>PrÃ©-visualizaÃ§Ã£o</span>
+                <span>Pré-visualização</span>
                 <span>{preview.length} Parcelas</span>
              </div>
              <ScrollArea className="flex-1 h-[280px] p-3">
@@ -1342,7 +1343,7 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
              disabled={!formData.description || !formData.totalAmount || preview.length === 0}
              onClick={() => onSave(preview)}
            >
-             Gerar e LanÃ§ar Parcelas
+             Gerar e Lançar Parcelas
            </Button>
         </DialogFooter>
       </DialogContent>
@@ -1350,7 +1351,7 @@ function InstallmentExpenseModal({ isOpen, onClose, onSave }: { isOpen: boolean,
   )
 }
 
-// --- Modal de ConfirmaÃ§Ã£o de Pagamento ---
+// --- Modal de Confirmação de Pagamento ---
 
 function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: { 
   isOpen: boolean, 
@@ -1401,7 +1402,7 @@ function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: {
             </div>
             {receivedAmount !== (tuition.amount ?? 0) && (
               <p className="text-[10px] text-amber-600 font-bold flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" /> Valor original: R$ {(tuition.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} â€” alteraÃ§Ã£o apenas neste recebimento.
+                <AlertCircle className="h-3 w-3" /> Valor original: R$ {(tuition.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} â€” alteração apenas neste recebimento.
               </p>
             )}
           </div>
@@ -1428,14 +1429,14 @@ function PaymentConfirmationModal({ isOpen, onClose, tuition, onConfirm }: {
                     <QrCode className="h-3.5 w-3.5 text-emerald-600" /> Pix
                   </div>
                 </SelectItem>
-                <SelectItem value="EspÃ©cie">
+                <SelectItem value="Espécie">
                   <div className="flex items-center gap-2">
-                    <DollarSign className="h-3.5 w-3.5 text-orange" /> EspÃ©cie
+                    <DollarSign className="h-3.5 w-3.5 text-orange" /> Espécie
                   </div>
                 </SelectItem>
-                <SelectItem value="CartÃ£o">
+                <SelectItem value="Cartão">
                   <div className="flex items-center gap-2">
-                    <CreditCard className="h-3.5 w-3.5 text-blue-600" /> CartÃ£o
+                    <CreditCard className="h-3.5 w-3.5 text-blue-600" /> Cartão
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -1500,14 +1501,14 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
   const [rProfStatus, setRProfStatus] = useState<"all" | "pending" | "paid">("all")
 
   const EXPENSE_CATEGORIES = [
-    "Alimento", "Limpeza", "Professores", "Material de EscritÃ³rio", "Transporte",
-    "Pessoal", "Aluguel", "Energia/Ãgua", "Internet", "Marketing", "Eventos", "Material DidÃ¡tico", "Outros"
+    "Alimento", "Limpeza", "Professores", "Material de Escritório", "Transporte",
+    "Pessoal", "Aluguel", "Energia/Ãgua", "Internet", "Marketing", "Eventos", "Material Didático", "Outros"
   ]
 
   function handleDRE() {
     if (rDreAccumulated) {
       const accumulated = allTransactions.filter(t => t.competencia && t.competencia <= rDreMonth)
-      printFinancialDRE_PDF(accumulated, rDreMonth, hubName, undefined, `DRE Acumulado atÃ© ${rDreMonth}`)
+      printFinancialDRE_PDF(accumulated, rDreMonth, hubName, undefined, `DRE Acumulado até ${rDreMonth}`)
     } else {
       const monthly = allTransactions.filter(t => t.competencia === rDreMonth)
       printFinancialDRE_PDF(monthly, rDreMonth, hubName)
@@ -1524,7 +1525,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <FileText className="h-4 w-4 text-orange" /> Mensalidades
             </CardTitle>
-            <CardDescription className="text-xs">RelatÃ³rio por aluno e situaÃ§Ã£o de pagamento.</CardDescription>
+            <CardDescription className="text-xs">Relatório por aluno e situação de pagamento.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1568,20 +1569,20 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <ArrowUpRight className="h-4 w-4 text-emerald-600" /> Receita Realizada
             </CardTitle>
-            <CardDescription className="text-xs">Entradas confirmadas com filtros por perÃ­odo e valor.</CardDescription>
+            <CardDescription className="text-xs">Entradas confirmadas com filtros por período e valor.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-3 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">MÃªs/Ano</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
                 <Input type="month" value={rRevenueMonth} onChange={e => setRRevenueMonth(e.target.value)} className="h-9 text-xs" />
               </div>
               <div className="col-span-1.5 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor MÃ­n (R$)</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor Mín (R$)</label>
                 <Input type="number" placeholder="0,00" value={rRevenueMin} onChange={e => setRRevenueMin(e.target.value)} className="h-9 text-xs" />
               </div>
               <div className="col-span-1.5 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor MÃ¡x (R$)</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor Máx (R$)</label>
                 <Input type="number" placeholder="8" value={rRevenueMax} onChange={e => setRRevenueMax(e.target.value)} className="h-9 text-xs" />
               </div>
             </div>
@@ -1604,7 +1605,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <ArrowDownRight className="h-4 w-4 text-rose-600" /> Despesas
             </CardTitle>
-            <CardDescription className="text-xs">Projetadas e realizadas com filtros por categoria e perÃ­odo.</CardDescription>
+            <CardDescription className="text-xs">Projetadas e realizadas com filtros por categoria e período.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1630,7 +1631,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
                 </Select>
               </div>
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">MÃªs/Ano</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
                 <Input type="month" value={rExpMonth} onChange={e => setRExpMonth(e.target.value)} className="h-9 text-xs" />
               </div>
             </div>
@@ -1653,18 +1654,18 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-primary" /> DRE â€” Demonstrativo de Resultado
             </CardTitle>
-            <CardDescription className="text-xs">Receitas vs despesas de um mÃªs ou acumulado.</CardDescription>
+            <CardDescription className="text-xs">Receitas vs despesas de um mês ou acumulado.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-muted-foreground">CompetÃªncia</label>
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Competência</label>
               <Input type="month" value={rDreMonth} onChange={e => setRDreMonth(e.target.value)} className="h-9 text-xs" />
             </div>
             <div className="flex items-center gap-2 p-2 rounded-md border bg-muted/30 cursor-pointer" onClick={() => setRDreAccumulated(v => !v)}>
               <div className={cn("w-4 h-4 rounded border-2 flex items-center justify-center transition-colors", rDreAccumulated ? "bg-primary border-primary" : "border-muted-foreground")}>
                 {rDreAccumulated && <span className="text-white font-black text-[10px]">?</span>}
               </div>
-              <span className="text-xs font-medium">Acumulado atÃ© este mÃªs</span>
+              <span className="text-xs font-medium">Acumulado até este mês</span>
             </div>
             <Button
               size="sm" className="w-full"
@@ -1679,9 +1680,9 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
         <Card className="premium-shadow border-t-4 border-t-purple-500">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-purple-600" /> Parcelamentos e ProjeÃ§Ãµes
+              <Calendar className="h-4 w-4 text-purple-600" /> Parcelamentos e Projeções
             </CardTitle>
-            <CardDescription className="text-xs">Despesas parceladas e previstas por categoria e perÃ­odo.</CardDescription>
+            <CardDescription className="text-xs">Despesas parceladas e previstas por categoria e período.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1707,7 +1708,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
                 </Select>
               </div>
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">MÃªs/Ano</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
                 <Input type="month" value={rInstMonth} onChange={e => setRInstMonth(e.target.value)} className="h-9 text-xs" />
               </div>
             </div>
@@ -1730,7 +1731,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <Briefcase className="h-4 w-4 text-blue-600" /> Pro-labore
             </CardTitle>
-            <CardDescription className="text-xs">Pagamentos por professor, mÃªs e status.</CardDescription>
+            <CardDescription className="text-xs">Pagamentos por professor, mês e status.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1758,7 +1759,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
                 </Select>
               </div>
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">MÃªs/Ano</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Mês/Ano</label>
                 <Input type="month" value={rProfMonth} onChange={e => setRProfMonth(e.target.value)} className="h-9 text-xs" />
               </div>
             </div>
