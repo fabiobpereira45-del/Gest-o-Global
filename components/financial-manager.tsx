@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useMemo } from "react"
 import { 
@@ -302,6 +302,41 @@ export function FinancialManager() {
     setIsSyncOpen(false)
   }
 
+  async function handleDeleteIncome(t: FinancialTransaction) {
+    const tuitionMatch = t.description?.match(/ID:\s*([a-f0-9-]{36})/)
+    const tuitionId = tuitionMatch ? tuitionMatch[1] : null
+
+    if (tuitionId) {
+      if (confirm(`Esta receita está vinculada a uma mensalidade (ID: ${tuitionId.substring(0,8)}...).\n\nDeseja estornar este pagamento? A mensalidade do aluno voltará ao status "Pendente".`)) {
+        setLoading(true)
+        try {
+          await revertTuitionPayment(tuitionId)
+          toast.success("Pagamento estornado com sucesso!")
+          await loadData()
+        } catch (err) {
+          toast.error("Erro ao estornar pagamento.")
+        } finally {
+          setLoading(false)
+        }
+        return
+      }
+    } else {
+      if (confirm('Deseja excluir permanentemente este registro de receita?')) {
+        setLoading(true)
+        try {
+          await deleteFinancialTransaction(t.id)
+          toast.success("Receita excluída.")
+          await loadData()
+        } catch (err) {
+          toast.error("Erro ao excluir receita.")
+        } finally {
+          setLoading(false)
+        }
+      }
+    }
+  }
+
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header section with Stats Cards */}
@@ -536,12 +571,13 @@ export function FinancialManager() {
                                  <td className="p-4"><span className="px-2 py-1 bg-muted rounded text-[10px] font-bold uppercase">{t.competencia || '---'}</span></td>
                                  <td className="p-4"><StatusBadge status={t.status} /></td>
                                  <td className="p-4">
-                                    <Button size="sm" variant="ghost" className="text-destructive" onClick={async () => {
-                                       if (confirm('Deseja excluir permanentemente esta entrada de receita?')) {
-                                          await deleteFinancialTransaction(t.id);
-                                          await loadData();
-                                       }
-                                    }}>
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost" 
+                                      className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" 
+                                      onClick={() => handleDeleteIncome(t)}
+                                      title="Excluir ou Estornar"
+                                    >
                                        <Trash2 className="h-4 w-4" />
                                     </Button>
                                  </td>
@@ -1545,7 +1581,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
               </div>
               <div className="col-span-1.5 space-y-1">
                 <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor Máx (R$)</label>
-                <Input type="number" placeholder="∞" value={rRevenueMax} onChange={e => setRRevenueMax(e.target.value)} className="h-9 text-xs" />
+                <Input type="number" placeholder="8" value={rRevenueMax} onChange={e => setRRevenueMax(e.target.value)} className="h-9 text-xs" />
               </div>
             </div>
             <Button
@@ -1625,7 +1661,7 @@ function ReportsTab({ allTransactions, tuitions, students, disciplines, professo
             </div>
             <div className="flex items-center gap-2 p-2 rounded-md border bg-muted/30 cursor-pointer" onClick={() => setRDreAccumulated(v => !v)}>
               <div className={cn("w-4 h-4 rounded border-2 flex items-center justify-center transition-colors", rDreAccumulated ? "bg-primary border-primary" : "border-muted-foreground")}>
-                {rDreAccumulated && <span className="text-white font-black text-[10px]">✓</span>}
+                {rDreAccumulated && <span className="text-white font-black text-[10px]">?</span>}
               </div>
               <span className="text-xs font-medium">Acumulado até este mês</span>
             </div>
