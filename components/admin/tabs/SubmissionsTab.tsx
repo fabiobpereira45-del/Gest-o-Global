@@ -49,9 +49,14 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
 
   async function handleDelete() {
     if (deleteId) {
-      await deleteSubmission(deleteId)
-      onRefresh()
-      setDeleteId(null)
+      try {
+        await deleteSubmission(deleteId)
+        onRefresh()
+        setDeleteId(null)
+      } catch (err: any) {
+        console.error("Erro ao excluir resposta:", err)
+        alert("Erro ao excluir resposta: " + err.message)
+      }
     }
   }
 

@@ -53,9 +53,14 @@ export function AssessmentsTab({ assessments, submissions, questions, discipline
 
   async function handleDelete() {
     if (deleteId) {
-      await deleteAssessment(deleteId)
-      onRefresh()
-      setDeleteId(null)
+      try {
+        await deleteAssessment(deleteId)
+        onRefresh()
+        setDeleteId(null)
+      } catch (err: any) {
+        console.error("Erro ao excluir prova:", err)
+        alert("Erro ao excluir prova: " + err.message)
+      }
     }
   }
 
@@ -333,6 +338,7 @@ export function AssessmentsTab({ assessments, submissions, questions, discipline
 
       <ErrorBoundary>
         <AssessmentBuilder
+          key={editingAssessment?.id || "new-assessment"}
           open={builderOpen}
           assessment={editingAssessment}
           onClose={() => setBuilderOpen(false)}

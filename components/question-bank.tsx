@@ -211,7 +211,7 @@ function QuestionModal({
     if (!text.trim()) return false
     if (type === "multiple-choice" || type === "incorrect-alternative") {
       const filled = choices.filter((c) => c.text.trim())
-      return filled.length >= 2 && !!correctAnswer
+      return filled.length >= 2 && !!correctAnswer && filled.some(c => c.id === correctAnswer)
     }
     if (type === "true-false") return !!correctAnswer
     if (type === "fill-in-the-blank") {
@@ -269,11 +269,20 @@ function QuestionModal({
             <div className="w-28 flex flex-col gap-1.5">
               <Label>Pontos *</Label>
               <Input
-                type="number"
-                min={0.5}
-                step={0.5}
+                type="text"
+                inputMode="decimal"
                 value={points}
-                onChange={(e) => setPoints(Number(e.target.value))}
+                onChange={(e) => {
+                  const val = e.target.value.replace(",", ".")
+                  if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                    const num = parseFloat(val)
+                    if (!isNaN(num)) setPoints(num)
+                    else if (val === "") setPoints(0)
+                  }
+                }}
+                onBlur={() => {
+                   if (!points || points < 0) setPoints(1)
+                }}
               />
             </div>
           </div>
@@ -507,8 +516,11 @@ function BulkImportModal({
       const typeMatch = line.match(typePattern);
       if (typeMatch) {
         const t = typeMatch[1].toLowerCase();
-        if (t.includes("verdadeiro") || t.includes("falso")) currentQ.type = "true-false";
+        if (t.includes("verdadeiro") || t.includes("falso") || t.includes("v/f")) currentQ.type = "true-false";
         else if (t.includes("discursiva")) currentQ.type = "discursive";
+        else if (t.includes("incorreta")) currentQ.type = "incorrect-alternative";
+        else if (t.includes("lacuna") || t.includes("completar")) currentQ.type = "fill-in-the-blank";
+        else if (t.includes("relacionar") || t.includes("associa")) currentQ.type = "matching";
         else currentQ.type = "multiple-choice";
         continue;
       }
@@ -529,7 +541,7 @@ function BulkImportModal({
       }
       
       // If none matched and we have a current question, maybe it's multi-line text
-      if (currentQ && !line.match(RationalePattern)) {
+      if (currentQ && !line.match(rationalePattern)) {
         if (!currentQ.text) currentQ.text = line;
         else currentQ.text += " " + line;
       }

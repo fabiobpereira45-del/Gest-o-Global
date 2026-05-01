@@ -101,12 +101,16 @@ export function AdminDashboard({ onLogout }: Props) {
   async function refresh(showLoading: boolean = true) {
     if (showLoading) setLoading(true)
     try {
-      const [a, d] = await Promise.all([
+      const [a, d, s, q] = await Promise.all([
         getAssessments(),
-        getDisciplines()
+        getDisciplines(),
+        getSubmissions(500),
+        getQuestions(500)
       ])
       setAssessments(a)
       setDisciplines(d)
+      setSubmissions(s)
+      setQuestions(q)
     } catch (err) {
       console.error("Erro ao atualizar dados principais:", err)
     } finally {
@@ -117,8 +121,8 @@ export function AdminDashboard({ onLogout }: Props) {
   async function loadAnalytics() {
     try {
       const [s, q] = await Promise.all([
-        getSubmissions(200), // Limit to avoid hang
-        getQuestions(200)    // Limit to avoid hang
+        getSubmissions(500), 
+        getQuestions(500)    
       ])
       setSubmissions(s)
       setQuestions(q)
@@ -128,7 +132,7 @@ export function AdminDashboard({ onLogout }: Props) {
   }
 
   useEffect(() => {
-    if (tab === "overview") {
+    if (tab === "overview" || tab === "submissions") {
       loadAnalytics()
     }
   }, [tab])
@@ -240,15 +244,15 @@ export function AdminDashboard({ onLogout }: Props) {
         setIsMobileMenuOpen(false)
       }}
       className={cn(
-        "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group w-full",
+        "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-bold transition-all group w-full",
         tab === item.id
           ? "accent-gradient text-white shadow-lg shadow-orange/20"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          : "text-slate-300 hover:text-white hover:bg-white/10"
       )}
     >
       <div className={cn(
         "p-1.5 rounded-lg transition-colors",
-        tab === item.id ? "bg-white/20" : "bg-muted group-hover:bg-background"
+        tab === item.id ? "bg-white/20" : "bg-white/5 group-hover:bg-white/10"
       )}>
         {item.icon}
       </div>
@@ -289,7 +293,7 @@ export function AdminDashboard({ onLogout }: Props) {
               if (visibleItems.length === 0) return null
               return (
                 <div key={group.title} className="space-y-1">
-                  <h3 className="px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">
+                  <h3 className="px-3 text-[11px] font-extrabold uppercase tracking-[0.15em] text-slate-400/80 mb-3">
                     {group.title}
                   </h3>
                   <div className="grid gap-1">
@@ -379,8 +383,8 @@ export function AdminDashboard({ onLogout }: Props) {
           </div>
           <div className="flex items-center gap-4">
             {isMaster && (
-              <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded-full font-bold uppercase tracking-wider">
-                Acesso Master
+              <span className="text-[11px] bg-orange-500/10 text-orange-500 border border-orange-500/20 px-3 py-1.5 rounded-full font-black uppercase tracking-tighter shadow-sm">
+                👑 Acesso Master
               </span>
             )}
             <div className="flex items-center gap-3 pl-4 border-l border-border/50">

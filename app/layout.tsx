@@ -48,6 +48,40 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${merriweather.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            function isStorageAvailable(type) {
+              try {
+                var storage = window[type];
+                var x = '__storage_test__';
+                storage.setItem(x, x);
+                storage.removeItem(x);
+                return true;
+              } catch (e) {
+                return false;
+              }
+            }
+            function createShim() {
+              var storage = {};
+              return {
+                getItem: function(k) { return storage[k] || null; },
+                setItem: function(k, v) { storage[k] = v; },
+                removeItem: function(k) { delete storage[k]; },
+                clear: function() { storage = {}; },
+                get length() { return Object.keys(storage).length; },
+                key: function(i) { return Object.keys(storage)[i] || null; }
+              };
+            }
+            if (!isStorageAvailable('localStorage')) {
+              try { Object.defineProperty(window, 'localStorage', { value: createShim() }); } catch (e) { console.warn('Could not shim localStorage'); }
+            }
+            if (!isStorageAvailable('sessionStorage')) {
+              try { Object.defineProperty(window, 'sessionStorage', { value: createShim() }); } catch (e) { console.warn('Could not shim sessionStorage'); }
+            }
+          })();
+        ` }} />
+      </head>
       <body className="font-sans antialiased bg-background text-foreground" suppressHydrationWarning>
         <CursorReset />
         <ErrorBoundary>

@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { supabaseSafeStorage } from '../storage-safety'
 
 let supabaseInstance: any = null
 
@@ -10,7 +11,23 @@ export function createClient() {
     
     supabaseInstance = createBrowserClient(
       supabaseUrl,
-      supabaseKey
+      supabaseKey,
+      {
+        auth: {
+          storage: supabaseSafeStorage,
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        },
+        global: {
+          storage: supabaseSafeStorage
+        },
+        realtime: {
+          params: {
+            eventsPerSecond: 10
+          }
+        }
+      }
     )
   }
   return supabaseInstance

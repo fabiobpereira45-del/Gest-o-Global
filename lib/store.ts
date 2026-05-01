@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client"
+import { safeLocalStorage } from "./storage-safety"
 // CACHE-BUSTER: v1.2.3-purge - 2026-04-30 02:13 (Restoration Deploy)
 import { triggerN8nWebhook } from "@/lib/n8n"
 export { triggerN8nWebhook }
@@ -120,15 +121,17 @@ export const MASTER_CREDENTIALS = {
 export const PROFESSOR_CREDENTIALS = MASTER_CREDENTIALS
 
 function readLocal<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback
   try {
-    const raw = localStorage.getItem(key)
+    const raw = safeLocalStorage.getItem(key)
     return raw ? (JSON.parse(raw) as T) : fallback
   } catch { return fallback }
 }
 function writeLocal<T>(key: string, value: T): void {
-  if (typeof window === "undefined") return
-  localStorage.setItem(key, JSON.stringify(value))
+  try {
+    safeLocalStorage.setItem(key, JSON.stringify(value))
+  } catch (err) {
+    console.warn(`[Storage] Failed to write key "${key}":`, err)
+  }
 }
 
 export function uid(): string {
@@ -158,7 +161,9 @@ export function saveProfessorSession(professorId: string, role: "master" | "prof
   }
 }
 export function clearProfessorSession(): void {
-  if (typeof window !== "undefined") localStorage.removeItem(KEYS.PROFESSOR_SESSION)
+  try {
+    safeLocalStorage.removeItem(KEYS.PROFESSOR_SESSION)
+  } catch {}
 }
 
 export async function registerStudentAuth(name: string, cpf: string, password: string) {
@@ -366,10 +371,10 @@ export async function logoutStudentAuth() {
 export function getStudentSession(): StudentSession | null { return readLocal<StudentSession | null>(KEYS.STUDENT_SESSION, null) }
 export function saveStudentSession(s: StudentSession): void { writeLocal(KEYS.STUDENT_SESSION, s) }
 export function clearStudentSession(): void {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(KEYS.STUDENT_SESSION)
-    localStorage.removeItem(KEYS.DRAFT_ANSWERS)
-  }
+  try {
+    safeLocalStorage.removeItem(KEYS.STUDENT_SESSION)
+    safeLocalStorage.removeItem(KEYS.DRAFT_ANSWERS)
+  } catch {}
 }
 
 export async function getActiveAssessment(id?: string): Promise<Assessment | null> {
@@ -780,7 +785,8 @@ export async function updateAssessment(id: string, data: Partial<Omit<Assessment
 
 export async function deleteAssessment(id: string): Promise<void> {
   const supabase = createClient()
-  await supabase.from('assessments').delete().eq('id', id)
+  const { error } = await supabase.from('assessments').delete().eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 export async function getSubmissions(limit: number = 500): Promise<StudentSubmission[]> {
@@ -814,7 +820,8 @@ export async function getSubmissionsByAssessment(assessmentId: string): Promise<
 
 export async function deleteSubmission(id: string): Promise<void> {
   const supabase = createClient()
-  await supabase.from('student_submissions').delete().eq('id', id)
+  const { error } = await supabase.from('student_submissions').delete().eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 export async function updateSubmissionScore(id: string, newScore: number, totalPoints: number): Promise<void> {
