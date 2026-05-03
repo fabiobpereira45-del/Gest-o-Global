@@ -218,7 +218,19 @@ export function AssessmentsTab({ assessments, submissions, questions, discipline
                   </div>
 
                   <div>
-                    <Label className="text-xs font-semibold text-foreground mb-1.5 block">Abertura Automática (Opcional)</Label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label className="text-xs font-semibold text-foreground block">Abertura Automática (Opcional)</Label>
+                      {localOpenAt && (
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setLocalOpenAt(null)}
+                          className="h-auto p-0 text-[10px] text-destructive hover:text-destructive/80 hover:bg-transparent font-bold uppercase tracking-wider"
+                        >
+                          Desativar
+                        </Button>
+                      )}
+                    </div>
                     <Input
                       type="datetime-local"
                       value={toLocalDatetimeStr(localOpenAt)}
@@ -227,7 +239,19 @@ export function AssessmentsTab({ assessments, submissions, questions, discipline
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-semibold text-foreground mb-1.5 block">Fechamento Automático (Opcional)</Label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label className="text-xs font-semibold text-foreground block">Fechamento Automático (Opcional)</Label>
+                      {localCloseAt && (
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setLocalCloseAt(null)}
+                          className="h-auto p-0 text-[10px] text-destructive hover:text-destructive/80 hover:bg-transparent font-bold uppercase tracking-wider"
+                        >
+                          Desativar
+                        </Button>
+                      )}
+                    </div>
                     <Input
                       type="datetime-local"
                       value={toLocalDatetimeStr(localCloseAt)}
