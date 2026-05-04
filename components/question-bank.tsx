@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import {
-  Plus, Pencil, Trash2, ChevronRight, BookOpen, CheckSquare, AlignLeft, X, Check, Sparkles, Upload, ListChecks
+  Plus, Pencil, Trash2, ChevronRight, BookOpen, CheckSquare, AlignLeft, X, Check, Sparkles, Upload, ListChecks, Download
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,6 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 
 import { AIQuestionGenerator } from "./ai-question-generator"
 import { cn } from "@/lib/utils"
+import { printDisciplineQuestionsPDF } from "@/lib/pdf"
 
 
 // ─── Type Labels ──────────────────────────────────────────────────────────────
@@ -937,6 +938,14 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
                   onClick={() => setAiModal(true)}
                 >
                   <Sparkles className="h-4 w-4 mr-1.5" /> Gerar com IA
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => selectedDiscipline && printDisciplineQuestionsPDF(selectedDiscipline, questions)}
+                  className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                >
+                  <Download className="h-4 w-4 mr-1.5" /> Baixar PDF
                 </Button>
                 <Button
                   size="sm"

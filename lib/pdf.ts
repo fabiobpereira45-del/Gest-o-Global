@@ -49,6 +49,9 @@ function getCorrectLabel(question: Question): string {
 function typeLabel(type: Question["type"]): string {
   if (type === "multiple-choice") return "Múltipla Escolha"
   if (type === "true-false") return "Verdadeiro ou Falso"
+  if (type === "incorrect-alternative") return "Alternativa Incorreta"
+  if (type === "fill-in-the-blank") return "Completar Lacunas"
+  if (type === "matching") return "Relacionar Colunas"
   return "Discursiva"
 }
 
@@ -938,4 +941,70 @@ export function printProLaboreReportPDF(disciplines: Discipline[], transactions:
     <table><thead><tr><th>#</th><th>Período</th><th>Disciplina</th><th>Professor</th><th style="text-align:right;">Valor Pago</th><th>Status</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="6" style="text-align:center;">Nenhum registro encontrado</td></tr>'}</tbody></table>`
   safePrint(getModernTemplate(content, `Relatório de Pro-labore${filters?.monthYear ? ' — ' + filters.monthYear : ''}`, hubName), existingWin)
+}
+
+export function printDisciplineQuestionsPDF(discipline: Discipline, questions: Question[], hubName?: string, existingWin?: Window | null): void {
+  const qList = Array.isArray(questions) ? questions : []
+  
+  const rows = qList.map((q, i) => {
+      let optionsHtml = ""
+      
+      if (q.type === "multiple-choice" || q.type === "incorrect-alternative") {
+          optionsHtml = (q.choices || []).map((c, ci) => `
+            <div style="margin:8px 0;display:flex;gap:10px;">
+              <div style="width:20px;height:20px;border:1.5px solid #cbd5e1;border-radius:4px;flex-shrink:0;"></div> 
+              <span style="font-size:13px;">
+                (${String.fromCharCode(65 + ci)}) ${c.text} 
+                ${c.id === q.correctAnswer ? "<strong style='color:#166534;'> (Gabarito)</strong>" : ""}
+              </span>
+            </div>`).join('')
+      } else if (q.type === "true-false") {
+          optionsHtml = `
+            <div style="margin:12px 0;display:flex;gap:20px;">
+              <div style='display:flex;gap:8px;align-items:center;'>
+                <div style='width:18px;height:18px;border:1.5px solid #cbd5e1;border-radius:50%;'></div> 
+                <span>Verdadeiro ${q.correctAnswer === "true" ? "<strong style='color:#166534;'> (Gabarito)</strong>" : ""}</span>
+              </div> 
+              <div style='display:flex;gap:8px;align-items:center;'>
+                <div style='width:18px;height:18px;border:1.5px solid #cbd5e1;border-radius:50%;'></div> 
+                <span>Falso ${q.correctAnswer === "false" ? "<strong style='color:#166534;'> (Gabarito)</strong>" : ""}</span>
+              </div>
+            </div>`
+      } else if (q.type === "matching") {
+          optionsHtml = (q.pairs || []).map((p) => `
+            <div style="margin:8px 0;display:flex;gap:15px;align-items:center;font-size:13px;">
+              <div style="flex:1;padding:8px;border:1px solid #e2e8f0;border-radius:4px;background:#f8fafc;">${p.left}</div>
+              <div style="color:#cbd5e1;">&harr;</div>
+              <div style="flex:1;padding:8px;border:1px solid #e2e8f0;border-radius:4px;background:#f8fafc;">${p.right}</div>
+            </div>`).join('')
+      } else if (q.type === "fill-in-the-blank") {
+          const previewText = q.text.replace(/\[\[(.*?)\]\]/g, "__________")
+          const answers = [...q.text.matchAll(/\[\[(.*?)\]\]/g)].map(m => m[1]).join(", ")
+          optionsHtml = `
+            <div style="margin:10px 0;padding:12px;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:8px;font-size:13px;color:#475569;">
+              ${previewText}
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#166534;"><strong>Gabarito:</strong> ${answers}</div>`
+      } else {
+          optionsHtml = "<div style='height:80px;border:1px solid #e2e8f0;margin-top:10px;border-radius:8px;background:#fcfcfc;'></div>"
+      }
+      
+      return `
+        <div style="margin-bottom:30px;break-inside:avoid;padding:20px;border:1px solid #e2e8f0;border-radius:12px;">
+            <div style="font-weight:800;font-size:11px;color:#64748b;text-transform:uppercase;margin-bottom:8px;letter-spacing:1px;">Questão ${i+1} • ${q.points} pts • ${typeLabel(q.type)}</div>
+            <div style="margin-bottom:15px;line-height:1.6;font-size:14px;color:#1e3a5f;font-weight:600;">${q.type === "fill-in-the-blank" ? "Preencha as lacunas abaixo:" : q.text}</div>
+            ${optionsHtml}
+        </div>
+      `
+  }).join('')
+  
+  const content = `
+    <div style="margin-bottom:25px;padding:20px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;">
+        <p style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:700;">Banco de Questões</p>
+        <p style="font-size:18px;font-weight:800;color:#1e3a5f;">Disciplina: ${discipline.name}</p>
+        <p style="font-size:12px;color:#64748b;">Total: ${qList.length} questões</p>
+    </div>
+    ${rows || '<p>Nenhuma questão nesta disciplina.</p>'}
+  `
+  safePrint(getModernTemplate(content, `Banco de Questões - ${discipline.name}`, hubName), existingWin)
 }
