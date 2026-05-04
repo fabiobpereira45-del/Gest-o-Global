@@ -380,15 +380,26 @@ export function clearStudentSession(): void {
 export async function getActiveAssessment(id?: string): Promise<Assessment | null> {
   const supabase = createClient()
   const now = new Date().toISOString()
-  let query = supabase.from('assessments').select('*').eq('is_published', true)
+  
+  let query = supabase.from('assessments').select('*').eq('archived', false)
   
   if (id) {
     query = query.eq('id', id)
   } else {
-    query = query.lte('open_at', now).or(`close_at.is.null,close_at.gte.${now}`)
+    // Mostrar se estiver publicada OU se os resultados estiverem liberados (mesmo bloqueada)
+    query = query.or('is_published.eq.true,release_results.eq.true')
   }
 
   const { data } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle()
+  
+  if (data && !id && data.is_published) {
+    // Se for por data (landing page) e estiver publicada, valida a janela de tempo
+    const isOpen = !data.open_at || new Date(data.open_at) <= new Date(now)
+    const isClosed = data.close_at && new Date(data.close_at) < new Date(now)
+    // Se estiver fora da janela e os resultados NÃO estiverem liberados, ignora
+    if ((!isOpen || isClosed) && !data.release_results) return null
+  }
+
   return data ? mapAssessment(data) : null
 }
 
