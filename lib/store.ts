@@ -1327,9 +1327,16 @@ export async function saveStudentGrade(grade: Omit<StudentGrade, "id" | "created
     onConflict: 'student_identifier,discipline_id'
   })
 
-  // Fallback se faltar constraint
-  if (error && error.message.includes("ON CONFLICT")) {
-    console.warn("Constraint de notas ausente. Usando modo tradicional.")
+  // Fallback se faltar constraint ou se houver conflito com NULL
+  // Nota: NULLs em constraints UNIQUE no Postgres no so considerados duplicados por padro.
+  // Por isso, o upsert pode falhar em detectar o conflito se discipline_id for NULL.
+  if (error || !id) {
+    if (error && !error.message.includes("ON CONFLICT") && error.code !== "PGRST204") {
+       // Se for um erro real (no de constraint), lana
+       throw error;
+    }
+
+    console.warn("Constraint de notas ausente ou discipline_id nulo. Usando modo de segurana...")
     if (id) {
         await supabase.from('student_grades').update(dbData).eq('id', id)
     } else {
@@ -1404,22 +1411,21 @@ export async function saveBatchGrades(grades: Array<Omit<StudentGrade, "id" | "c
 }
 
 export function calculateAttendanceScore(presCount: number, onlineCount: number, settings: GradingSettings): number {
-    const presScore = presCount * (settings.pointsPerPresence || 3);
-    const onlineScore = onlineCount * (settings.onlinePresencePoints || 2);
-    // Limita a 10 ou conforme regra específica se necessário.
+    // A presença vale 2,5 pontos (seja online ou presencial), limitado a 10.
+    const presScore = presCount * 2.5;
+    const onlineScore = onlineCount * 2.5;
+    
+    // Limita a 10 por disciplina
     return Math.min(10, Math.round((presScore + onlineScore) * 100) / 100);
 }
 
 export function calculateFinalGrade(grade: Partial<StudentGrade>, attendanceScore: number): number {
-    const notaAtividades = (Number(grade.worksGrade) || 0) +
-                         (Number(grade.seminarGrade) || 0) +
-                         (Number(grade.participationBonus) || 0) +
-                         attendanceScore;
-    
+    // A nota será a soma da presença total + soma da prova, dividida pelo divisor (padrão 2)
+    const notaAtividades = attendanceScore;
     const provaOnline = Number(grade.examGrade) || 0;
     const divisor = (Number(grade.customDivisor) && Number(grade.customDivisor) > 0) ? Number(grade.customDivisor) : 2;
     
-    // Fórmula padrão IBAD: (Atividades + Prova) / Divisor
+    // Fórmula: (Presença + Prova) / Divisor
     return Math.round(((notaAtividades + provaOnline) / divisor) * 100) / 100;
 }
 
