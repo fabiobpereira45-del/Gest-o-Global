@@ -264,6 +264,10 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
             if (!studentName || !studentIdentifier) {
                 throw new Error("O nome e identificador do aluno são obrigatórios.")
             }
+
+            if (!formData.disciplineId) {
+                throw new Error("Selecione uma disciplina. O lançamento geral não é permitido no momento.")
+            }
             
             if (!isEditing) {
                 const alreadyExists = grades.find(g => 
@@ -825,9 +829,15 @@ export function GradesManager({ isMaster }: { isMaster: boolean }) {
                                    <p className="text-[10px] text-muted-foreground">Calculada das chamadas (Presencial + Online).</p>
                                </div>
                                <div className="space-y-2">
-                                   <Label className="text-xs font-bold text-slate-400 uppercase tracking-widest">÷ Divisor</Label>
-                                   <Input type="number" value={2} disabled className="h-11 bg-slate-100 border-none rounded-lg font-mono font-bold text-slate-400" />
-                                   <p className="text-[10px] text-muted-foreground">Fixo: (Atividades + Prova) / 2</p>
+                                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">÷ Divisor</Label>
+                                   <Input 
+                                       type="number" 
+                                       step="0.1"
+                                       value={formData.customDivisor} 
+                                       onChange={(e) => setFormData({ ...formData, customDivisor: e.target.value })}
+                                       className="h-11 bg-white border-slate-200 rounded-lg font-mono font-bold" 
+                                   />
+                                   <p className="text-[10px] text-muted-foreground">Fórmula: (Atividades + Prova) / Divisor</p>
                                </div>
                             </div>
                         </div>

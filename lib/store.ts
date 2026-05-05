@@ -1327,9 +1327,16 @@ export async function saveStudentGrade(grade: Omit<StudentGrade, "id" | "created
     onConflict: 'student_identifier,discipline_id'
   })
 
-  // Fallback se faltar constraint
-  if (error && error.message.includes("ON CONFLICT")) {
-    console.warn("Constraint de notas ausente. Usando modo tradicional.")
+  // Fallback se faltar constraint ou se houver conflito com NULL
+  // Nota: NULLs em constraints UNIQUE no Postgres no so considerados duplicados por padro.
+  // Por isso, o upsert pode falhar em detectar o conflito se discipline_id for NULL.
+  if (error || !id) {
+    if (error && !error.message.includes("ON CONFLICT") && error.code !== "PGRST204") {
+       // Se for um erro real (no de constraint), lana
+       throw error;
+    }
+
+    console.warn("Constraint de notas ausente ou discipline_id nulo. Usando modo de segurana...")
     if (id) {
         await supabase.from('student_grades').update(dbData).eq('id', id)
     } else {
