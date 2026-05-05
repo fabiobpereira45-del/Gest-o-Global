@@ -1,0 +1,20 @@
+# Ignore the large PowerPoint directory
+MATERIAS*
+MATÉRIAS*
+*POWER POINT*
+
+# Ignore other large/unnecessary files
+node_modules/
+.next/
+scratch/
+*.pptx
+*.pdf
+*.sql
+*.mjs
+*.txt
+*.js
+!next.config.mjs
+!postcss.config.mjs
+!tailwind.config.js
+!package.json
+!package-lock.json
