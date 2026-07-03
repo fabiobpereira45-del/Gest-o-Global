@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { BarChart3, CheckCircle2, Download, FileText, Pencil, Trophy, Trash2, Users, XCircle } from "lucide-react"
+import { BarChart3, CheckCircle2, Download, Eye, FileText, Pencil, Trophy, Trash2, Users, XCircle, X, Clock, AlertTriangle, Flag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
@@ -21,6 +21,224 @@ interface Props {
   isMaster: boolean
 }
 
+// ─── Answer Viewer Modal ──────────────────────────────────────────────────────
+function AnswerViewerModal({
+  sub,
+  assessment,
+  questions,
+  onClose,
+}: {
+  sub: StudentSubmission
+  assessment: Assessment
+  questions: Question[]
+  onClose: () => void
+}) {
+  const orderedQuestions = assessment.questionIds
+    .map((id) => questions.find((q) => q.id === id))
+    .filter(Boolean) as Question[]
+
+  function getAnswer(questionId: string) {
+    return sub.answers.find((a) => a.questionId === questionId)?.answer ?? ""
+  }
+
+  function renderAnswer(q: Question, rawAnswer: string) {
+    if (!rawAnswer) {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-amber-600 font-semibold text-sm">
+          <AlertTriangle className="h-3.5 w-3.5" /> Sem resposta
+        </span>
+      )
+    }
+
+    if (q.type === "multiple-choice" || q.type === "incorrect-alternative") {
+      const choice = q.choices?.find((c) => c.id === rawAnswer)
+      const isCorrect = rawAnswer === q.correctAnswer
+      return (
+        <div className={cn(
+          "flex items-start gap-3 p-3 rounded-xl border",
+          isCorrect
+            ? "bg-green-50 border-green-200 text-green-800"
+            : "bg-red-50 border-red-200 text-red-800"
+        )}>
+          {isCorrect
+            ? <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-green-600" />
+            : <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-600" />}
+          <div>
+            <p className="font-semibold text-sm">{choice?.text ?? rawAnswer}</p>
+            {!isCorrect && (
+              <p className="text-xs mt-1 opacity-80">
+                Resposta correta: <strong>{q.choices?.find((c) => c.id === q.correctAnswer)?.text}</strong>
+              </p>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    if (q.type === "true-false") {
+      const isCorrect = rawAnswer === q.correctAnswer
+      const label = rawAnswer === "true" ? "Verdadeiro" : "Falso"
+      return (
+        <div className={cn(
+          "flex items-center gap-3 p-3 rounded-xl border",
+          isCorrect
+            ? "bg-green-50 border-green-200 text-green-800"
+            : "bg-red-50 border-red-200 text-red-800"
+        )}>
+          {isCorrect
+            ? <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
+            : <XCircle className="h-4 w-4 shrink-0 text-red-600" />}
+          <span className="font-semibold text-sm">{label}</span>
+          {!isCorrect && (
+            <span className="text-xs opacity-80 ml-2">
+              (Correto: {q.correctAnswer === "true" ? "Verdadeiro" : "Falso"})
+            </span>
+          )}
+        </div>
+      )
+    }
+
+    if (q.type === "fill-in-the-blank") {
+      let parsed: Record<string, string> = {}
+      try { parsed = JSON.parse(rawAnswer) } catch { }
+      return (
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(parsed).map(([key, val]) => (
+            <span key={key} className="bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-lg px-3 py-1 text-sm font-medium">
+              {val || <em className="opacity-50">em branco</em>}
+            </span>
+          ))}
+        </div>
+      )
+    }
+
+    if (q.type === "matching") {
+      let parsed: Record<string, string> = {}
+      try { parsed = JSON.parse(rawAnswer) } catch { }
+      return (
+        <div className="flex flex-col gap-2">
+          {q.pairs?.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+              <span className="font-semibold text-slate-800 flex-1">{p.left}</span>
+              <span className="text-slate-400">→</span>
+              <span className={cn(
+                "flex-1 font-medium",
+                parsed[p.id] === p.right ? "text-green-700" : "text-red-600"
+              )}>
+                {parsed[p.id] || <em className="opacity-50">sem resposta</em>}
+                {parsed[p.id] !== p.right && (
+                  <span className="text-xs text-slate-500 ml-2">(correto: {p.right})</span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    // Discursive
+    return (
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+        {rawAnswer}
+      </div>
+    )
+  }
+
+  const scorePct = sub.percentage
+  const scoreLabel = (scorePct / 10).toFixed(1)
+  const isPassing = scorePct >= 70
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Panel */}
+      <div className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50 flex items-start justify-between gap-4 shrink-0">
+          <div>
+            <h2 className="font-bold text-slate-900 text-lg font-serif">{sub.studentName}</h2>
+            <p className="text-sm text-slate-500">{sub.studentEmail}</p>
+            <div className="flex items-center gap-3 mt-2">
+              <span className={cn(
+                "px-3 py-1 rounded-full text-sm font-black border",
+                isPassing
+                  ? "bg-green-50 text-green-700 border-green-200"
+                  : "bg-red-50 text-red-700 border-red-200"
+              )}>
+                {scoreLabel} / 10
+              </span>
+              <span className="flex items-center gap-1 text-xs text-slate-500">
+                <Clock className="h-3 w-3" /> {formatTime(sub.timeElapsedSeconds)}
+              </span>
+              {(sub.focusLostCount ?? 0) > 0 && (
+                <span className="flex items-center gap-1 text-xs text-amber-600 font-semibold">
+                  <Flag className="h-3 w-3" /> {sub.focusLostCount} alerta(s)
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-9 w-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors shrink-0"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Question List */}
+        <div className="overflow-y-auto flex-1 px-6 py-6 flex flex-col gap-6">
+          {orderedQuestions.map((q, idx) => {
+            const rawAnswer = getAnswer(q.id)
+            const isAnswered = !!rawAnswer
+
+            return (
+              <div key={q.id} className="flex flex-col gap-3">
+                {/* Question label */}
+                <div className="flex items-start gap-3">
+                  <span className={cn(
+                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black border",
+                    isAnswered ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-amber-50 border-amber-200 text-amber-700"
+                  )}>
+                    {idx + 1}
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      {q.type === "multiple-choice" ? "Múltipla Escolha" :
+                       q.type === "true-false" ? "Verdadeiro ou Falso" :
+                       q.type === "fill-in-the-blank" ? "Preenchimento" :
+                       q.type === "incorrect-alternative" ? "Escolha a Incorreta" :
+                       q.type === "matching" ? "Relacionar Colunas" : "Discursiva"}
+                    </p>
+                    <p className="text-sm font-medium text-slate-800 leading-snug">{q.text}</p>
+                  </div>
+                </div>
+                {/* Answer */}
+                <div className="ml-10">
+                  {renderAnswer(q, rawAnswer)}
+                </div>
+                {idx < orderedQuestions.length - 1 && (
+                  <hr className="border-slate-100 mt-2" />
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2 shrink-0">
+          <Button variant="outline" className="rounded-xl font-semibold" onClick={onClose}>
+            Fechar
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function SubmissionsTab({ assessments, allSubmissions, questions, onRefresh, isMaster }: Props) {
   const [selectedAssessmentId, setSelectedAssessmentId] = useState(assessments[0]?.id ?? "")
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -28,6 +246,9 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
   const [editingSubId, setEditingSubId] = useState<string | null>(null)
   const [editScore, setEditScore] = useState<string>("")
   const [isSavingScore, setIsSavingScore] = useState(false)
+
+  // ─── Viewer state ─────────────────────────────────────────────────────────
+  const [viewingSub, setViewingSub] = useState<StudentSubmission | null>(null)
 
   const submissions = allSubmissions
     .filter((s) => s.assessmentId === selectedAssessmentId)
@@ -221,6 +442,17 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {/* ← NEW: Ver Respostas em tela */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100"
+                        title="Ver Respostas"
+                        onClick={() => setViewingSub(sub)}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      {/* PDF download (existing) */}
                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Baixar PDF" onClick={() => handlePDF(sub)}>
                         <Download className="h-3.5 w-3.5" />
                       </Button>
@@ -252,6 +484,16 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ─── Answer Viewer Modal ─────────────────────────────────────────── */}
+      {viewingSub && selectedAssessment && (
+        <AnswerViewerModal
+          sub={viewingSub}
+          assessment={selectedAssessment}
+          questions={questions}
+          onClose={() => setViewingSub(null)}
+        />
+      )}
     </div>
   )
 }
