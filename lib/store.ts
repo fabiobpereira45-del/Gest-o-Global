@@ -409,6 +409,7 @@ export async function hasStudentSubmitted(email: string, assessmentId: string): 
     .select('*', { count: 'exact', head: true })
     .eq('student_email', email)
     .eq('assessment_id', assessmentId)
+    .or('reopened.is.null,reopened.eq.false')
   return (count || 0) > 0
 }
 
@@ -811,7 +812,13 @@ export async function getSubmissions(limit: number = 500): Promise<StudentSubmis
 
 export async function saveSubmission(sub: StudentSubmission): Promise<StudentSubmission> {
   const supabase = createClient()
-  const record = { id: sub.id, assessment_id: sub.assessmentId, student_name: sub.studentName, student_email: sub.studentEmail, answers: sub.answers, score: sub.score, total_points: sub.totalPoints, percentage: sub.percentage, submitted_at: sub.submittedAt, time_elapsed_seconds: sub.timeElapsedSeconds, focus_lost_count: sub.focusLostCount || 0 }
+  // Se o aluno estava com prova reaberta, remove a submission antiga antes de inserir a nova
+  await supabase.from('student_submissions')
+    .delete()
+    .eq('student_email', sub.studentEmail.toLowerCase())
+    .eq('assessment_id', sub.assessmentId)
+    .eq('reopened', true)
+  const record = { id: sub.id, assessment_id: sub.assessmentId, student_name: sub.studentName, student_email: sub.studentEmail, answers: sub.answers, score: sub.score, total_points: sub.totalPoints, percentage: sub.percentage, submitted_at: sub.submittedAt, time_elapsed_seconds: sub.timeElapsedSeconds, focus_lost_count: sub.focusLostCount || 0, reopened: false }
   const { data, error } = await supabase.from('student_submissions').insert(record).select().single()
   if (error) throw new Error(error.message)
   return mapSubmission(data)
@@ -819,8 +826,32 @@ export async function saveSubmission(sub: StudentSubmission): Promise<StudentSub
 
 export async function getSubmissionByEmailAndAssessment(email: string, assessmentId: string): Promise<StudentSubmission | null> {
   const supabase = createClient()
-  const { data } = await supabase.from('student_submissions').select('*').eq('student_email', email.trim().toLowerCase()).eq('assessment_id', assessmentId).maybeSingle()
+  const { data } = await supabase.from('student_submissions').select('*')
+    .eq('student_email', email.trim().toLowerCase())
+    .eq('assessment_id', assessmentId)
+    .or('reopened.is.null,reopened.eq.false')
+    .maybeSingle()
   return data ? mapSubmission(data) : null
+}
+
+/** Retorna a submissão marcada como reaberta (aluno pode continuar de onde parou) */
+export async function getReopenedSubmission(email: string, assessmentId: string): Promise<StudentSubmission | null> {
+  const supabase = createClient()
+  const { data } = await supabase.from('student_submissions').select('*')
+    .eq('student_email', email.trim().toLowerCase())
+    .eq('assessment_id', assessmentId)
+    .eq('reopened', true)
+    .maybeSingle()
+  return data ? mapSubmission(data) : null
+}
+
+/** Master reabre a prova de um aluno — marca a submission como 'reopened' */
+export async function reopenSubmission(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('student_submissions')
+    .update({ reopened: true })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 export async function getSubmissionsByAssessment(assessmentId: string): Promise<StudentSubmission[]> {

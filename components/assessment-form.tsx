@@ -12,7 +12,7 @@ import {
 import {
   getAssessmentById, getQuestionsByDiscipline, saveDraftAnswers, getDraftAnswers,
   saveSubmission, calculateScore, clearStudentSession, getDisciplines,
-  getSubmissionByEmailAndAssessment,
+  getSubmissionByEmailAndAssessment, getReopenedSubmission,
   type StudentSession, type StudentAnswer, type StudentSubmission, uid,
   type Assessment, type Question, type Discipline,
 } from "@/lib/store"
@@ -79,6 +79,14 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
           console.log("Aluno já realizou esta prova. Redirecionando para o resultado.");
           onSubmit(existing);
           return;
+      }
+
+      // Check if there's a reopened submission → pre-load previous answers
+      const reopened = await getReopenedSubmission(session.email, session.assessmentId)
+      if (reopened && reopened.answers && reopened.answers.length > 0) {
+        console.log(`Prova reaberta detectada. Pré-carregando ${reopened.answers.length} respostas anteriores.`)
+        setAnswers(reopened.answers)
+        saveDraftAnswers(reopened.answers)
       }
 
       const a = await getAssessmentById(session.assessmentId)

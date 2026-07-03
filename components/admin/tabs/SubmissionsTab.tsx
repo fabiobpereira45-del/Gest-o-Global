@@ -1,14 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { BarChart3, CheckCircle2, Download, Eye, FileText, Pencil, Trophy, Trash2, Users, XCircle, X, Clock, AlertTriangle, Flag } from "lucide-react"
+import { BarChart3, CheckCircle2, Download, Eye, FileText, Pencil, RotateCcw, Trophy, Trash2, Users, XCircle, X, Clock, AlertTriangle, Flag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { type Assessment, type StudentSubmission, type Question, deleteSubmission, updateSubmissionScore } from "@/lib/store"
+import { type Assessment, type StudentSubmission, type Question, deleteSubmission, updateSubmissionScore, reopenSubmission } from "@/lib/store"
 import { printStudentPDF } from "@/lib/pdf"
 import { formatDate, formatTime } from "../admin-utils"
 import { cn } from "@/lib/utils"
@@ -242,6 +242,8 @@ function AnswerViewerModal({
 export function SubmissionsTab({ assessments, allSubmissions, questions, onRefresh, isMaster }: Props) {
   const [selectedAssessmentId, setSelectedAssessmentId] = useState(assessments[0]?.id ?? "")
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [reopenId, setReopenId] = useState<string | null>(null)
+  const [isReopening, setIsReopening] = useState(false)
 
   const [editingSubId, setEditingSubId] = useState<string | null>(null)
   const [editScore, setEditScore] = useState<string>("")
@@ -249,6 +251,21 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
 
   // ─── Viewer state ─────────────────────────────────────────────────────────
   const [viewingSub, setViewingSub] = useState<StudentSubmission | null>(null)
+
+  async function handleReopen() {
+    if (!reopenId) return
+    setIsReopening(true)
+    try {
+      await reopenSubmission(reopenId)
+      onRefresh()
+      setReopenId(null)
+    } catch (err: any) {
+      console.error("Erro ao reabrir prova:", err)
+      alert("Erro ao reabrir a prova: " + err.message)
+    } finally {
+      setIsReopening(false)
+    }
+  }
 
   const submissions = allSubmissions
     .filter((s) => s.assessmentId === selectedAssessmentId)
@@ -456,6 +473,18 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Baixar PDF" onClick={() => handlePDF(sub)}>
                         <Download className="h-3.5 w-3.5" />
                       </Button>
+                      {/* Reopen — master only */}
+                      {isMaster && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-orange-500 hover:text-orange-700 hover:bg-orange-100"
+                          title="Reabrir Prova para o Aluno"
+                          onClick={() => setReopenId(sub.id)}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-100" title="Editar Nota" onClick={() => startEditingScore(sub)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -481,6 +510,33 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={handleDelete}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ─── Reopen Confirmation Dialog ──────────────────────────────────── */}
+      <AlertDialog open={!!reopenId} onOpenChange={(o) => !o && setReopenId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-orange-500" />
+              Reabrir Prova para o Aluno
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              O aluno poderá fazer login novamente e continuar a prova a partir das respostas já enviadas.
+              As questões respondidas anteriormente serão mantidas. 
+              <strong className="block mt-2 text-orange-700">Esta ação não pode ser desfeita pelo aluno — apenas o master pode cancelar uma reabertura.</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isReopening}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-orange-500 text-white hover:bg-orange-600"
+              onClick={handleReopen}
+              disabled={isReopening}
+            >
+              {isReopening ? "Reabrindo..." : "Sim, Reabrir Prova"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
