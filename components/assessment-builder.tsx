@@ -42,9 +42,10 @@ interface Props {
   assessment?: Assessment | null // if set, editing mode
   onClose: () => void
   onSave: () => void
+  disciplines?: Discipline[]
 }
 
-export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) {
+export function AssessmentBuilder({ open, assessment, onClose, onSave, disciplines: propsDisciplines }: Props) {
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
 
@@ -75,7 +76,10 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
     let mounted = true
 
     async function init() {
-      const discs = await getDisciplines()
+      let discs = propsDisciplines || []
+      if (discs.length === 0) {
+        discs = await getDisciplines()
+      }
       if (!mounted) return
       setDisciplines(discs)
 
@@ -110,7 +114,7 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
     init()
 
     return () => { mounted = false }
-  }, [open, assessment])
+  }, [open, assessment, propsDisciplines])
 
   useEffect(() => {
     if (!disciplineId) return
@@ -392,7 +396,7 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a disciplina" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[20000]">
                       {disciplines.length > 0 ? (
                         disciplines.map((d) => (
                           <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
@@ -620,7 +624,7 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave }: Props) 
                           return (
                             <label
                               key={q.id}
-                              className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${checked ? "border-primary bg-primary/5 shadow-md scale-[1.01]" :
+                              className={`relative flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${checked ? "border-primary bg-primary/5 shadow-md" :
                                 disabled ? "border-border opacity-40 cursor-not-allowed" :
                                   "border-border bg-white hover:border-primary/40 hover:shadow-sm"
                                 }`}

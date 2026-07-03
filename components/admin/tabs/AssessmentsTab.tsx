@@ -367,6 +367,7 @@ export function AssessmentsTab({ assessments, submissions, questions, discipline
           assessment={editingAssessment}
           onClose={() => setBuilderOpen(false)}
           onSave={onRefresh}
+          disciplines={disciplines}
         />
       </ErrorBoundary>
 

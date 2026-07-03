@@ -58,6 +58,13 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
   const [showGrid, setShowGrid] = useState(false)
   const [flagged, setFlagged] = useState<Set<string>>(new Set()) // Questions marked for review
 
+  // Submit confirmation modal state
+  const [submitModal, setSubmitModal] = useState<{
+    open: boolean
+    mode: "incomplete" | "confirm"
+    missingIndexes: number[]
+  }>({ open: false, mode: "confirm", missingIndexes: [] })
+
   const [elapsed, setElapsed] = useState(0)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [focusLostCount, setFocusLostCount] = useState(0)
@@ -152,6 +159,21 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
     }
   }, [answers, assessment, questions, session, onSubmit, focusLostCount, isSubmitting])
 
+  // Called when the student clicks any "Submit" button
+  const handleSubmitClick = useCallback(() => {
+    const missingIndexes = questions.reduce<number[]>((acc, q, idx) => {
+      const ans = answers.find(a => a.questionId === q.id)
+      if (!ans || !ans.answer || ans.answer.trim() === "") acc.push(idx)
+      return acc
+    }, [])
+
+    if (missingIndexes.length > 0) {
+      setSubmitModal({ open: true, mode: "incomplete", missingIndexes })
+    } else {
+      setSubmitModal({ open: true, mode: "confirm", missingIndexes: [] })
+    }
+  }, [questions, answers])
+
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startedAt.current.getTime()) / 1000))
@@ -224,6 +246,134 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
       return newSet
     })
   }
+
+  // ─── Submit Confirmation Modal ───────────────────────────────────────────
+  const SubmitModal = submitModal.open ? (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => setSubmitModal(prev => ({ ...prev, open: false }))}
+      />
+
+      {/* Dialog */}
+      <div className="relative z-10 w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* Header */}
+        <div className={cn(
+          "px-8 pt-8 pb-6 flex flex-col items-center text-center",
+          submitModal.mode === "incomplete" ? "bg-amber-50" : "bg-indigo-50"
+        )}>
+          <div className={cn(
+            "h-16 w-16 rounded-2xl flex items-center justify-center mb-4 shadow-inner",
+            submitModal.mode === "incomplete"
+              ? "bg-amber-100 text-amber-600"
+              : "bg-indigo-100 text-indigo-600"
+          )}>
+            {submitModal.mode === "incomplete"
+              ? <AlertTriangle className="h-8 w-8" />
+              : <CheckCircle2 className="h-8 w-8" />}
+          </div>
+          <h3 className={cn(
+            "text-xl font-bold font-serif",
+            submitModal.mode === "incomplete" ? "text-amber-900" : "text-indigo-900"
+          )}>
+            {submitModal.mode === "incomplete"
+              ? "Questões sem resposta!"
+              : "Confirmar envio da prova"}
+          </h3>
+        </div>
+
+        {/* Body */}
+        <div className="px-8 py-6">
+          {submitModal.mode === "incomplete" ? (
+            <>
+              <p className="text-slate-600 text-sm leading-relaxed text-center mb-4">
+                Você ainda possui <strong className="text-amber-700">{submitModal.missingIndexes.length} questão(ões)</strong> sem resposta. 
+                Você não poderá alterar suas respostas após o envio.
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-2">Questões em branco:</p>
+                <div className="flex flex-wrap gap-2">
+                  {submitModal.missingIndexes.map(idx => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setSubmitModal(prev => ({ ...prev, open: false }))
+                        setCurrentStep(idx)
+                        setShowGrid(false)
+                      }}
+                      className="w-9 h-9 rounded-xl bg-white border-2 border-amber-300 text-amber-700 font-black text-sm hover:bg-amber-100 transition-colors"
+                    >
+                      {idx + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 text-center mt-3">Clique em um número para ir à questão, ou escolha uma opção abaixo.</p>
+            </>
+          ) : (
+            <p className="text-slate-600 text-sm leading-relaxed text-center">
+              Todas as questões foram respondidas. Ao confirmar, <strong>sua prova será entregue definitivamente</strong> e não poderá ser alterada.
+            </p>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className={cn(
+          "px-8 pb-8 flex flex-col gap-3",
+          submitModal.mode === "incomplete" ? "" : ""
+        )}>
+          {submitModal.mode === "incomplete" ? (
+            <>
+              <Button
+                size="lg"
+                className="w-full rounded-xl h-12 font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-200"
+                onClick={() => {
+                  setSubmitModal(prev => ({ ...prev, open: false }))
+                  handleFinalize()
+                }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Enviando..." : "Entregar mesmo assim"}
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full rounded-xl h-12 font-bold border-slate-300 text-slate-700 hover:bg-slate-50"
+                onClick={() => setSubmitModal(prev => ({ ...prev, open: false }))}
+              >
+                Voltar e responder
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                size="lg"
+                className="w-full rounded-xl h-12 font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
+                onClick={() => {
+                  setSubmitModal(prev => ({ ...prev, open: false }))
+                  handleFinalize()
+                }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Enviando..." : "Sim, entregar agora"}
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full rounded-xl h-12 font-bold border-slate-300 text-slate-700 hover:bg-slate-50"
+                onClick={() => setSubmitModal(prev => ({ ...prev, open: false }))}
+              >
+                Cancelar
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (isInitializing) {
     return (
@@ -506,7 +656,7 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
                     "rounded-xl font-bold h-14 px-8 text-white shadow-lg shadow-slate-300 transition-all w-full sm:w-auto",
                     isSubmitting ? "bg-slate-400 cursor-not-allowed" : "bg-black hover:bg-slate-800"
                   )}
-                  onClick={() => handleFinalize()}
+                  onClick={handleSubmitClick}
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
@@ -731,13 +881,16 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
           <Button
               size="lg"
               className="rounded-2xl h-16 px-12 font-black text-lg bg-primary text-white hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95"
-              onClick={handleFinalize}
+              onClick={handleSubmitClick}
               disabled={isSubmitting}
             >
               {isSubmitting ? "Enviando..." : "Finalizar Avaliação"}
           </Button>
         </footer>
       )}
+
+      {/* Submit Modal */}
+      {SubmitModal}
     </div>
   )
 }
