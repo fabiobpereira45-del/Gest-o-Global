@@ -254,7 +254,7 @@ function AnswerViewerModal({
                 <div className="ml-10">
                   {renderAnswer(q, rawAnswer)}
                 </div>
-                {idx < orderedQuestions.length - 1 && (
+                {idx < questions.length - 1 && (
                   <hr className="border-slate-100 mt-2" />
                 )}
               </div>
