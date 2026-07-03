@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { BarChart3, CheckCircle2, Download, Eye, FileText, Pencil, RotateCcw, Trophy, Trash2, Users, XCircle, X, Clock, AlertTriangle, Flag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -8,7 +8,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { type Assessment, type StudentSubmission, type Question, deleteSubmission, updateSubmissionScore, reopenSubmission } from "@/lib/store"
+import { type Assessment, type StudentSubmission, type Question, deleteSubmission, updateSubmissionScore, reopenSubmission, getQuestionsByDiscipline } from "@/lib/store"
 import { printStudentPDF } from "@/lib/pdf"
 import { formatDate, formatTime } from "../admin-utils"
 import { cn } from "@/lib/utils"
@@ -25,17 +25,35 @@ interface Props {
 function AnswerViewerModal({
   sub,
   assessment,
-  questions,
   onClose,
 }: {
   sub: StudentSubmission
   assessment: Assessment
-  questions: Question[]
   onClose: () => void
 }) {
-  const orderedQuestions = assessment.questionIds
-    .map((id) => questions.find((q) => q.id === id))
-    .filter(Boolean) as Question[]
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [loadingQs, setLoadingQs] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    async function load() {
+      try {
+        const qs = await getQuestionsByDiscipline(assessment.disciplineId)
+        if (!mounted) return
+        // Manter a ordem exata dos questionIds da avaliação
+        const ordered = assessment.questionIds
+          .map((id) => qs.find((q) => q.id === id))
+          .filter(Boolean) as Question[]
+        setQuestions(ordered)
+      } catch (err) {
+        console.error("Erro ao carregar questões do viewer:", err)
+      } finally {
+        if (mounted) setLoadingQs(false)
+      }
+    }
+    load()
+    return () => { mounted = false }
+  }, [assessment.disciplineId, assessment.questionIds])
 
   function getAnswer(questionId: string) {
     return sub.answers.find((a) => a.questionId === questionId)?.answer ?? ""
@@ -148,6 +166,23 @@ function AnswerViewerModal({
   const scoreLabel = (scorePct / 10).toFixed(1)
   const isPassing = scorePct >= 70
 
+  if (loadingQs) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative z-10 flex flex-col items-center justify-center gap-4 bg-white rounded-3xl shadow-2xl border border-slate-200 p-12">
+          <div className="relative flex h-14 w-14">
+            <div className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-500 opacity-20" />
+            <div className="relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-white text-indigo-600 shadow-xl border border-indigo-100">
+              <Eye className="h-7 w-7 animate-pulse" />
+            </div>
+          </div>
+          <p className="text-slate-500 font-medium text-sm animate-pulse">Carregando questões...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       {/* Backdrop */}
@@ -190,7 +225,7 @@ function AnswerViewerModal({
 
         {/* Question List */}
         <div className="overflow-y-auto flex-1 px-6 py-6 flex flex-col gap-6">
-          {orderedQuestions.map((q, idx) => {
+          {questions.map((q, idx) => {
             const rawAnswer = getAnswer(q.id)
             const isAnswered = !!rawAnswer
 
@@ -546,7 +581,6 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
         <AnswerViewerModal
           sub={viewingSub}
           assessment={selectedAssessment}
-          questions={questions}
           onClose={() => setViewingSub(null)}
         />
       )}
