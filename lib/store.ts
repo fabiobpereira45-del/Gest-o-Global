@@ -992,7 +992,8 @@ export async function updateProfessorAccount(id: string, data: Partial<Omit<Prof
   if (data.bank_info !== undefined) updateData.bank_info = data.bank_info || null
   if (data.password) updateData.password_hash = hashPassword(data.password)
   
-  const { data: updated } = await supabase.from('professor_accounts').update(updateData).eq('id', id).select().maybeSingle()
+  const { data: updated, error } = await supabase.from('professor_accounts').update(updateData).eq('id', id).select().maybeSingle()
+  if (error) throw new Error(`Falha ao atualizar professor: ${error.message}`)
   return updated ? mapProfessor(updated) : null
 }
 
