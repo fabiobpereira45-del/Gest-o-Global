@@ -59,33 +59,50 @@ export function AIQuestionGenerator({ disciplines, defaultDisciplineId }: Props)
   }
 
   function handleCopyPrompt() {
-    const prompt = `Atue como um Professor de Teologia especializado em ${selectedDiscipline?.name || 'Teologia'}.
-Sua tarefa é elaborar ${count} questões para uma avaliação acadêmica.
+    const prompt = `Você é um Professor Doutor em Teologia e especialista em avaliação acadêmica para a disciplina de "${selectedDiscipline?.name || 'Teologia'}".
+Elabore exatamente ${count} questões teológicas de alto nível para a disciplina "${selectedDiscipline?.name || 'Teologia'}".
 
 ---
-PERFIL PEDAGÓGICO:
-- Público-Alvo: ${audience}
-- Complexidade: ${difficulty}
+DIRETRIZES PEDAGÓGICAS:
 - Disciplina: ${selectedDiscipline?.name || 'Teologia'}
-- Formatos Solicitados: ${types.map(t => TYPE_LABELS[t]).join(", ")}
+- Nível de Dificuldade: ${difficulty}
+- Público-Alvo: ${audience}
+- Modalidades Solicitadas: ${types.map(t => TYPE_LABELS[t]).join(", ")}
 ${sourceText ? `---
-TEXTO DE BASE:
-${sourceText}` : ""}
----
-INSTRUÇÕES DE FORMATO:
-Para que eu possa importar no sistema Gestão Global, você DEVE retornar as questões seguindo RIGOROSAMENTE este formato estruturado:
+TEXTO DE BASE / EMENTA / CAPÍTULOS A SEREM ABORDADOS:
+${sourceText}
+` : ""}---
+REGRAS E FORMATO OBRIGATÓRIO DE RESPOSTA:
+Retorne as ${count} questões no formato padronizado abaixo. Não adicione introduções ou conversas antes das questões.
 
-Questão [Número]: [Texto da Questão]
-Tipo: [Múltipla Escolha / Verdadeiro ou Falso / Discursiva]
-Opção A: [Texto]
-Opção B: [Texto]
-Opção C: [Texto]
-Opção D: [Texto]
-Gabarito: [A, B, C ou D / Verdadeiro ou Falso]
-Fundamentação: [Breve explicação teográfica da resposta]
+Exemplo de Múltipla Escolha:
+Questão 1: [Enunciado completo da questão]
+Tipo: Múltipla Escolha
+Opção A: [Texto da alternativa A]
+Opção B: [Texto da alternativa B]
+Opção C: [Texto da alternativa C]
+Opção D: [Texto da alternativa D]
+Gabarito: B
+Fundamentação: [Justificativa teológica com referências]
+
+Exemplo de Escolha a Incorreta:
+Questão 2: [Enunciado pedindo para assinalar a alternativa INCORRETA]
+Tipo: Escolha a Incorreta
+Opção A: [Texto correto]
+Opção B: [Texto correto]
+Opção C: [Texto INCORRETO]
+Opção D: [Texto correto]
+Gabarito: C
+Fundamentação: [Justificativa de por que a opção é incorreta]
+
+Exemplo de Verdadeiro ou Falso:
+Questão 3: [Afirmação teológica para julgamento de valor]
+Tipo: Verdadeiro ou Falso
+Gabarito: Verdadeiro
+Fundamentação: [Justificativa teológica]
 
 ---
-INICIE A ELABORAÇÃO AGORA:`
+INICIE A ELABORAÇÃO DAS ${count} QUESTÕES AGORA:`
 
     navigator.clipboard.writeText(prompt)
     setCopied(true)

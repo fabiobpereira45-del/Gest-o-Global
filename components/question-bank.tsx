@@ -454,19 +454,219 @@ function BulkImportModal({
     }
   }, [open])
 
-  // Improved parser for AI-structured format and CSV
+  // Universal CSV Parser supporting RFC 4180 with quotes & multi-line
+  function parseCSVRows(rawText: string): string[][] {
+    const rows: string[][] = [];
+    let currentRow: string[] = [];
+    let currentField = '';
+    let inQuotes = false;
+    let i = 0;
+
+    // Detect if separator is semicolon or comma
+    const commaCount = (rawText.match(/","/g) || []).length;
+    const semiCount = (rawText.match(/";"/g) || []).length + (rawText.match(/;/g) || []).length;
+    const sep = semiCount > commaCount ? ';' : ',';
+
+    while (i < rawText.length) {
+      const char = rawText[i];
+      const nextChar = rawText[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          currentField += '"';
+          i += 2;
+          continue;
+        } else {
+          inQuotes = !inQuotes;
+          i++;
+          continue;
+        }
+      }
+
+      if (!inQuotes && (char === sep || (sep === ';' && char === ';') || (sep === ',' && char === ','))) {
+        currentRow.push(currentField.trim());
+        currentField = '';
+        i++;
+        continue;
+      }
+
+      if (!inQuotes && (char === '\r' || char === '\n')) {
+        if (char === '\r' && nextChar === '\n') i++;
+        currentRow.push(currentField.trim());
+        currentField = '';
+        if (currentRow.some(f => f.length > 0)) {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+        i++;
+        continue;
+      }
+
+      currentField += char;
+      i++;
+    }
+
+    if (currentField.length > 0 || currentRow.length > 0) {
+      currentRow.push(currentField.trim());
+      if (currentRow.some(f => f.length > 0)) {
+        rows.push(currentRow);
+      }
+    }
+
+    return rows;
+  }
+
+  // Universal Parser for AI Structured Text, CSV (comma/semicolon/quotes) and JSON
   function parseContent(content: string) {
-    const lines = content.split('\n');
+    const trimmed = content.trim();
+    if (!trimmed) return [];
+
+    // 1. Try JSON Array
+    if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        const arr = Array.isArray(parsed) ? parsed : (parsed.questions || [parsed]);
+        return arr.map((item: any) => {
+          const rawChoices = item.choices || item.options || item.alternativas || [];
+          const choices = rawChoices.map((c: any, idx: number) => ({
+            id: uid(),
+            text: typeof c === 'object' ? (c.text || c.label || '') : String(c)
+          }));
+          let correctId = choices[0]?.id || "";
+          const rawAns = String(item.correctAnswer || item.gabarito || item.answer || "A").trim().toUpperCase();
+          const match = rawAns.match(/([A-E])/);
+          if (match) {
+            const idx = match[1].charCodeAt(0) - 65;
+            if (choices[idx]) correctId = choices[idx].id;
+          }
+          return {
+            text: item.text || item.question || item.enunciado || "",
+            type: item.type || "multiple-choice",
+            choices,
+            correctAnswer: correctId,
+            points: Number(item.points || 1)
+          };
+        }).filter((q: any) => q.text);
+      } catch {}
+    }
+
+    // 2. Try CSV parsing (with commas or semicolons)
+    const csvRows = parseCSVRows(trimmed);
+    if (csvRows.length > 0 && csvRows[0].length >= 3) {
+      const csvQuestions: any[] = [];
+      for (const row of csvRows) {
+        if (row.length < 3) continue;
+        
+        // Skip header row if present
+        const firstColLower = (row[0] || "").toLowerCase();
+        if (firstColLower.includes("número") || firstColLower.includes("numero") || firstColLower.includes("enunciado") || firstColLower.includes("questão")) {
+          if (row.length > 4 && (row[1]?.toLowerCase().includes("enunciado") || row[1]?.toLowerCase().includes("pergunta"))) continue;
+        }
+
+        let qText = "";
+        let qType = "multiple-choice";
+        let startIndex = 0;
+
+        // If column 0 is question number (e.g. "24" or "Questão 24")
+        if (/^(?:Questão\s*)?\d+$/i.test(row[0]) && row.length >= 4) {
+          qText = row[1];
+          startIndex = 2;
+        } else {
+          qText = row[0];
+          startIndex = 1;
+        }
+
+        // Check if next column is Question Type
+        const possibleType = (row[startIndex] || "").toLowerCase();
+        if (possibleType.includes("múltipla") || possibleType.includes("multipla") || possibleType.includes("verdadeiro") || possibleType.includes("falso") || possibleType.includes("incorreta") || possibleType.includes("discursiva") || possibleType.includes("lacuna") || possibleType.includes("relacionar")) {
+          if (possibleType.includes("verdadeiro") || possibleType.includes("falso") || possibleType.includes("v/f")) qType = "true-false";
+          else if (possibleType.includes("incorreta")) qType = "incorrect-alternative";
+          else if (possibleType.includes("discursiva")) qType = "discursive";
+          else if (possibleType.includes("lacuna")) qType = "fill-in-the-blank";
+          else if (possibleType.includes("relacionar")) qType = "matching";
+          else qType = "multiple-choice";
+          startIndex++;
+        }
+
+        const remaining = row.slice(startIndex);
+        
+        if (qType === "multiple-choice" || qType === "incorrect-alternative") {
+          let gabIndex = -1;
+          let gabarito = "";
+          for (let r = remaining.length - 1; r >= 0; r--) {
+            const val = remaining[r].trim();
+            if (/^[A-Ea-e]$/.test(val) || /^Opção\s+[A-E]$/i.test(val) || /^Gabarito:\s*[A-E]/i.test(val)) {
+              gabIndex = r;
+              gabarito = val.replace(/^Opção\s+/i, '').replace(/^Gabarito:\s*/i, '').toUpperCase();
+              break;
+            }
+          }
+
+          let options: string[] = [];
+          if (gabIndex !== -1) {
+            options = remaining.slice(0, gabIndex).filter(o => o.trim());
+          } else if (remaining.length >= 4) {
+            const secondLast = remaining[remaining.length - 2]?.trim();
+            if (/^[A-Ea-e]$/.test(secondLast)) {
+              gabarito = secondLast.toUpperCase();
+              options = remaining.slice(0, remaining.length - 2);
+            } else {
+              gabarito = remaining[remaining.length - 1]?.trim().toUpperCase() || "A";
+              options = remaining.slice(0, remaining.length - 1);
+            }
+          }
+
+          const choices = options.map((optText) => ({
+            id: uid(),
+            text: optText.replace(/^[A-Ea-e]\s*[\)\.\-:]\s*/, '').trim()
+          }));
+
+          const letterCode = (gabarito.charCodeAt(0) || 65) - 65;
+          const correctChoiceId = (choices[letterCode] && choices[letterCode].id) || (choices[0] && choices[0].id) || "";
+
+          if (qText && choices.length >= 2) {
+            csvQuestions.push({
+              text: qText.trim(),
+              type: qType,
+              choices,
+              correctAnswer: correctChoiceId,
+              points: 1
+            });
+          }
+        } else if (qType === "true-false") {
+          let finalCorrect = "true";
+          const lastVal = remaining[remaining.length - 1]?.toLowerCase() || "";
+          if (lastVal.includes("falso") || lastVal === "f") finalCorrect = "false";
+          if (qText) {
+            csvQuestions.push({
+              text: qText.trim(),
+              type: "true-false",
+              choices: [],
+              correctAnswer: finalCorrect,
+              points: 1
+            });
+          }
+        }
+      }
+
+      if (csvQuestions.length > 0) {
+        return csvQuestions;
+      }
+    }
+
+    // 3. Structured Text / Markdown format
+    const lines = trimmed.split('\n');
     const questions: any[] = [];
     let currentQ: any = null;
     let inRationale = false;
 
     // Patterns for AI-structured format
     const qPattern = /^(?:\*{1,2})?Questão\s*(\d+)?:?\s*(?:\*{1,2})?\s*(.*)/i;
+    const numListPattern = /^(\d{1,2})\s*[\.\-\)]\s+(.*)/;
     const typePattern = /^(?:\*{1,2})?Tipo:\s*(?:\*{1,2})?\s*(.*)/i;
     const optionPattern = /^(?:\*{1,2})?Opção\s*([A-E]):?\s*(?:\*{1,2})?\s*(.*)/i;
     const altOptionPattern = /^(?:\*{1,2})?([A-E])\)\s*(?:\*{1,2})?\s*(.*)/i;
-    const answerPattern = /^(?:\*{1,2})?(?:Gabarito|Resposta\s*Correta):\s*(?:\*{1,2})?\s*(.*)/i;
+    const answerPattern = /^(?:\*{1,2})?(?:Gabarito|Resposta\s*Correta|Resposta):\s*(?:\*{1,2})?\s*(.*)/i;
     const rationalePattern = /^(?:\*{1,2})?(?:Fundamentação|Justificativa|Explicação|Comentário):\s*(?:\*{1,2})?\s*(.*)/i;
     const dividerPattern = /^[\=\-\*_#~]{3,}$/;
 
@@ -475,12 +675,12 @@ function BulkImportModal({
       if (!line) continue;
       if (dividerPattern.test(line)) continue;
 
-      const qMatch = line.match(qPattern);
-      if (qMatch) {
+      const qMatch = line.match(qPattern) || (!currentQ || currentQ.choices.length > 0 ? line.match(numListPattern) : null);
+      if (qMatch && !optionPattern.test(line) && !altOptionPattern.test(line)) {
         if (currentQ && currentQ.text) questions.push(currentQ);
         inRationale = false;
         currentQ = {
-          text: qMatch[2]?.replace(/^\*+|\*+$/g, '').trim() || "",
+          text: (qMatch[2] || "").replace(/^\*+|\*+$/g, '').trim(),
           type: "multiple-choice",
           choices: [],
           correctAnswer: "",
@@ -495,39 +695,10 @@ function BulkImportModal({
       }
 
       if (inRationale) {
-        // Skip rationale lines until next question
         continue;
       }
 
-      if (!currentQ) {
-        // Fallback to CSV if not in AI format yet
-        if (line.includes(';')) {
-          const parts = line.split(';');
-          if (parts.length >= 6) {
-            const [qText, a, b, c, d, correctLetter] = parts;
-            const choices = [
-              { id: uid(), text: a.trim() },
-              { id: uid(), text: b.trim() },
-              { id: uid(), text: c.trim() },
-              { id: uid(), text: d.trim() },
-            ];
-            let correctId = choices[0].id;
-            const letter = correctLetter.trim().toUpperCase();
-            if (letter === "B") correctId = choices[1].id;
-            else if (letter === "C") correctId = choices[2].id;
-            else if (letter === "D") correctId = choices[3].id;
-
-            questions.push({
-              text: qText.trim(),
-              type: "multiple-choice",
-              choices,
-              correctAnswer: correctId,
-              points: 1
-            });
-          }
-        }
-        continue;
-      }
+      if (!currentQ) continue;
 
       const typeMatch = line.match(typePattern);
       if (typeMatch) {
@@ -556,12 +727,11 @@ function BulkImportModal({
         continue;
       }
       
-      // If we are before choices, it is multi-line question text
+      // Multi-line question text or choice text
       if (currentQ.choices.length === 0 && !currentQ.correctAnswer) {
         if (!currentQ.text) currentQ.text = line;
         else currentQ.text += " " + line;
       } else if (currentQ.choices.length > 0 && !currentQ.correctAnswer) {
-        // Multi-line choice
         const lastChoice = currentQ.choices[currentQ.choices.length - 1];
         if (lastChoice) {
           lastChoice.text += " " + line;
