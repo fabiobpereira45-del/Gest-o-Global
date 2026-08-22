@@ -10,7 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  getAssessmentById, getQuestionsByDiscipline, saveDraftAnswers, getDraftAnswers,
+  getAssessmentById, getQuestionsByDiscipline, saveDraftAnswers, getDraftAnswers, clearDraftAnswers,
   saveSubmission, calculateScore, clearStudentSession, getDisciplines,
   getSubmissionByEmailAndAssessment, getReopenedSubmission,
   type StudentSession, type StudentAnswer, type StudentSubmission, uid,
@@ -53,7 +53,8 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const hasSubmittedRef = useRef(false)
 
-  const [answers, setAnswers] = useState<StudentAnswer[]>(() => getDraftAnswers())
+  // Inicializa com array vazio — o rascunho isolado será carregado após saber o assessmentId
+  const [answers, setAnswers] = useState<StudentAnswer[]>([])
   const [currentStep, setCurrentStep] = useState(0) // 0 to questions.length (last is review)
   const [showGrid, setShowGrid] = useState(false)
   const [flagged, setFlagged] = useState<Set<string>>(new Set()) // Questions marked for review
@@ -81,12 +82,19 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
           return;
       }
 
+      // Carrega rascunho isolado por assessmentId (evita contaminação entre provas)
+      const savedDraft = getDraftAnswers(session.assessmentId)
+
       // Check if there's a reopened submission → pre-load previous answers
       const reopened = await getReopenedSubmission(session.email, session.assessmentId)
       if (reopened && reopened.answers && reopened.answers.length > 0) {
         console.log(`Prova reaberta detectada. Pré-carregando ${reopened.answers.length} respostas anteriores.`)
         setAnswers(reopened.answers)
-        saveDraftAnswers(reopened.answers)
+        saveDraftAnswers(reopened.answers, session.assessmentId)
+      } else if (savedDraft.length > 0) {
+        // Carrega rascunho local somente se não houver prova reaberta
+        console.log(`Rascunho local detectado com ${savedDraft.length} respostas.`)
+        setAnswers(savedDraft)
       }
 
       const a = await getAssessmentById(session.assessmentId)
@@ -103,6 +111,10 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
         if (selectedQs.length < a.questionIds.length) {
             console.warn(`Aviso: Esta prova deveria ter ${a.questionIds.length} questões, mas apenas ${selectedQs.length} foram encontradas no banco de dados da disciplina.`);
         }
+
+        // Filtra o rascunho para remover questões que não pertencem a esta prova
+        const validIds = new Set(selectedQs.map(q => q.id))
+        setAnswers(prev => prev.filter(ans => validIds.has(ans.questionId)))
         
         // Shuffle questions and choices if enabled
         if (a.shuffleVariants) {
@@ -141,14 +153,18 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
 
     try {
       const elapsedSecs = Math.floor((Date.now() - startedAt.current.getTime()) / 1000)
-      const { score, totalPoints, percentage } = calculateScore(answers, questions, assessment.pointsPerQuestion)
+      // Captura o estado mais recente das respostas de forma síncrona
+      const currentAnswers = await new Promise<StudentAnswer[]>((resolve) => {
+        setAnswers(prev => { resolve(prev); return prev })
+      })
+      const { score, totalPoints, percentage } = calculateScore(currentAnswers, questions, assessment.pointsPerQuestion)
 
       const sub: StudentSubmission = {
         id: uid(),
         assessmentId: assessment.id,
         studentName: session.name,
         studentEmail: session.email,
-        answers,
+        answers: currentAnswers,
         score,
         totalPoints,
         percentage,
@@ -157,7 +173,8 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
         focusLostCount,
       }
       await saveSubmission(sub)
-      clearStudentSession()
+      clearStudentSession(assessment.id)
+      clearDraftAnswers(assessment.id)
       onSubmit(sub)
     } catch (err) {
       console.error("Erro ao salvar submissão:", err)
@@ -224,10 +241,10 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
     setAnswers((prev) => {
       const filtered = prev.filter((a) => a.questionId !== questionId)
       const updated = answer ? [...filtered, { questionId, answer }] : filtered
-      saveDraftAnswers(updated)
+      saveDraftAnswers(updated, session.assessmentId)
       return updated
     })
-  }, [])
+  }, [session.assessmentId])
 
   const handleSubAnswer = useCallback((questionId: string, key: string, value: string) => {
     setAnswers((prev) => {
@@ -241,10 +258,10 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
       
       const filtered = prev.filter((a) => a.questionId !== questionId)
       const updated = [...filtered, { questionId, answer: answerStr }]
-      saveDraftAnswers(updated)
+      saveDraftAnswers(updated, session.assessmentId)
       return updated
     })
-  }, [])
+  }, [session.assessmentId])
 
   const toggleFlag = (questionId: string) => {
     setFlagged(prev => {

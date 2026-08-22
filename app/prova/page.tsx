@@ -33,7 +33,7 @@ function ProvaPageContent() {
     }, [])
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="flex flex-col min-h-screen bg-background">
             <AssessmentHeader />
             <main className="mx-auto max-w-3xl px-4 py-8">
                 {view === "login" && (

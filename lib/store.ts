@@ -370,10 +370,13 @@ export async function logoutStudentAuth() {
 
 export function getStudentSession(): StudentSession | null { return readLocal<StudentSession | null>(KEYS.STUDENT_SESSION, null) }
 export function saveStudentSession(s: StudentSession): void { writeLocal(KEYS.STUDENT_SESSION, s) }
-export function clearStudentSession(): void {
+export function clearStudentSession(assessmentId?: string): void {
   try {
     safeLocalStorage.removeItem(KEYS.STUDENT_SESSION)
     safeLocalStorage.removeItem(KEYS.DRAFT_ANSWERS)
+    if (assessmentId) {
+      safeLocalStorage.removeItem(`${KEYS.DRAFT_ANSWERS}_${assessmentId}`)
+    }
   } catch {}
 }
 
@@ -413,8 +416,28 @@ export async function hasStudentSubmitted(email: string, assessmentId: string): 
   return (count || 0) > 0
 }
 
-export function getDraftAnswers(): StudentAnswer[] { return readLocal<StudentAnswer[]>(KEYS.DRAFT_ANSWERS, []) }
-export function saveDraftAnswers(answers: StudentAnswer[]): void { writeLocal(KEYS.DRAFT_ANSWERS, answers) }
+export function getDraftAnswers(assessmentId?: string): StudentAnswer[] {
+  // Se assessmentId fornecido, usa chave isolada; caso contrário, retorna vazio (segurança)
+  if (!assessmentId) return []
+  return readLocal<StudentAnswer[]>(`${KEYS.DRAFT_ANSWERS}_${assessmentId}`, [])
+}
+export function saveDraftAnswers(answers: StudentAnswer[], assessmentId?: string): void {
+  if (!assessmentId) {
+    // Fallback para compatibilidade: salva na chave antiga se não tiver assessmentId
+    writeLocal(KEYS.DRAFT_ANSWERS, answers)
+    return
+  }
+  writeLocal(`${KEYS.DRAFT_ANSWERS}_${assessmentId}`, answers)
+}
+export function clearDraftAnswers(assessmentId?: string): void {
+  try {
+    if (assessmentId) {
+      safeLocalStorage.removeItem(`${KEYS.DRAFT_ANSWERS}_${assessmentId}`)
+    }
+    // Limpa também a chave legada
+    safeLocalStorage.removeItem(KEYS.DRAFT_ANSWERS)
+  } catch {}
+}
 
 // ——— DB Mappers —————————————————————————————————————————————————————————————————
 function mapSemester(row: any): Semester { return { id: row.id, name: row.name, order: row.order, shift: row.shift || undefined, is_completed: row.is_completed || false, createdAt: row.created_at } }
@@ -465,7 +488,7 @@ function mapAssessment(row: any): Assessment {
     createdAt: row.created_at
   }
 }
-function mapSubmission(row: any): StudentSubmission { return { id: row.id, assessmentId: row.assessment_id, studentName: row.student_name, studentEmail: row.student_email, answers: row.answers, score: row.score, totalPoints: row.total_points, percentage: row.percentage, submittedAt: row.submitted_at, timeElapsedSeconds: row.time_elapsed_seconds, focusLostCount: row.focus_lost_count || 0 } }
+function mapSubmission(row: any): StudentSubmission { return { id: row.id, assessmentId: row.assessment_id, studentName: row.student_name, studentEmail: row.student_email, answers: Array.isArray(row.answers) ? row.answers : [], score: row.score, totalPoints: row.total_points, percentage: row.percentage, submittedAt: row.submitted_at, timeElapsedSeconds: row.time_elapsed_seconds, focusLostCount: row.focus_lost_count || 0 } }
 function mapProfessor(p: any): ProfessorAccount {
   if (!p) return { id: "unknown", name: "Professor", email: "", passwordHash: "", role: "professor", createdAt: new Date().toISOString(), active: false }
   return { id: p.id || "unknown", name: p.name || "Professor", email: p.email || "", passwordHash: p.password_hash || "", role: p.role || "professor", avatar_url: p.avatar_url, bio: p.bio || null, createdAt: p.created_at || new Date().toISOString(), active: p.active !== false, pix_key: p.pix_key || null, bank_info: p.bank_info || null }
