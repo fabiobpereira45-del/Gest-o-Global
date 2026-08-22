@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { triggerN8nWebhook } from "@/lib/n8n"
 
 export async function POST(req: Request) {
@@ -10,9 +10,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "ID do aluno é obrigatório" }, { status: 400 })
         }
 
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-        const supabase = createClient(supabaseUrl, supabaseKey)
+        const supabase = createAdminClient()
 
         // 1. Get student data
         const { data: student, error: fetchErr } = await supabase

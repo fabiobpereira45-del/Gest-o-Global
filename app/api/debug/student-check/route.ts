@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
@@ -7,9 +7,7 @@ export async function GET(req: Request) {
     
     if (!cpf) return NextResponse.json({ error: "Informe o CPF" }, { status: 400 })
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createAdminClient()
 
     const cleanCpf = cpf.replace(/\D/g, '')
 

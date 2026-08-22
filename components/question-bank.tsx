@@ -22,7 +22,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import {
   type Discipline, type Question, type QuestionType, type Choice, type MatchingPair,
   getDisciplines, addDiscipline, updateDiscipline, deleteDiscipline,
-  getQuestionsByDiscipline, addQuestion, updateQuestion, deleteQuestion, uid, getDisciplineQuestionCounts,
+  getQuestionsByDiscipline, addQuestion, addQuestions, updateQuestion, deleteQuestion, uid, getDisciplineQuestionCounts,
   deleteQuestions, deleteQuestionsByDiscipline
 } from "@/lib/store"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -459,28 +459,43 @@ function BulkImportModal({
     const lines = content.split('\n');
     const questions: any[] = [];
     let currentQ: any = null;
+    let inRationale = false;
 
-    // Pattern for AI-structured format (Questão X: text)
-    const qPattern = /^Questão\s*(\d+)?:?\s*(.*)/i;
-    const typePattern = /^Tipo:\s*(.*)/i;
-    const optionPattern = /^Opção\s*([A-D]):?\s*(.*)/i;
-    const answerPattern = /^Gabarito:\s*(.*)/i;
-    const rationalePattern = /^Fundamentação:\s*(.*)/i;
+    // Patterns for AI-structured format
+    const qPattern = /^(?:\*{1,2})?Questão\s*(\d+)?:?\s*(?:\*{1,2})?\s*(.*)/i;
+    const typePattern = /^(?:\*{1,2})?Tipo:\s*(?:\*{1,2})?\s*(.*)/i;
+    const optionPattern = /^(?:\*{1,2})?Opção\s*([A-E]):?\s*(?:\*{1,2})?\s*(.*)/i;
+    const altOptionPattern = /^(?:\*{1,2})?([A-E])\)\s*(?:\*{1,2})?\s*(.*)/i;
+    const answerPattern = /^(?:\*{1,2})?(?:Gabarito|Resposta\s*Correta):\s*(?:\*{1,2})?\s*(.*)/i;
+    const rationalePattern = /^(?:\*{1,2})?(?:Fundamentação|Justificativa|Explicação|Comentário):\s*(?:\*{1,2})?\s*(.*)/i;
+    const dividerPattern = /^[\=\-\*_#~]{3,}$/;
 
-    for (let line of lines) {
-      line = line.trim();
+    for (let rawLine of lines) {
+      const line = rawLine.trim();
       if (!line) continue;
+      if (dividerPattern.test(line)) continue;
 
       const qMatch = line.match(qPattern);
       if (qMatch) {
         if (currentQ && currentQ.text) questions.push(currentQ);
+        inRationale = false;
         currentQ = {
-          text: qMatch[2] || "",
+          text: qMatch[2]?.replace(/^\*+|\*+$/g, '').trim() || "",
           type: "multiple-choice",
           choices: [],
           correctAnswer: "",
           points: 1
         };
+        continue;
+      }
+
+      if (rationalePattern.test(line)) {
+        inRationale = true;
+        continue;
+      }
+
+      if (inRationale) {
+        // Skip rationale lines until next question
         continue;
       }
 
@@ -526,25 +541,31 @@ function BulkImportModal({
         continue;
       }
 
-      const optMatch = line.match(optionPattern);
+      const optMatch = line.match(optionPattern) || line.match(altOptionPattern);
       if (optMatch) {
         currentQ.choices.push({
           id: optMatch[1].toUpperCase(),
-          text: optMatch[2]
+          text: optMatch[2].replace(/^\*+|\*+$/g, '').trim()
         });
         continue;
       }
 
       const ansMatch = line.match(answerPattern);
       if (ansMatch) {
-        currentQ.correctAnswer = ansMatch[1].trim();
+        currentQ.correctAnswer = ansMatch[1].replace(/[*()]/g, '').trim();
         continue;
       }
       
-      // If none matched and we have a current question, maybe it's multi-line text
-      if (currentQ && !line.match(rationalePattern)) {
+      // If we are before choices, it is multi-line question text
+      if (currentQ.choices.length === 0 && !currentQ.correctAnswer) {
         if (!currentQ.text) currentQ.text = line;
         else currentQ.text += " " + line;
+      } else if (currentQ.choices.length > 0 && !currentQ.correctAnswer) {
+        // Multi-line choice
+        const lastChoice = currentQ.choices[currentQ.choices.length - 1];
+        if (lastChoice) {
+          lastChoice.text += " " + line;
+        }
       }
     }
 
@@ -552,7 +573,7 @@ function BulkImportModal({
 
     // Map letter IDs to real UIDs for multiple choice
     return questions.map(q => {
-      if (q.type === "multiple-choice" && q.choices.length > 0) {
+      if ((q.type === "multiple-choice" || q.type === "incorrect-alternative") && q.choices.length > 0) {
         const uids: Record<string, string> = {};
         const finalChoices = q.choices.map((c: any) => {
           const newId = uid();
@@ -561,9 +582,11 @@ function BulkImportModal({
         });
         
         let finalCorrect = q.correctAnswer;
-        const letterMatch = q.correctAnswer.match(/([A-D])/i);
+        const letterMatch = q.correctAnswer.match(/([A-E])/i);
         if (letterMatch && uids[letterMatch[1].toUpperCase()]) {
           finalCorrect = uids[letterMatch[1].toUpperCase()];
+        } else if (finalChoices[0]) {
+          finalCorrect = finalChoices[0].id;
         }
 
         return { ...q, choices: finalChoices, correctAnswer: finalCorrect };
@@ -581,8 +604,6 @@ function BulkImportModal({
     });
   }
 
-  const RationalePattern = /^Fundamentação:.*/i;
-
   useEffect(() => {
     if (text.trim()) {
       const parsed = parseContent(text);
@@ -598,16 +619,14 @@ function BulkImportModal({
     setError("");
 
     try {
-      for (const q of preview) {
-        await addQuestion({
-          disciplineId,
-          ...q
-        });
-      }
+      await addQuestions(preview.map(q => ({
+        disciplineId,
+        ...q
+      })));
       onSave();
       onClose();
-    } catch (err) {
-      setError("Erro ao salvar algumas questões no banco de dados.");
+    } catch (err: any) {
+      setError(err?.message || "Erro ao salvar algumas questões no banco de dados.");
       console.error(err);
     } finally {
       setLoading(false);

@@ -734,11 +734,36 @@ export const getPublicClasses = getClasses
 
 export async function addQuestion(data: Omit<Question, "id" | "createdAt">): Promise<Question> {
   const supabase = createClient()
-  const q: any = { discipline_id: data.disciplineId, type: data.type, text: data.text, choices: data.choices, correct_answer: data.correctAnswer, points: data.points, created_at: new Date().toISOString() }
+  const newId = uid()
+  const q: any = { id: newId, discipline_id: data.disciplineId, type: data.type, text: data.text, choices: data.choices, correct_answer: data.correctAnswer, points: data.points, created_at: new Date().toISOString() }
   if (data.pairs && data.pairs.length > 0) q.choices = { options: data.choices || [], matchingPairs: data.pairs }
   const { error } = await supabase.from('questions').insert(q)
   if (error) throw new Error(`Erro ao salvar questão: ${error.message}`)
   return mapQuestion(q)
+}
+
+export async function addQuestions(questions: Omit<Question, "id" | "createdAt">[]): Promise<Question[]> {
+  if (questions.length === 0) return []
+  const supabase = createClient()
+  const payload = questions.map(data => {
+    const q: any = {
+      id: uid(),
+      discipline_id: data.disciplineId,
+      type: data.type,
+      text: data.text,
+      choices: data.choices,
+      correct_answer: data.correctAnswer,
+      points: data.points,
+      created_at: new Date().toISOString()
+    }
+    if (data.pairs && data.pairs.length > 0) {
+      q.choices = { options: data.choices || [], matchingPairs: data.pairs }
+    }
+    return q
+  })
+  const { error } = await supabase.from('questions').insert(payload)
+  if (error) throw new Error(`Erro ao salvar questões em lote: ${error.message}`)
+  return payload.map(mapQuestion)
 }
 
 export async function updateQuestion(id: string, data: Partial<Omit<Question, "id" | "createdAt">>): Promise<void> {
