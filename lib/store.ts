@@ -992,7 +992,23 @@ export async function updateProfessorAccount(id: string, data: Partial<Omit<Prof
   if (data.bank_info !== undefined) updateData.bank_info = data.bank_info || null
   if (data.password) updateData.password_hash = hashPassword(data.password)
   
-  const { data: updated, error } = await supabase.from('professor_accounts').update(updateData).eq('id', id).select().maybeSingle()
+  let { data: updated, error } = await supabase.from('professor_accounts').update(updateData).eq('id', id).select().maybeSingle()
+  
+  // Se der erro de coluna ausente (ex: bank_info, pix_key, bio), tenta salvar os campos essenciais (role, name, email, active)
+  if (error && error.message && error.message.includes("Could not find the '")) {
+    const fallbackData: any = {}
+    if (data.name !== undefined) fallbackData.name = updateData.name
+    if (data.email !== undefined) fallbackData.email = updateData.email
+    if (data.role !== undefined) fallbackData.role = updateData.role
+    if (data.active !== undefined) fallbackData.active = updateData.active
+    if (data.password) fallbackData.password_hash = updateData.password_hash
+    
+    const retry = await supabase.from('professor_accounts').update(fallbackData).eq('id', id).select().maybeSingle()
+    if (!retry.error) {
+      return retry.data ? mapProfessor(retry.data) : null
+    }
+  }
+
   if (error) throw new Error(`Falha ao atualizar professor: ${error.message}`)
   return updated ? mapProfessor(updated) : null
 }
