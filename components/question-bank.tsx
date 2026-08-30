@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import {
-  Plus, Pencil, Trash2, ChevronRight, BookOpen, CheckSquare, AlignLeft, X, Check, Sparkles, Upload, ListChecks, Download
+  Plus, Pencil, Trash2, ChevronRight, BookOpen, CheckSquare, AlignLeft, X, Check, Sparkles, Upload, ListChecks, Download, Search
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -896,7 +896,7 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
   const [bulkDeleteModal, setBulkDeleteModal] = useState(false)
   const [emptyDiscModal, setEmptyDiscModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-
+  const [searchQuery, setSearchQuery] = useState("")
 
   async function reload(discIdToSelect?: string) {
     const discs = await getDisciplines()
@@ -932,6 +932,7 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
 
   async function handleSelectDisc(d: Discipline) {
     setSelectedDiscipline(d)
+    setSearchQuery("")
     const qs = await getQuestionsByDiscipline(d.id)
     setQuestions(qs)
   }
@@ -985,11 +986,24 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
     }
   }
 
+  const filteredQuestions = questions.filter(q => {
+    if (!searchQuery.trim()) return true
+    const term = searchQuery.toLowerCase().trim()
+    const matchText = q.text?.toLowerCase().includes(term)
+    const matchChoices = q.choices?.some(c => c.text.toLowerCase().includes(term))
+    const matchPairs = q.pairs?.some(p => p.left.toLowerCase().includes(term) || p.right.toLowerCase().includes(term))
+    const matchType = (TYPE_LABELS[q.type] || "").toLowerCase().includes(term)
+    return matchText || matchChoices || matchPairs || matchType
+  })
+
   const toggleSelectAll = () => {
-    if (selectedIds.length === questions.length) {
-      setSelectedIds([])
+    const currentVisibleIds = filteredQuestions.map(q => q.id)
+    const allVisibleSelected = currentVisibleIds.length > 0 && currentVisibleIds.every(id => selectedIds.includes(id))
+    
+    if (allVisibleSelected) {
+      setSelectedIds(prev => prev.filter(id => !currentVisibleIds.includes(id)))
     } else {
-      setSelectedIds(questions.map(q => q.id))
+      setSelectedIds(prev => Array.from(new Set([...prev, ...currentVisibleIds])))
     }
   }
 
@@ -1070,12 +1084,12 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
 
       {/* Right: Questions */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/5">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between px-5 py-3 border-b border-border bg-muted/5 gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {questions.length > 0 && (
               <div className="flex items-center gap-2 pr-3 border-r border-border">
                 <Checkbox 
-                  checked={selectedIds.length === questions.length && questions.length > 0}
+                  checked={filteredQuestions.length > 0 && filteredQuestions.every(q => selectedIds.includes(q.id))}
                   onCheckedChange={toggleSelectAll}
                   aria-label="Selecionar todas as questões"
                 />
@@ -1090,6 +1104,31 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
               )}
             </div>
           </div>
+
+          {/* Search Bar */}
+          {selectedDiscipline && questions.length > 0 && (
+            <div className="relative flex-1 min-w-[180px] max-w-xs md:max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                type="text"
+                placeholder="Buscar por iniciais, texto, gabarito..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-8 h-9 text-xs bg-background rounded-lg border-border focus-visible:ring-1"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-full"
+                  title="Limpar busca"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
           {selectedDiscipline && (
             <div className="flex items-center gap-2">
               {selectedIds.length > 0 ? (
@@ -1169,8 +1208,18 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
                 <Plus className="h-3.5 w-3.5 mr-1.5" /> Adicionar primeira questão
               </Button>
             </div>
+          ) : filteredQuestions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 py-16">
+              <Search className="h-10 w-10 opacity-30" />
+              <p className="text-sm font-medium">Nenhuma questão encontrada para &quot;{searchQuery}&quot;</p>
+              <Button size="sm" variant="outline" onClick={() => setSearchQuery("")}>
+                Limpar busca
+              </Button>
+            </div>
           ) : (
-            questions.map((q, i) => (
+            filteredQuestions.map((q) => {
+              const originalIndex = questions.findIndex(item => item.id === q.id) + 1
+              return (
               <div
                 key={q.id}
                 className={cn(
@@ -1190,7 +1239,7 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
                     "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors",
                     selectedIds.includes(q.id) ? "bg-primary text-white" : "bg-primary/10 text-primary"
                   )}>
-                    {i + 1}
+                    {originalIndex}
                   </div>
                 </div>
 
@@ -1249,7 +1298,7 @@ export function QuestionBank({ isMaster }: { isMaster?: boolean }) {
                   </Button>
                 </div>
               </div>
-            ))
+            )})
           )}
         </div>
       </div>

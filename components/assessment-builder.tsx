@@ -6,7 +6,7 @@ import {
   Users, FileText, BookOpen, Settings, BarChart3, Download, LogOut,
   Plus, Pencil, Trash2, Eye, EyeOff, Trophy, Clock, CheckCircle2,
   ShieldCheck, Sparkles, AlertCircle, AlertTriangle, ChevronRight, ChevronLeft, Shuffle, Check, ListChecks, Search, HelpCircle, Variable,
-  ArrowUp, ArrowDown, RefreshCw, List, Globe, Lock
+  ArrowUp, ArrowDown, RefreshCw, List, Globe, Lock, X
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -70,6 +70,7 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave, disciplin
   const [allQuestions, setAllQuestions] = useState<Question[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [loadingQuestions, setLoadingQuestions] = useState(false)
+  const [manualSearchQuery, setManualSearchQuery] = useState("")
 
   useEffect(() => {
     if (!open) return
@@ -82,6 +83,7 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave, disciplin
       }
       if (!mounted) return
       setDisciplines(discs)
+      setManualSearchQuery("")
 
       if (assessment) {
         setTitle(assessment.title)
@@ -588,76 +590,124 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave, disciplin
                   </button>
                 </div>
 
-                {selectionMode === "manual" && (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <p className={`text-sm ${selectedIds.size < questionCount ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
-                        Selecione exatamente <strong>{questionCount}</strong> questão{questionCount === 1 ? "" : "es"} ({selectedIds.size} selecionada{selectedIds.size === 1 ? "" : "s"})
-                        {selectedIds.size < questionCount && (
-                          <span className="ml-2 text-amber-600 font-bold">— Faltam {questionCount - selectedIds.size}</span>
+                {selectionMode === "manual" && (() => {
+                  const filteredManualQuestions = availableQuestions.filter(q => {
+                    if (!manualSearchQuery.trim()) return true
+                    const term = manualSearchQuery.toLowerCase().trim()
+                    const matchText = q.text?.toLowerCase().includes(term)
+                    const matchChoices = q.choices?.some(c => c.text.toLowerCase().includes(term))
+                    const matchPairs = q.pairs?.some(p => p.left.toLowerCase().includes(term) || p.right.toLowerCase().includes(term))
+                    const matchType = (FORMAT_LABELS[q.type] || q.type).toLowerCase().includes(term)
+                    return matchText || matchChoices || matchPairs || matchType
+                  })
+
+                  return (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <p className={`text-sm ${selectedIds.size < questionCount ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
+                          Selecione exatamente <strong>{questionCount}</strong> questão{questionCount === 1 ? "" : "es"} ({selectedIds.size} selecionada{selectedIds.size === 1 ? "" : "s"})
+                          {selectedIds.size < questionCount && (
+                            <span className="ml-2 text-amber-600 font-bold">— Faltam {questionCount - selectedIds.size}</span>
+                          )}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {availableQuestions.length < questionCount && (
+                            <Button size="sm" variant="outline" className="text-amber-600 border-amber-200" onClick={() => setQuestionCount(availableQuestions.length)}>
+                              Ajustar p/ Máximo ({availableQuestions.length})
+                            </Button>
+                          )}
+                          {availableQuestions.length > 0 && (
+                            <Button size="sm" variant="outline" onClick={handleAutoSelect}>
+                              <Shuffle className="h-3.5 w-3.5 mr-1.5" /> Sortear
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Barra de Busca Manual */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                        <Input
+                          type="text"
+                          placeholder="Buscar questões por texto, iniciais ou alternativas..."
+                          value={manualSearchQuery}
+                          onChange={(e) => setManualSearchQuery(e.target.value)}
+                          className="pl-9 pr-8 h-9 text-xs bg-slate-50 border-slate-200 focus-visible:bg-white focus-visible:ring-1"
+                        />
+                        {manualSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setManualSearchQuery("")}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                            title="Limpar busca"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
                         )}
-                      </p>
-                      <div className="flex gap-2">
-                        {availableQuestions.length < questionCount && (
-                          <Button size="sm" variant="outline" className="text-amber-600 border-amber-200" onClick={() => setQuestionCount(availableQuestions.length)}>
-                            Ajustar p/ Máximo ({availableQuestions.length})
-                          </Button>
-                        )}
-                        {availableQuestions.length > 0 && (
-                          <Button size="sm" variant="outline" onClick={handleAutoSelect}>
-                            <Shuffle className="h-3.5 w-3.5 mr-1.5" /> Sortear
-                          </Button>
+                      </div>
+
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pr-1">
+                        {availableQuestions.filter(Boolean).length === 0 ? (
+                          <div className="xl:col-span-2">
+                            <p className="text-sm text-muted-foreground text-center py-12 bg-white border border-dashed rounded-xl">
+                              Nenhuma questão disponível para este formato e disciplina.
+                            </p>
+                          </div>
+                        ) : filteredManualQuestions.length === 0 ? (
+                          <div className="xl:col-span-2">
+                            <div className="flex flex-col items-center justify-center py-12 bg-slate-50 border border-dashed rounded-xl gap-2">
+                              <Search className="h-8 w-8 text-slate-300" />
+                              <p className="text-sm font-medium text-slate-600">
+                                Nenhuma questão encontrada para &quot;{manualSearchQuery}&quot;
+                              </p>
+                              <Button size="sm" variant="ghost" className="text-xs text-primary font-bold" onClick={() => setManualSearchQuery("")}>
+                                Limpar busca
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          filteredManualQuestions.filter(Boolean).map((q) => {
+                            const originalIndex = availableQuestions.findIndex(item => item.id === q.id) + 1
+                            const checked = selectedIds.has(q.id)
+                            const disabled = !checked && selectedIds.size >= questionCount
+                            return (
+                              <label
+                                key={q.id}
+                                className={`relative flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${checked ? "border-primary bg-primary/5 shadow-md" :
+                                  disabled ? "border-border opacity-40 cursor-not-allowed" :
+                                    "border-border bg-white hover:border-primary/40 hover:shadow-sm"
+                                  }`}
+                              >
+                                <div className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${checked ? "border-primary bg-primary" : "border-muted-foreground/30"
+                                  }`}>
+                                  {checked && <Check className="h-4 w-4 text-primary-foreground" />}
+                                </div>
+                                <input
+                                  type="checkbox"
+                                  className="sr-only"
+                                  checked={checked}
+                                  disabled={disabled}
+                                  onChange={() => toggleQuestion(q.id)}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 uppercase">
+                                      Q{originalIndex}
+                                    </span>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase">
+                                      {FORMAT_LABELS[q.type] || q.type}
+                                    </span>
+                                  </div>
+                                  <span className="text-[13px] font-medium text-slate-700 leading-relaxed block">{q.text}</span>
+                                </div>
+                              </label>
+                            )
+                          })
                         )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pr-1">
-                      {availableQuestions.filter(Boolean).length === 0 ? (
-                        <div className="xl:col-span-2">
-                          <p className="text-sm text-muted-foreground text-center py-12 bg-white border border-dashed rounded-xl">
-                            Nenhuma questão disponível para este formato e disciplina.
-                          </p>
-                        </div>
-                      ) : (
-                        availableQuestions.filter(Boolean).map((q, i) => {
-                          const checked = selectedIds.has(q.id)
-                          const disabled = !checked && selectedIds.size >= questionCount
-                          return (
-                            <label
-                              key={q.id}
-                              className={`relative flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${checked ? "border-primary bg-primary/5 shadow-md" :
-                                disabled ? "border-border opacity-40 cursor-not-allowed" :
-                                  "border-border bg-white hover:border-primary/40 hover:shadow-sm"
-                                }`}
-                            >
-                              <div className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${checked ? "border-primary bg-primary" : "border-muted-foreground/30"
-                                }`}>
-                                {checked && <Check className="h-4 w-4 text-primary-foreground" />}
-                              </div>
-                              <input
-                                type="checkbox"
-                                className="sr-only"
-                                checked={checked}
-                                disabled={disabled}
-                                onChange={() => toggleQuestion(q.id)}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 uppercase">
-                                    Q{i + 1}
-                                  </span>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase">
-                                    {FORMAT_LABELS[q.type] || q.type}
-                                  </span>
-                                </div>
-                                <span className="text-[13px] font-medium text-slate-700 leading-relaxed block">{q.text}</span>
-                              </div>
-                            </label>
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
+                  )
+                })()}
 
                 {selectionMode === "auto" && (
                   <div className={cn(
