@@ -352,6 +352,8 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
     .filter((s) => s.assessmentId === selectedAssessmentId)
     .sort((a, b) => getFinalGrade(b) - getFinalGrade(a))
 
+  const selectedAssessment = assessments.find((a) => a.id === selectedAssessmentId)
+
   const classAverage = submissions.length > 0
     ? submissions.reduce((acc, curr) => acc + getFinalGrade(curr), 0) / submissions.length
     : 0
