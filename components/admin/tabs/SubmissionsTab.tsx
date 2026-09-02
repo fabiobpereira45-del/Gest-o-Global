@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { BarChart3, CheckCircle2, Download, Eye, FileText, Pencil, RotateCcw, Trophy, Trash2, Users, XCircle, X, Clock, AlertTriangle, Flag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -167,8 +168,8 @@ function AnswerViewerModal({
   const isPassing = scorePct >= 70
 
   if (loadingQs) {
-    return (
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+    return createPortal(
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         <div className="relative z-10 flex flex-col items-center justify-center gap-4 bg-white rounded-3xl shadow-2xl border border-slate-200 p-12">
           <div className="relative flex h-14 w-14">
@@ -179,12 +180,13 @@ function AnswerViewerModal({
           </div>
           <p className="text-slate-500 font-medium text-sm animate-pulse">Carregando questões...</p>
         </div>
-      </div>
+      </div>,
+      document.body
     )
   }
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
@@ -301,7 +303,8 @@ function AnswerViewerModal({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 // ─────────────────────────────────────────────────────────────────────────────
