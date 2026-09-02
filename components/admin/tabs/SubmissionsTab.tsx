@@ -9,7 +9,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { type Assessment, type StudentSubmission, type Question, deleteSubmission, updateSubmissionScore, reopenSubmission, getQuestionsByDiscipline } from "@/lib/store"
-import { printStudentPDF } from "@/lib/pdf"
+import { printStudentPDF, printOverviewPDF, printScoreTablePDF } from "@/lib/pdf"
 import { formatDate, formatTime } from "../admin-utils"
 import { cn } from "@/lib/utils"
 
@@ -203,7 +203,9 @@ function AnswerViewerModal({
                   ? "bg-green-50 text-green-700 border-green-200"
                   : "bg-red-50 text-red-700 border-red-200"
               )}>
-                {scoreLabel} / 10
+                {sub.preQuestionnaireAnswers 
+                  ? (((sub.score / sub.totalPoints) * 10 + sub.preQuestionnaireScore!) / 2).toFixed(1)
+                  : scoreLabel} / 10
               </span>
               <span className="flex items-center gap-1 text-xs text-slate-500">
                 <Clock className="h-3 w-3" /> {formatTime(sub.timeElapsedSeconds)}
@@ -225,6 +227,36 @@ function AnswerViewerModal({
 
         {/* Question List */}
         <div className="overflow-y-auto flex-1 px-6 py-6 flex flex-col gap-6">
+          {sub.preQuestionnaireAnswers && (
+            <div className="mb-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <h3 className="text-sm font-bold text-slate-800 font-serif mb-3 flex justify-between items-center">
+                Questionário Pré-Avaliação
+                <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded-full">Nota: {sub.preQuestionnaireScore?.toFixed(1)}</span>
+              </h3>
+              <div className="grid gap-2">
+                {[
+                  { id: 'q1', label: 'Participou da aula presencial?' },
+                  { id: 'q2', label: 'Participou da Aula Online?' },
+                  { id: 'q3', label: 'Fez a leitura do Livro?' },
+                  { id: 'q4', label: 'Assistiu a vídeo aula?' },
+                  { id: 'q5', label: 'Respondeu ao Questionário?' }
+                ].map(q => (
+                  <div key={q.id} className="flex items-center justify-between text-sm p-2 bg-white rounded border border-slate-100">
+                    <span className="text-slate-600">{q.label}</span>
+                    <span className={cn(
+                      "font-bold px-2 py-0.5 rounded text-xs",
+                      sub.preQuestionnaireAnswers![q.id] 
+                        ? "bg-green-100 text-green-700" 
+                        : "bg-red-100 text-red-700"
+                    )}>
+                      {sub.preQuestionnaireAnswers![q.id] ? "SIM" : "NÃO"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {questions.map((q, idx) => {
             const rawAnswer = getAnswer(q.id)
             const isAnswered = !!rawAnswer
@@ -377,7 +409,11 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
             variant="outline"
             size="sm"
             onClick={() => {
-              alert("Geração de PDF Compilado em manutenção.")
+              if (!selectedAssessment) return
+              const qs = selectedAssessment.questionIds
+                .map((id) => questions.find((q) => q.id === id))
+                .filter(Boolean) as typeof questions
+              printOverviewPDF({ assessments: [selectedAssessment], submissions, questions: qs })
             }}
             className="ml-auto"
             disabled={submissions.length === 0}
@@ -388,7 +424,8 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
             variant="outline"
             size="sm"
             onClick={() => {
-              alert("Geração da Tabela em PDF em manutenção.")
+              if (!selectedAssessment) return
+              printScoreTablePDF({ assessment: selectedAssessment, submissions })
             }}
             disabled={submissions.length === 0}
           >
@@ -471,7 +508,9 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
                       </div>
                     ) : (
                       <span className={`px-2 py-0.5 rounded flex items-center justify-center font-bold font-mono text-sm max-w-[80px] mx-auto ` + (sub.percentage >= 70 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
-                        {(sub.percentage / 10).toFixed(1)}
+                        {sub.preQuestionnaireAnswers
+                          ? (((sub.score / sub.totalPoints) * 10 + sub.preQuestionnaireScore!) / 2).toFixed(1)
+                          : (sub.percentage / 10).toFixed(1)}
                       </span>
                     )}
                   </td>

@@ -161,16 +161,31 @@ export function AssessmentResult({ submission, onBack }: Props) {
                 {resultsReleased ? (
                   <>
                     <div className="flex items-baseline justify-center gap-2 mb-2">
-                       <h2 className="text-7xl font-black tracking-tight drop-shadow-lg font-serif">{(submission.percentage / 10).toFixed(1)}</h2>
+                       <h2 className="text-7xl font-black tracking-tight drop-shadow-lg font-serif">
+                         {submission.preQuestionnaireAnswers 
+                           ? (((submission.score / submission.totalPoints) * 10 + submission.preQuestionnaireScore!) / 2).toFixed(1)
+                           : (submission.percentage / 10).toFixed(1)}
+                       </h2>
                        <span className="text-2xl font-bold opacity-70"> / 10.0</span>
                     </div>
+
+                    {submission.preQuestionnaireAnswers && (
+                      <div className="flex justify-center gap-6 mt-2 mb-4 text-sm font-bold text-white/80">
+                         <div className="bg-white/10 px-4 py-1.5 rounded-full border border-white/10">
+                           Prova: {((submission.score / submission.totalPoints) * 10).toFixed(1)}
+                         </div>
+                         <div className="bg-white/10 px-4 py-1.5 rounded-full border border-white/10">
+                           Quest.: {submission.preQuestionnaireScore?.toFixed(1)}
+                         </div>
+                      </div>
+                    )}
                     
                     <div className="flex items-center justify-center gap-3 mt-4">
                       <div className="px-5 py-2 rounded-full bg-white font-bold shadow-md flex items-center gap-2">
                         {passed ? (
-                          <><Sparkles className="h-4 w-4 text-green-600" /> <span className="text-green-700">Aprovado ({submission.percentage}%)</span></>
+                          <><Sparkles className="h-4 w-4 text-green-600" /> <span className="text-green-700">Aprovado</span></>
                         ) : (
-                          <><AlertTriangle className="h-4 w-4 text-rose-600" /> <span className="text-rose-700">Reprovado ({submission.percentage}%)</span></>
+                          <><AlertTriangle className="h-4 w-4 text-rose-600" /> <span className="text-rose-700">Reprovado</span></>
                         )}
                       </div>
                     </div>

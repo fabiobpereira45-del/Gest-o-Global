@@ -104,8 +104,8 @@ export function AdminDashboard({ onLogout }: Props) {
       const [a, d, s, q] = await Promise.all([
         getAssessments(),
         getDisciplines(),
-        getSubmissions(500),
-        getQuestions(500)
+        getSubmissions(5000),
+        getQuestions(5000)
       ])
       setAssessments(a)
       setDisciplines(d)
@@ -121,8 +121,8 @@ export function AdminDashboard({ onLogout }: Props) {
   async function loadAnalytics() {
     try {
       const [s, q] = await Promise.all([
-        getSubmissions(500), 
-        getQuestions(500)    
+        getSubmissions(5000), 
+        getQuestions(5000)    
       ])
       setSubmissions(s)
       setQuestions(q)

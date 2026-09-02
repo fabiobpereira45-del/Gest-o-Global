@@ -813,6 +813,69 @@ export function printOverviewPDF({ assessments, submissions, questions }: { asse
     safePrint(getModernTemplate(content, "Relatório Geral de Avaliações", hubName), existingWin)
 }
 
+export function printScoreTablePDF({ assessment, submissions }: { assessment: Assessment, submissions: StudentSubmission[] }, hubName?: string, existingWin?: Window | null): void {
+    const subList = Array.isArray(submissions) ? [...submissions].sort((a, b) => b.percentage - a.percentage) : []
+    const avgPct = subList.length > 0 ? subList.reduce((acc, s) => acc + (s.percentage || 0), 0) / subList.length : 0
+    const approved = subList.filter(s => s.percentage >= 70).length
+    const failed = subList.length - approved
+
+    const rows = subList.map((s, i) => {
+        const nota = ((s.percentage || 0) / 10).toFixed(1)
+        const isPassing = (s.percentage || 0) >= 70
+        const statusClass = isPassing ? 'badge-success' : 'badge-danger'
+        const statusText = isPassing ? 'Aprovado' : 'Reprovado'
+        const tempo = formatTime(s.timeElapsedSeconds || 0)
+        return `
+        <tr>
+            <td width="40" style="color:#94a3b8;font-weight:600;">${i + 1}</td>
+            <td class="row-accent">
+                <div style="font-weight:700;color:#1e3a5f;">${s.studentName || '—'}</div>
+                <div style="font-size:11px;color:#94a3b8;">${s.studentEmail || ''}</div>
+            </td>
+            <td style="text-align:center;font-size:18px;font-weight:800;color:#1e3a5f;">${nota}</td>
+            <td style="text-align:center;color:#64748b;font-size:12px;">${tempo}</td>
+            <td style="text-align:center;"><span class="badge ${statusClass}">${statusText}</span></td>
+        </tr>`
+    }).join('')
+
+    const content = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;">
+          <div style="background:#f8fafc;padding:18px;border-radius:12px;border:1px solid #e2e8f0;text-align:center;">
+              <p style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Total de Alunos</p>
+              <p style="font-size:24px;font-weight:800;color:#1e3a5f;">${subList.length}</p>
+          </div>
+          <div style="background:#f0fdf4;padding:18px;border-radius:12px;border:1px solid #bbf7d0;text-align:center;">
+              <p style="font-size:10px;color:#166534;text-transform:uppercase;font-weight:700;">Aprovados</p>
+              <p style="font-size:24px;font-weight:800;color:#16a34a;">${approved}</p>
+          </div>
+          <div style="background:#fef2f2;padding:18px;border-radius:12px;border:1px solid #fecaca;text-align:center;">
+              <p style="font-size:10px;color:#991b1b;text-transform:uppercase;font-weight:700;">Reprovados</p>
+              <p style="font-size:24px;font-weight:800;color:#dc2626;">${failed}</p>
+          </div>
+          <div style="background:#fff7ed;padding:18px;border-radius:12px;border:1px solid #fed7aa;text-align:center;">
+              <p style="font-size:10px;color:#9a3412;text-transform:uppercase;font-weight:700;">Média da Turma</p>
+              <p style="font-size:24px;font-weight:800;color:#f97316;">${(avgPct / 10).toFixed(1)}</p>
+          </div>
+      </div>
+
+      <h2 style="margin-bottom:16px;">Tabela de Notas — ${assessment.title || 'Prova'}</h2>
+      <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Aluno</th>
+                <th style="text-align:center;">Nota</th>
+                <th style="text-align:center;">Tempo</th>
+                <th style="text-align:center;">Situação</th>
+            </tr>
+        </thead>
+        <tbody>${rows || '<tr><td colspan="5" style="text-align:center;">Nenhuma submissão encontrada</td></tr>'}</tbody>
+      </table>
+    `
+    safePrint(getModernTemplate(content, `Tabela de Notas - ${assessment.title || 'Prova'}`, hubName), existingWin)
+}
+
+
 export function printInstallmentsReportPDF(transactions: FinancialTransaction[], hubName?: string, existingWin?: Window | null, filters?: { category?: string; status?: string; monthYear?: string }): void {
   let list = (Array.isArray(transactions) ? transactions : []).filter(t => t.type === 'expense')
   if (filters?.category && filters.category !== 'all') list = list.filter(t => t.category === filters.category)

@@ -139,12 +139,21 @@ export function StudentGradesView({ studentId, studentEmail, studentDoc }: Props
             const studentDisciplineSubs = submissions.filter(s => assessmentIds.includes(s.assessmentId));
             if (studentDisciplineSubs.length > 0) {
                 finalExamGrade = Math.max(...studentDisciplineSubs.map(s => {
-                    const pct = Number(s.percentage || 0);
                     const rawScore = Number(s.score || 0);
                     const totalPts = Number(s.totalPoints || 0);
-                    if (pct > 0) return Math.round((pct / 10) * 100) / 100;
-                    if (totalPts > 0 && rawScore > 10) return Math.round((rawScore / totalPts) * 10 * 100) / 100;
-                    return rawScore;
+                    
+                    let baseExamScore = 0;
+                    if (totalPts > 0) {
+                        baseExamScore = (rawScore / totalPts) * 10;
+                    } else if (s.percentage > 0) {
+                        baseExamScore = s.percentage / 10;
+                    }
+
+                    if (s.preQuestionnaireAnswers) {
+                        return (baseExamScore + (s.preQuestionnaireScore || 0)) / 2;
+                    }
+                    
+                    return baseExamScore;
                 }));
             }
 

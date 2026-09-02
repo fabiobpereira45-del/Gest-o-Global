@@ -13,9 +13,9 @@ export interface Discipline { id: string; name: string; description?: string | n
 export interface StudyMaterial { id: string; disciplineId: string; title: string; description?: string; fileUrl: string; createdAt: string }
 export interface GradingSettings { id: string; pointsPerPresence: number; onlinePresencePoints: number; interactionPoints: number; bookActivityPoints: number; passingAverage: number; totalDivisor: number; updatedAt: string; }
 export interface Question { id: string; disciplineId: string; type: QuestionType; text: string; choices: Choice[]; pairs?: MatchingPair[]; correctAnswer: string; points: number; createdAt: string }
-export interface Assessment { id: string; title: string; disciplineId: string; professor: string; institution: string; questionIds: string[]; pointsPerQuestion: number; totalPoints: number; openAt: string | null; closeAt: string | null; isPublished: boolean; archived: boolean; shuffleVariants?: boolean; timeLimitMinutes?: number | null; logoBase64?: string; rules?: string; releaseResults?: boolean; modality?: "public" | "private"; createdAt: string }
+export interface Assessment { id: string; title: string; disciplineId: string; professor: string; institution: string; questionIds: string[]; pointsPerQuestion: number; totalPoints: number; openAt: string | null; closeAt: string | null; isPublished: boolean; archived: boolean; shuffleVariants?: boolean; timeLimitMinutes?: number | null; logoBase64?: string; rules?: string; releaseResults?: boolean; modality?: "public" | "private"; requirePreQuestionnaire?: boolean; preQuestionnaireConfig?: Record<string, number>; createdAt: string }
 export interface StudentAnswer { questionId: string; answer: string }
-export interface StudentSubmission { id: string; assessmentId: string; studentName: string; studentEmail: string; answers: StudentAnswer[]; score: number; totalPoints: number; percentage: number; submittedAt: string; timeElapsedSeconds: number; focusLostCount?: number }
+export interface StudentSubmission { id: string; assessmentId: string; studentName: string; studentEmail: string; answers: StudentAnswer[]; score: number; totalPoints: number; percentage: number; submittedAt: string; timeElapsedSeconds: number; focusLostCount?: number; preQuestionnaireAnswers?: Record<string, boolean>; preQuestionnaireScore?: number }
 export interface ProfessorAccount { id: string; name: string; email: string; passwordHash: string; role: "master" | "professor"; avatar_url?: string | null; bio?: string | null; createdAt: string; active?: boolean; pix_key?: string | null; bank_info?: string | null; }
 export interface FinancialSettings { 
   tuitionRate: number; 
@@ -485,10 +485,12 @@ function mapAssessment(row: any): Assessment {
     rules: row.rules,
     releaseResults: row.release_results,
     modality: cleanModality,
+    requirePreQuestionnaire: !!row.require_pre_questionnaire,
+    preQuestionnaireConfig: row.pre_questionnaire_config,
     createdAt: row.created_at
   }
 }
-function mapSubmission(row: any): StudentSubmission { return { id: row.id, assessmentId: row.assessment_id, studentName: row.student_name, studentEmail: row.student_email, answers: Array.isArray(row.answers) ? row.answers : [], score: row.score, totalPoints: row.total_points, percentage: row.percentage, submittedAt: row.submitted_at, timeElapsedSeconds: row.time_elapsed_seconds, focusLostCount: row.focus_lost_count || 0 } }
+function mapSubmission(row: any): StudentSubmission { return { id: row.id, assessmentId: row.assessment_id, studentName: row.student_name, studentEmail: row.student_email, answers: Array.isArray(row.answers) ? row.answers : [], score: row.score, totalPoints: row.total_points, percentage: row.percentage, submittedAt: row.submitted_at, timeElapsedSeconds: row.time_elapsed_seconds, focusLostCount: row.focus_lost_count || 0, preQuestionnaireAnswers: row.pre_questionnaire_answers, preQuestionnaireScore: row.pre_questionnaire_score } }
 function mapProfessor(p: any): ProfessorAccount {
   if (!p) return { id: "unknown", name: "Professor", email: "", passwordHash: "", role: "professor", createdAt: new Date().toISOString(), active: false }
   return { id: p.id || "unknown", name: p.name || "Professor", email: p.email || "", passwordHash: p.password_hash || "", role: p.role || "professor", avatar_url: p.avatar_url, bio: p.bio || null, createdAt: p.created_at || new Date().toISOString(), active: p.active !== false, pix_key: p.pix_key || null, bank_info: p.bank_info || null }
@@ -813,7 +815,7 @@ export async function getAssessmentById(id: string): Promise<Assessment | null> 
 
 export async function addAssessment(data: Omit<Assessment, "id" | "createdAt" | "releaseResults" | "archived">): Promise<Assessment> {
   const a = { ...data, id: uid(), createdAt: new Date().toISOString(), releaseResults: false, archived: false }
-  const dbData = { id: a.id, title: a.title, discipline_id: a.disciplineId, professor: a.professor, institution: a.institution, question_ids: a.questionIds, points_per_question: a.pointsPerQuestion, total_points: a.totalPoints, open_at: a.openAt, close_at: a.closeAt, is_published: a.isPublished, shuffle_variants: a.shuffleVariants, time_limit_minutes: a.timeLimitMinutes, logo_base64: a.logoBase64, rules: a.rules, release_results: a.releaseResults, modality: a.modality ?? "public", created_at: a.createdAt }
+  const dbData = { id: a.id, title: a.title, discipline_id: a.disciplineId, professor: a.professor, institution: a.institution, question_ids: a.questionIds, points_per_question: a.pointsPerQuestion, total_points: a.totalPoints, open_at: a.openAt, close_at: a.closeAt, is_published: a.isPublished, shuffle_variants: a.shuffleVariants, time_limit_minutes: a.timeLimitMinutes, logo_base64: a.logoBase64, rules: a.rules, release_results: a.releaseResults, modality: a.modality ?? "public", require_pre_questionnaire: a.requirePreQuestionnaire ?? false, pre_questionnaire_config: a.preQuestionnaireConfig ?? null, created_at: a.createdAt }
   const supabase = createClient()
   const { error } = await supabase.from('assessments').insert(dbData)
   if (error) throw new Error(error.message)
@@ -840,6 +842,8 @@ export async function updateAssessment(id: string, data: Partial<Omit<Assessment
   if (data.releaseResults !== undefined) dbData.release_results = data.releaseResults
   if (data.modality !== undefined) dbData.modality = data.modality
   if (data.archived !== undefined) dbData.archived = data.archived
+  if (data.requirePreQuestionnaire !== undefined) dbData.require_pre_questionnaire = data.requirePreQuestionnaire
+  if (data.preQuestionnaireConfig !== undefined) dbData.pre_questionnaire_config = data.preQuestionnaireConfig
   await supabase.from('assessments').update(dbData).eq('id', id)
 }
 
@@ -866,7 +870,7 @@ export async function saveSubmission(sub: StudentSubmission): Promise<StudentSub
     .eq('student_email', sub.studentEmail.toLowerCase())
     .eq('assessment_id', sub.assessmentId)
     .eq('reopened', true)
-  const record = { id: sub.id, assessment_id: sub.assessmentId, student_name: sub.studentName, student_email: sub.studentEmail, answers: sub.answers, score: sub.score, total_points: sub.totalPoints, percentage: sub.percentage, submitted_at: sub.submittedAt, time_elapsed_seconds: sub.timeElapsedSeconds, focus_lost_count: sub.focusLostCount || 0, reopened: false }
+  const record = { id: sub.id, assessment_id: sub.assessmentId, student_name: sub.studentName, student_email: sub.studentEmail, answers: sub.answers, score: sub.score, total_points: sub.totalPoints, percentage: sub.percentage, submitted_at: sub.submittedAt, time_elapsed_seconds: sub.timeElapsedSeconds, focus_lost_count: sub.focusLostCount || 0, reopened: false, pre_questionnaire_answers: sub.preQuestionnaireAnswers ?? null, pre_questionnaire_score: sub.preQuestionnaireScore ?? 0 }
   const { data, error } = await supabase.from('student_submissions').insert(record).select().single()
   if (error) throw new Error(error.message)
   return mapSubmission(data)

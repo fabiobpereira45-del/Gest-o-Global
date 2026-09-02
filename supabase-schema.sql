@@ -126,6 +126,8 @@ CREATE TABLE IF NOT EXISTS public.assessments (
   rules               TEXT,
   release_results     BOOLEAN NOT NULL DEFAULT FALSE,
   modality            TEXT NOT NULL DEFAULT 'public',
+  require_pre_questionnaire BOOLEAN NOT NULL DEFAULT FALSE,
+  pre_questionnaire_config JSONB,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -142,6 +144,8 @@ CREATE TABLE IF NOT EXISTS public.student_submissions (
   submitted_at         TIMESTAMPTZ,
   time_elapsed_seconds INTEGER NOT NULL DEFAULT 0,
   focus_lost_count     INTEGER NOT NULL DEFAULT 0,
+  pre_questionnaire_answers JSONB,
+  pre_questionnaire_score NUMERIC NOT NULL DEFAULT 0,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

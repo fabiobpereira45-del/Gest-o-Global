@@ -59,6 +59,12 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
   const [showGrid, setShowGrid] = useState(false)
   const [flagged, setFlagged] = useState<Set<string>>(new Set()) // Questions marked for review
 
+  // Pre-questionnaire
+  const [preQuestAnswers, setPreQuestAnswers] = useState<Record<string, boolean>>({
+    q1: false, q2: false, q3: false, q4: false, q5: false
+  })
+  const [showPreQuest, setShowPreQuest] = useState(false)
+
   // Submit confirmation modal state
   const [submitModal, setSubmitModal] = useState<{
     open: boolean
@@ -138,6 +144,10 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
           const currentElapsed = Math.floor((Date.now() - startedAt.current.getTime()) / 1000)
           setTimeLeft(Math.max(0, totalSecs - currentElapsed))
         }
+
+        if (a.requirePreQuestionnaire) {
+          setShowPreQuest(true)
+        }
       }
       setIsInitializing(false)
     }
@@ -159,6 +169,15 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
       })
       const { score, totalPoints, percentage } = calculateScore(currentAnswers, questions, assessment.pointsPerQuestion)
 
+      let preQuestScore = 0
+      if (assessment.requirePreQuestionnaire && assessment.preQuestionnaireConfig) {
+        Object.keys(preQuestAnswers).forEach(key => {
+          if (preQuestAnswers[key]) {
+            preQuestScore += assessment.preQuestionnaireConfig![key] || 0
+          }
+        })
+      }
+
       const sub: StudentSubmission = {
         id: uid(),
         assessmentId: assessment.id,
@@ -171,6 +190,8 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
         submittedAt: new Date().toISOString(),
         timeElapsedSeconds: elapsedSecs,
         focusLostCount,
+        preQuestionnaireAnswers: assessment.requirePreQuestionnaire ? preQuestAnswers : undefined,
+        preQuestionnaireScore: assessment.requirePreQuestionnaire ? preQuestScore : undefined,
       }
       await saveSubmission(sub)
       clearStudentSession(assessment.id)
@@ -428,6 +449,55 @@ export function AssessmentForm({ session, onSubmit, onBack }: Props) {
         <Button className="mt-8 px-8 py-6 text-lg rounded-xl premium-shadow font-bold bg-primary hover:bg-primary/90" onClick={() => router.push("/")}>
           Sair e Voltar
         </Button>
+      </div>
+    )
+  }
+
+  if (showPreQuest) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80vh] p-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl border max-w-2xl w-full">
+          <h2 className="text-2xl font-bold font-serif mb-6 text-slate-900 text-center">Questionário Pré-Avaliação</h2>
+          <p className="text-slate-500 mb-8 text-center text-sm">Por favor, responda com sinceridade às questões abaixo antes de iniciar a prova.</p>
+          
+          <div className="flex flex-col gap-4 mb-8">
+            {[
+              { id: 'q1', label: '1 - Participou da aula presencial?' },
+              { id: 'q2', label: '2 - Participou da Aula Online?' },
+              { id: 'q3', label: '3 - Fez a leitura do Livro?' },
+              { id: 'q4', label: '4 - Assistiu a vídeo aula?' },
+              { id: 'q5', label: '5 - Respondeu ao Questionário?' }
+            ].map((q) => (
+              <div key={q.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border">
+                <span className="font-medium text-slate-700">{q.label}</span>
+                <div className="flex gap-2">
+                  <Button 
+                    variant={preQuestAnswers[q.id] === true ? "default" : "outline"} 
+                    className={preQuestAnswers[q.id] === true ? "bg-green-600 hover:bg-green-700" : ""}
+                    onClick={() => setPreQuestAnswers(prev => ({ ...prev, [q.id]: true }))}
+                  >
+                    Sim
+                  </Button>
+                  <Button 
+                    variant={preQuestAnswers[q.id] === false ? "default" : "outline"}
+                    className={preQuestAnswers[q.id] === false ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+                    onClick={() => setPreQuestAnswers(prev => ({ ...prev, [q.id]: false }))}
+                  >
+                    Não
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Button 
+            size="lg" 
+            className="w-full h-14 text-lg font-bold rounded-xl"
+            onClick={() => setShowPreQuest(false)}
+          >
+            Iniciar Avaliação
+          </Button>
+        </div>
       </div>
     )
   }

@@ -63,6 +63,10 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave, disciplin
   const [pointsPerQuestion, setPointsPerQuestion] = useState(1)
   const [pointsInput, setPointsInput] = useState("1")
   const [timeLimitMinutes, setTimeLimitMinutes] = useState<number>(0)
+  const [requirePreQuestionnaire, setRequirePreQuestionnaire] = useState(false)
+  const [preQuestionnaireConfig, setPreQuestionnaireConfig] = useState<Record<string, number>>({
+    q1: 1, q2: 1, q3: 1, q4: 1, q5: 1
+  })
 
   // Step 3
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("auto")
@@ -96,6 +100,10 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave, disciplin
         setTimeLimitMinutes(assessment.timeLimitMinutes ?? 0)
         setQuestionCount(assessment.questionIds?.length || 0)
         setSelectedIds(new Set(assessment.questionIds || []))
+        setRequirePreQuestionnaire(assessment.requirePreQuestionnaire ?? false)
+        if (assessment.preQuestionnaireConfig) {
+          setPreQuestionnaireConfig(assessment.preQuestionnaireConfig)
+        }
         setStep(1)
       } else {
         setTitle("")
@@ -110,6 +118,8 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave, disciplin
         setTimeLimitMinutes(0)
         setSelectionMode("auto")
         setSelectedIds(new Set())
+        setRequirePreQuestionnaire(false)
+        setPreQuestionnaireConfig({ q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 })
         setStep(1)
       }
     }
@@ -270,6 +280,8 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave, disciplin
           totalPoints: totalPointsNum,
           modality,
           timeLimitMinutes: timeLimitMinutes > 0 ? timeLimitMinutes : null,
+          requirePreQuestionnaire,
+          preQuestionnaireConfig: requirePreQuestionnaire ? preQuestionnaireConfig : null,
         })
       } else {
         await addAssessment({
@@ -287,6 +299,8 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave, disciplin
           isPublished: false,
           modality,
           timeLimitMinutes: timeLimitMinutes > 0 ? timeLimitMinutes : null,
+          requirePreQuestionnaire,
+          preQuestionnaireConfig: requirePreQuestionnaire ? preQuestionnaireConfig : null,
         })
       }
 
@@ -553,6 +567,50 @@ export function AssessmentBuilder({ open, assessment, onClose, onSave, disciplin
                   </div>
                   <p className="text-[11px] text-muted-foreground italic">Se definido, o cronômetro aparecerá para o aluno e a prova será enviada automaticamente ao expirar.</p>
                 </div>
+
+                <div className="flex flex-col gap-3 mt-2 border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="req-pre-quest">Exigir Questionário Pré-Prova</Label>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        id="req-pre-quest"
+                        className="sr-only peer" 
+                        checked={requirePreQuestionnaire}
+                        onChange={(e) => setRequirePreQuestionnaire(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                  {requirePreQuestionnaire && (
+                    <div className="bg-slate-50 p-4 rounded-lg border flex flex-col gap-3">
+                      <p className="text-xs font-semibold text-slate-600 mb-1">Defina a pontuação para cada item do questionário:</p>
+                      {[
+                        { id: 'q1', label: '1 - Participou da aula presencial?' },
+                        { id: 'q2', label: '2 - Participou da Aula Online?' },
+                        { id: 'q3', label: '3 - Fez a leitura do Livro?' },
+                        { id: 'q4', label: '4 - Assistiu a vídeo aula?' },
+                        { id: 'q5', label: '5 - Respondeu ao Questionário?' }
+                      ].map((q) => (
+                        <div key={q.id} className="flex items-center justify-between gap-4">
+                          <span className="text-sm">{q.label}</span>
+                          <Input 
+                            type="number" 
+                            min="0"
+                            step="0.1"
+                            value={preQuestionnaireConfig[q.id]}
+                            onChange={(e) => setPreQuestionnaireConfig(prev => ({ ...prev, [q.id]: parseFloat(e.target.value) || 0 }))}
+                            className="w-20 text-center"
+                          />
+                        </div>
+                      ))}
+                      <p className="text-xs text-muted-foreground mt-2 border-t pt-2">
+                        A nota deste questionário será somada à nota da prova e dividida por 2 para a média final. Mantenha a pontuação máxima compatível com a prova (ex: se a prova vale 10, a soma destes itens deve valer 10).
+                      </p>
+                    </div>
+                  )}
+                </div>
+
               </div>
             )}
 
