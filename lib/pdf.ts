@@ -621,6 +621,10 @@ export function printStudentPDF({ submission, assessment, questions }: { submiss
     })
     .join("")
 
+  const finalScore = submission?.preQuestionnaireAnswers
+    ? (((submission.score / (submission.totalPoints || 1)) * 10 + (submission.preQuestionnaireScore || 0)) / 2)
+    : (submission?.totalPoints > 0 ? (submission.score / submission.totalPoints) * 10 : (submission?.percentage || 0) / 10)
+
   const statsHTML = `
     <div style="display:flex;gap:20px;margin-bottom:30px;background:#f8fafc;padding:20px;border-radius:12px;border:1px solid #e2e8f0;">
         <div style="flex:1;">
@@ -630,11 +634,11 @@ export function printStudentPDF({ submission, assessment, questions }: { submiss
         </div>
         <div style="text-align:center;padding:0 20px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
             <p style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Nota Final</p>
-            <p style="font-size:24px;font-weight:800;color:#1e3a5f;">${((submission?.percentage || 0) / 10).toFixed(1)} <span style="font-size:14px;color:#64748b;font-weight:400;">/ 10.0</span></p>
+            <p style="font-size:24px;font-weight:800;color:#1e3a5f;">${finalScore.toFixed(1)} <span style="font-size:14px;color:#64748b;font-weight:400;">/ 10.0</span></p>
         </div>
         <div style="text-align:right;">
             <p style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Desempenho</p>
-            <p style="font-size:24px;font-weight:800;color:#f97316;">${submission?.percentage || 0}%</p>
+            <p style="font-size:24px;font-weight:800;color:#f97316;">${Math.round(finalScore * 10)}%</p>
         </div>
     </div>
     <div style="font-size:11px;color:#64748b;margin-bottom:20px;">
@@ -762,17 +766,27 @@ export function printOverviewPDF({ assessments, submissions, questions }: { asse
     const qList = Array.isArray(questions) ? questions : []
     const aList = Array.isArray(assessments) ? assessments : []
 
-    const avgPercentage = subList.length > 0 ? (subList.reduce((acc, s) => acc + (s?.percentage || 0), 0) / subList.length) : 0
-    const avgScore = avgPercentage / 10
+    function getSubGrade(s: StudentSubmission): number {
+      const exam = (s?.totalPoints || 0) > 0 ? ((s?.score || 0) / s.totalPoints) * 10 : (s?.percentage || 0) / 10
+      if (s?.preQuestionnaireAnswers) {
+        return (exam + (s?.preQuestionnaireScore || 0)) / 2
+      }
+      return exam
+    }
+
+    const avgScore = subList.length > 0 ? (subList.reduce((acc, s) => acc + getSubGrade(s), 0) / subList.length) : 0
     
-    const rows = subList.map((s, i) => `
+    const rows = subList.map((s, i) => {
+        const grade = getSubGrade(s)
+        const isPass = grade >= 7.0
+        return `
         <tr>
             <td width="40">${i+1}</td>
             <td class="row-accent">${s?.studentName || '—'}</td>
-            <td style="font-weight:700; color:#1e3a5f;">${((s?.percentage || 0) / 10).toFixed(1)}</td>
-            <td style="text-align:right;"><span class="badge ${s?.percentage >= 70 ? 'badge-success' : 'badge-danger'}">${s?.percentage || 0}%</span></td>
+            <td style="font-weight:700; color:#1e3a5f;">${grade.toFixed(1)}</td>
+            <td style="text-align:right;"><span class="badge ${isPass ? 'badge-success' : 'badge-danger'}">${Math.round(grade * 10)}%</span></td>
         </tr>
-    `).join('')
+    `}).join('')
 
     const assessmentsList = aList.map(a => `<div style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;background:#fcfcfc;"><strong>${a.title}</strong><br/>${(a.questionIds || []).length} questões • ${a.totalPoints} pts</div>`).join('')
 
@@ -814,14 +828,22 @@ export function printOverviewPDF({ assessments, submissions, questions }: { asse
 }
 
 export function printScoreTablePDF({ assessment, submissions }: { assessment: Assessment, submissions: StudentSubmission[] }, hubName?: string, existingWin?: Window | null): void {
-    const subList = Array.isArray(submissions) ? [...submissions].sort((a, b) => b.percentage - a.percentage) : []
-    const avgPct = subList.length > 0 ? subList.reduce((acc, s) => acc + (s.percentage || 0), 0) / subList.length : 0
-    const approved = subList.filter(s => s.percentage >= 70).length
+    function getSubGrade(s: StudentSubmission): number {
+      const exam = (s?.totalPoints || 0) > 0 ? ((s?.score || 0) / s.totalPoints) * 10 : (s?.percentage || 0) / 10
+      if (s?.preQuestionnaireAnswers) {
+        return (exam + (s?.preQuestionnaireScore || 0)) / 2
+      }
+      return exam
+    }
+
+    const subList = Array.isArray(submissions) ? [...submissions].sort((a, b) => getSubGrade(b) - getSubGrade(a)) : []
+    const avgScore = subList.length > 0 ? subList.reduce((acc, s) => acc + getSubGrade(s), 0) / subList.length : 0
+    const approved = subList.filter(s => getSubGrade(s) >= 7.0).length
     const failed = subList.length - approved
 
     const rows = subList.map((s, i) => {
-        const nota = ((s.percentage || 0) / 10).toFixed(1)
-        const isPassing = (s.percentage || 0) >= 70
+        const grade = getSubGrade(s)
+        const isPassing = grade >= 7.0
         const statusClass = isPassing ? 'badge-success' : 'badge-danger'
         const statusText = isPassing ? 'Aprovado' : 'Reprovado'
         const tempo = formatTime(s.timeElapsedSeconds || 0)
@@ -832,7 +854,7 @@ export function printScoreTablePDF({ assessment, submissions }: { assessment: As
                 <div style="font-weight:700;color:#1e3a5f;">${s.studentName || '—'}</div>
                 <div style="font-size:11px;color:#94a3b8;">${s.studentEmail || ''}</div>
             </td>
-            <td style="text-align:center;font-size:18px;font-weight:800;color:#1e3a5f;">${nota}</td>
+            <td style="text-align:center;font-size:18px;font-weight:800;color:#1e3a5f;">${grade.toFixed(1)}</td>
             <td style="text-align:center;color:#64748b;font-size:12px;">${tempo}</td>
             <td style="text-align:center;"><span class="badge ${statusClass}">${statusText}</span></td>
         </tr>`
@@ -854,7 +876,7 @@ export function printScoreTablePDF({ assessment, submissions }: { assessment: As
           </div>
           <div style="background:#fff7ed;padding:18px;border-radius:12px;border:1px solid #fed7aa;text-align:center;">
               <p style="font-size:10px;color:#9a3412;text-transform:uppercase;font-weight:700;">Média da Turma</p>
-              <p style="font-size:24px;font-weight:800;color:#f97316;">${(avgPct / 10).toFixed(1)}</p>
+              <p style="font-size:24px;font-weight:800;color:#f97316;">${avgScore.toFixed(1)}</p>
           </div>
       </div>
 

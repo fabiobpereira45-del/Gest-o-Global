@@ -163,9 +163,11 @@ function AnswerViewerModal({
     )
   }
 
-  const scorePct = sub.percentage
-  const scoreLabel = (scorePct / 10).toFixed(1)
-  const isPassing = scorePct >= 70
+  const finalScore = sub.preQuestionnaireAnswers 
+    ? (((sub.score / (sub.totalPoints || 1)) * 10 + (sub.preQuestionnaireScore || 0)) / 2)
+    : (sub.totalPoints > 0 ? (sub.score / sub.totalPoints) * 10 : sub.percentage / 10)
+  const scoreLabel = finalScore.toFixed(1)
+  const isPassing = finalScore >= 7.0
 
   if (loadingQs) {
     return createPortal(
@@ -205,9 +207,7 @@ function AnswerViewerModal({
                   ? "bg-green-50 text-green-700 border-green-200"
                   : "bg-red-50 text-red-700 border-red-200"
               )}>
-                {sub.preQuestionnaireAnswers 
-                  ? (((sub.score / sub.totalPoints) * 10 + sub.preQuestionnaireScore!) / 2).toFixed(1)
-                  : scoreLabel} / 10
+                {scoreLabel} / 10
               </span>
               <span className="flex items-center gap-1 text-xs text-slate-500">
                 <Clock className="h-3 w-3" /> {formatTime(sub.timeElapsedSeconds)}
@@ -337,14 +337,23 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
     }
   }
 
+  // Calcula a nota final de cada submissão (média entre questionário e prova)
+  function getFinalGrade(sub: StudentSubmission): number {
+    const examScore = sub.totalPoints > 0
+      ? (sub.score / sub.totalPoints) * 10
+      : sub.percentage / 10
+    if (sub.preQuestionnaireAnswers) {
+      return (examScore + (sub.preQuestionnaireScore || 0)) / 2
+    }
+    return examScore
+  }
+
   const submissions = allSubmissions
     .filter((s) => s.assessmentId === selectedAssessmentId)
-    .sort((a, b) => b.percentage - a.percentage)
+    .sort((a, b) => getFinalGrade(b) - getFinalGrade(a))
 
-  const selectedAssessment = assessments.find((a) => a.id === selectedAssessmentId)
-
-  const averagePercentage = submissions.length > 0
-    ? submissions.reduce((acc, curr) => acc + curr.percentage, 0) / submissions.length
+  const classAverage = submissions.length > 0
+    ? submissions.reduce((acc, curr) => acc + getFinalGrade(curr), 0) / submissions.length
     : 0
 
   function handlePDF(sub: StudentSubmission) {
@@ -452,7 +461,7 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
             <div>
               <p className="text-xs text-muted-foreground uppercase font-medium">Média da Turma</p>
               <div className="flex items-baseline gap-1">
-                <p className="text-2xl font-bold">{(averagePercentage / 10).toFixed(1)}</p>
+                <p className="text-2xl font-bold">{classAverage.toFixed(1)}</p>
                 <p className="text-sm text-muted-foreground">/ 10.0</p>
               </div>
             </div>
@@ -509,13 +518,15 @@ export function SubmissionsTab({ assessments, allSubmissions, questions, onRefre
                           <XCircle className="h-4 w-4" />
                         </Button>
                       </div>
-                    ) : (
-                      <span className={`px-2 py-0.5 rounded flex items-center justify-center font-bold font-mono text-sm max-w-[80px] mx-auto ` + (sub.percentage >= 70 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
-                        {sub.preQuestionnaireAnswers
-                          ? (((sub.score / sub.totalPoints) * 10 + sub.preQuestionnaireScore!) / 2).toFixed(1)
-                          : (sub.percentage / 10).toFixed(1)}
-                      </span>
-                    )}
+                    ) : (() => {
+                      const grade = getFinalGrade(sub)
+                      const isPassingGrade = grade >= 7.0
+                      return (
+                        <span className={`px-2 py-0.5 rounded flex items-center justify-center font-bold font-mono text-sm max-w-[80px] mx-auto ` + (isPassingGrade ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
+                          {grade.toFixed(1)}
+                        </span>
+                      )
+                    })()}
                   </td>
 
                   <td className="px-4 py-3 text-center hidden md:table-cell text-muted-foreground">
